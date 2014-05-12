@@ -519,12 +519,12 @@ namespace System.Net
 #if NET_4_5
 		public virtual Task<Stream> GetRequestStreamAsync ()
 		{
-			return Task<Stream>.Factory.FromAsync (BeginGetRequestStream, EndGetRequestStream, null);
+			return Task<Stream>.Factory.FromAsync ((c, s) => BeginGetRequestStream (c, s), (r) => EndGetRequestStream (r), null);
 		}
 
 		public virtual Task<WebResponse> GetResponseAsync ()
 		{
-			return Task<WebResponse>.Factory.FromAsync (BeginGetResponse, EndGetResponse, null);
+			return Task<WebResponse>.Factory.FromAsync ((c, s) => BeginGetResponse (c, s), (r) => EndGetResponse (r), null);
 		}
 #endif
 

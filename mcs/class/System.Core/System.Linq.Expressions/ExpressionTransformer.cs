@@ -205,7 +205,7 @@ namespace System.Linq.Expressions {
 
 		protected virtual ReadOnlyCollection<Expression> VisitExpressionList (ReadOnlyCollection<Expression> original)
 		{
-			var list = VisitList (original, Visit);
+			var list = VisitList (original, (e) => Visit (e));
 			if (list == null) return original;
 
 			return new ReadOnlyCollection<Expression> (list);
@@ -234,12 +234,12 @@ namespace System.Linq.Expressions {
 
 		protected virtual IEnumerable<MemberBinding> VisitBindingList (ReadOnlyCollection<MemberBinding> original)
 		{
-			return VisitList (original, VisitBinding);
+			return VisitList (original, (b) => VisitBinding (b));
 		}
 
 		protected virtual IEnumerable<ElementInit> VisitElementInitializerList (ReadOnlyCollection<ElementInit> original)
 		{
-			return VisitList (original, VisitElementInitializer);
+			return VisitList (original, (i) => VisitElementInitializer (i));
 		}
 
 		private IList<TElement> VisitList<TElement> (ReadOnlyCollection<TElement> original, Func<TElement, TElement> visit)

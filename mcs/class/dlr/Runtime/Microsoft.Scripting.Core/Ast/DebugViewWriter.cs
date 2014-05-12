@@ -1019,7 +1019,7 @@ namespace System.Linq.Expressions {
             Out("(");
             Visit(node.SwitchValue);
             Out(") {", Flow.NewLine);
-            Visit(node.Cases, VisitSwitchCase);
+            Visit(node.Cases, (n) => VisitSwitchCase (n));
             if (node.DefaultBody != null) {
                 Out(".Default:", Flow.NewLine);
                 Indent(); Indent();
@@ -1053,7 +1053,7 @@ namespace System.Linq.Expressions {
             Indent();
             Visit(node.Body);
             Dedent();
-            Visit(node.Handlers, VisitCatchBlock);
+            Visit(node.Handlers, (n) => VisitCatchBlock (n));
             if (node.Finally != null) {
                 Out(Flow.NewLine, "} .Finally {", Flow.NewLine);
                 Indent();

@@ -182,7 +182,7 @@ namespace System.Runtime.Remoting.Lifetime
 			}
 
 			ISponsor nextSponsor = (ISponsor) _renewingSponsors.Peek();
-			_renewalDelegate = new RenewalDelegate (nextSponsor.Renewal);
+			_renewalDelegate = (l) => nextSponsor.Renewal(l);
 			IAsyncResult ar = _renewalDelegate.BeginInvoke (this, null, null);
 			ThreadPool.RegisterWaitForSingleObject (ar.AsyncWaitHandle, new WaitOrTimerCallback (ProcessSponsorResponse), ar, _sponsorshipTimeout, true);
 		}

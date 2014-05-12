@@ -58,7 +58,7 @@ namespace System.IO
 			if (offset < 0)
 				throw new ArgumentOutOfRangeException ("offset", "Must be >= 0");
 
-			WriteDelegate d = new WriteDelegate (this.Write);
+			WriteDelegate d = new WriteDelegate ((b, o, c) => this.Write (b, o, c));
 			return d.BeginInvoke (buffer, offset, count, cback, state);
 		}
 
@@ -95,7 +95,7 @@ namespace System.IO
 			if (offset < 0)
 				throw new ArgumentOutOfRangeException ("offset", "Must be >= 0");
 
-			ReadDelegate d = new ReadDelegate (this.Read);
+			ReadDelegate d = new ReadDelegate ((b, o, c) => this.Read (b, o, c));
 			return d.BeginInvoke (buffer, offset, count, cback, state);
 		}
 

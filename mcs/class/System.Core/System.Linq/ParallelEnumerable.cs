@@ -552,7 +552,7 @@ namespace System.Linq
 				comparer = EqualityComparer<TSource>.Default;
 
 			var source = new CancellationTokenSource ();
-			var zip = new QueryZipNode<TSource, TSource, bool> (comparer.Equals, first.Node, second.Node) {	Strict = true };
+			var zip = new QueryZipNode<TSource, TSource, bool> ((x, y) => comparer.Equals (x, y), first.Node, second.Node) { Strict = true };
 			var innerQuery = new ParallelQuery<bool> (zip).WithImplementerToken (source);
 
 			bool result = true;

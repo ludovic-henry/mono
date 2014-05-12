@@ -478,7 +478,7 @@ namespace System.Linq.Expressions {
                 node,
                 node.Update(
                     Visit(node.SwitchValue),
-                    Visit(node.Cases, VisitSwitchCase),
+                    Visit(node.Cases, (n) => VisitSwitchCase (n)),
                     Visit(node.DefaultBody)
                 )
             );
@@ -503,7 +503,7 @@ namespace System.Linq.Expressions {
         protected internal virtual Expression VisitTry(TryExpression node) {
             return node.Update(
                 Visit(node.Body),
-                Visit(node.Handlers, VisitCatchBlock),
+                Visit(node.Handlers, (n) => VisitCatchBlock (n)),
                 Visit(node.Finally),
                 Visit(node.Fault)
             );
@@ -538,7 +538,7 @@ namespace System.Linq.Expressions {
         protected internal virtual Expression VisitMemberInit(MemberInitExpression node) {
             return node.Update(
                 VisitAndConvert(node.NewExpression, "VisitMemberInit"),
-                Visit(node.Bindings, VisitMemberBinding)
+                Visit(node.Bindings, (n) => VisitMemberBinding (n))
             );
         }
 
@@ -551,7 +551,7 @@ namespace System.Linq.Expressions {
         protected internal virtual Expression VisitListInit(ListInitExpression node) {
             return node.Update(
                 VisitAndConvert(node.NewExpression, "VisitListInit"),
-                Visit(node.Initializers, VisitElementInit)
+                Visit(node.Initializers, (n) => VisitElementInit (n))
             );
         }
 
@@ -601,7 +601,7 @@ namespace System.Linq.Expressions {
         /// <returns>The modified expression, if it or any subexpression was modified;
         /// otherwise, returns the original expression.</returns>
         protected virtual MemberMemberBinding VisitMemberMemberBinding(MemberMemberBinding node) {
-            return node.Update(Visit(node.Bindings, VisitMemberBinding));
+            return node.Update(Visit(node.Bindings, (n) => VisitMemberBinding (n)));
         }
 
         /// <summary>
@@ -611,7 +611,7 @@ namespace System.Linq.Expressions {
         /// <returns>The modified expression, if it or any subexpression was modified;
         /// otherwise, returns the original expression.</returns>
         protected virtual MemberListBinding VisitMemberListBinding(MemberListBinding node) {
-            return node.Update(Visit(node.Initializers, VisitElementInit));
+            return node.Update(Visit(node.Initializers, (n) => VisitElementInit (n)));
         }
 
 

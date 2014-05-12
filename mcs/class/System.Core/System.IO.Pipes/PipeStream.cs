@@ -304,7 +304,7 @@ namespace System.IO.Pipes
 		public override IAsyncResult BeginRead (byte [] buffer, int offset, int count, AsyncCallback callback, object state)
 		{
 			if (read_delegate == null)
-				read_delegate = new Func<byte[],int,int,int> (Read);
+				read_delegate = new Func<byte[],int,int,int> ((b, o, c) => Read (b, o, c));
 			return read_delegate.BeginInvoke (buffer, offset, count, callback, state);
 		}
 
@@ -314,7 +314,7 @@ namespace System.IO.Pipes
 		public override IAsyncResult BeginWrite (byte[] buffer, int offset, int count, AsyncCallback callback, object state)
 		{
 			if (write_delegate == null)
-				write_delegate = new Action<byte[],int,int> (Write);
+				write_delegate = new Action<byte[],int,int> ((b, o, c) => Write (b, o, c));
 			return write_delegate.BeginInvoke (buffer, offset, count, callback, state);
 		}
 

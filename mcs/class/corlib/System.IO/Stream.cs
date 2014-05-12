@@ -187,7 +187,7 @@ namespace System.IO
 			}
 
 			async_event.WaitOne ();
-			async_read = Read;
+			async_read = (b, o, c) => Read (b, o, c);
 			return async_read.BeginInvoke (buffer, offset, count, callback, state);
 		}
 
@@ -204,7 +204,7 @@ namespace System.IO
 			}
 
 			async_event.WaitOne ();
-			async_write = Write;
+			async_write = (b, o, c) => Write (b, o, c);
 			return async_write.BeginInvoke (buffer, offset, count, callback, state);
 		}
 		
@@ -330,7 +330,7 @@ namespace System.IO
 			if (cancellationToken.IsCancellationRequested)
 				return TaskConstants<int>.Canceled;
 
-			return Task<int>.Factory.FromAsync (BeginRead, EndRead, buffer, offset, count, null);
+			return Task<int>.Factory.FromAsync ((b, o, co, ca, s) => BeginRead (b, o, co, ca, s), (r) => EndRead (r), buffer, offset, count, null);
 		}
 
 		public Task WriteAsync (byte[] buffer, int offset, int count)
@@ -340,7 +340,7 @@ namespace System.IO
 
 		public virtual Task WriteAsync (byte[] buffer, int offset, int count, CancellationToken cancellationToken)
 		{
-			return Task.Factory.FromAsync (BeginWrite, EndWrite, buffer, offset, count, null);
+			return Task.Factory.FromAsync ((b, o, co, ca, s) => BeginWrite (b, o, co, ca, s), (r) => EndWrite (r), buffer, offset, count, null);
 		}
 #endif
 	}

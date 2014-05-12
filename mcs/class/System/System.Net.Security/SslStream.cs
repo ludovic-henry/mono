@@ -600,7 +600,7 @@ namespace System.Net.Security
 #if NET_4_5
 		public virtual Task AuthenticateAsClientAsync (string targetHost)
 		{
-			return Task.Factory.FromAsync (BeginAuthenticateAsClient, EndAuthenticateAsClient, targetHost, null);
+			return Task.Factory.FromAsync ((t, c, s) => BeginAuthenticateAsClient (t, c, s), (r) => EndAuthenticateAsClient (r), targetHost, null);
 		}
 
 		public virtual Task AuthenticateAsClientAsync (string targetHost, X509CertificateCollection clientCertificates, SslProtocols enabledSslProtocols, bool checkCertificateRevocation)
@@ -610,12 +610,12 @@ namespace System.Net.Security
 			return Task.Factory.FromAsync ((callback, state) => {
 				var d = (Tuple<string, X509CertificateCollection, SslProtocols, bool, SslStream>) state;
 				return d.Item5.BeginAuthenticateAsClient (d.Item1, d.Item2, d.Item3, d.Item4, callback, null);
-			}, EndAuthenticateAsClient, t);
+			}, (r) => EndAuthenticateAsClient (r), t);
 		}
 
 		public virtual Task AuthenticateAsServerAsync (X509Certificate serverCertificate)
 		{
-			return Task.Factory.FromAsync (BeginAuthenticateAsServer, EndAuthenticateAsServer, serverCertificate, null);
+			return Task.Factory.FromAsync ((ce, ca, s) => BeginAuthenticateAsServer (ce, ca, s), (r) => EndAuthenticateAsServer (r), serverCertificate, null);
 		}
 
 		public virtual Task AuthenticateAsServerAsync (X509Certificate serverCertificate, bool clientCertificateRequired, SslProtocols enabledSslProtocols, bool checkCertificateRevocation)
@@ -625,7 +625,7 @@ namespace System.Net.Security
 			return Task.Factory.FromAsync ((callback, state) => {
 				var d = (Tuple<X509Certificate, bool, SslProtocols, bool, SslStream>) state;
 				return d.Item5.BeginAuthenticateAsServer (d.Item1, d.Item2, d.Item3, d.Item4, callback, null);
-			}, EndAuthenticateAsServer, t);
+			}, (r) => EndAuthenticateAsServer (r), t);
 		}
 #endif
 

@@ -138,7 +138,7 @@ namespace System.Security.AccessControl
 		
 		internal void CanonicalizeAndClearAefa ()
 		{
-			RemoveAces<GenericAce> (IsAceMeaningless);
+			RemoveAces<GenericAce> (ace => IsAceMeaningless (ace));
 
 			is_canonical = TestCanonicity ();
 			

@@ -647,7 +647,11 @@ namespace System.Threading.Tasks
 			if (body == null)
 				throw new ArgumentNullException ("body");
 
-			return ForEach<TSource, TLocal> (source.GetPartitions, parallelOptions, localInit, body, localFinally);
+			return ForEach<TSource, TLocal> ((i) => source.GetPartitions (i),
+			                                 parallelOptions,
+			                                 localInit,
+			                                 body,
+			                                 localFinally);
 		}
 
 		public static ParallelLoopResult ForEach<TSource, TLocal> (OrderablePartitioner<TSource> source, ParallelOptions parallelOptions,
@@ -660,7 +664,7 @@ namespace System.Threading.Tasks
 			if (body == null)
 				throw new ArgumentNullException ("body");
 
-			return ForEach<KeyValuePair<long, TSource>, TLocal> (source.GetOrderablePartitions,
+			return ForEach<KeyValuePair<long, TSource>, TLocal> ((i) => source.GetOrderablePartitions (i),
 			                                                     parallelOptions,
 			                                                     localInit,
 			                                                     (e, s, l) => body (e.Value, s, e.Key, l),

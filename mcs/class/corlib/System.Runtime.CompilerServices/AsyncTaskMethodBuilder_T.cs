@@ -55,16 +55,16 @@ namespace System.Runtime.CompilerServices
 			where TAwaiter : INotifyCompletion
 			where TStateMachine : IAsyncStateMachine
 		{
-			var action = new Action (stateMachine.MoveNext);
-			awaiter.OnCompleted (action);
+			var sm = stateMachine;
+			awaiter.OnCompleted (() => { sm.MoveNext (); });
 		}
 		
 		public void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine> (ref TAwaiter awaiter, ref TStateMachine stateMachine)
 			where TAwaiter : ICriticalNotifyCompletion
 			where TStateMachine : IAsyncStateMachine
 		{
-			var action = new Action (stateMachine.MoveNext);
-			awaiter.UnsafeOnCompleted (action);	
+			var sm = stateMachine;
+			awaiter.UnsafeOnCompleted (() => { sm.MoveNext (); });
 		}
 		
 		public static AsyncTaskMethodBuilder<TResult> Create ()
