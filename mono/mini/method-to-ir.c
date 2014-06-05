@@ -11695,7 +11695,7 @@ mono_method_to_ir (MonoCompile *cfg, MonoMethod *method, MonoBasicBlock *start_b
 				break;
 			}
 			case CEE_LDFTN: {
-				MonoInst *argconst;
+				MonoInst *argconst, *handle_delegate;
 				MonoMethod *cil_method;
 
 				CHECK_STACK_OVF (1);
@@ -11757,12 +11757,16 @@ mono_method_to_ir (MonoCompile *cfg, MonoMethod *method, MonoBasicBlock *start_b
 							ip += 6;
 							if (cfg->verbose_level > 3)
 								g_print ("converting (in B%d: stack: %d) %s", bblock->block_num, (int)(sp - stack_start), mono_disasm_code_one (NULL, method, ip, NULL));
-							sp --;
-							*sp = handle_delegate_ctor (cfg, ctor_method->klass, target_ins, cmethod, context_used);
-							CHECK_CFG_EXCEPTION;
-							ip += 5;			
-							sp ++;
-							break;
+							handle_delegate = handle_delegate_ctor (cfg, ctor_method->klass, target_ins, cmethod, context_used, FALSE);
+							if (handle_delegate) {
+								sp --;
+								*sp = handle_delegate;
+								CHECK_CFG_EXCEPTION;
+								ip += 5;
+								sp ++;
+								break;
+							}
+							ip -= 6;
 						}
 #endif
 					}
