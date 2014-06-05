@@ -1581,22 +1581,6 @@ mono_create_delegate_trampoline_info (MonoDomain *domain, MonoClass *klass, Mono
 #else
 	return NULL;
 #endif
-}	
-
-
-/*
- * mono_create_delegate_trampoline_with_method:
- *
- *   Create a delegate trampoline for the KLASS+METHOD pair.
- */
-gpointer
-mono_create_delegate_trampoline_with_method (MonoDomain *domain, MonoClass *klass, MonoMethod *method)
-{
-#ifdef MONO_ARCH_HAVE_CREATE_DELEGATE_TRAMPOLINE
-	return mono_create_delegate_trampoline_info (domain, klass, method, FALSE)->invoke_impl;
-#else
-	return NULL;
-#endif
 }
 
 gpointer
