@@ -4526,8 +4526,6 @@ handle_delegate_ctor (MonoCompile *cfg, MonoClass *klass, MonoInst *target, Mono
 	if (!obj)
 		return NULL;
 
-	/* Inline the contents of mono_delegate_ctor */
-
 	/* Set target field */
 	/* Optimize away setting of NULL target */
 	if (!(target->opcode == OP_PCONST && target->inst_p0 == 0)) {
@@ -11839,15 +11837,15 @@ mono_method_to_ir (MonoCompile *cfg, MonoMethod *method, MonoBasicBlock *start_b
 							ip += 6;
 							if (cfg->verbose_level > 3)
 								g_print ("converting (in B%d: stack: %d) %s", bblock->block_num, (int)(sp - stack_start), mono_disasm_code_one (NULL, method, ip, NULL));
-							handle_delegate = handle_delegate_ctor (cfg, ctor_method->klass, target_ins, cmethod, context_used, TRUE);
-							if (handle_delegate) {
-								sp -= 2;
-								*sp = handle_delegate;
-								CHECK_CFG_EXCEPTION;
-								ip += 5;
-								sp ++;
-								break;
-							}
+							// handle_delegate = handle_delegate_ctor (cfg, ctor_method->klass, target_ins, cmethod, context_used, TRUE);
+							// if (handle_delegate) {
+							// 	sp -= 2;
+							// 	*sp = handle_delegate;
+							// 	CHECK_CFG_EXCEPTION;
+							// 	ip += 5;
+							// 	sp ++;
+							// 	break;
+							// }
 							ip -= 6;
 						}
 #endif

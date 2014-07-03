@@ -8086,7 +8086,7 @@ mono_arch_get_delegate_virtual_invoke_impl (MonoMethodSignature *sig, MonoMethod
 	int size = 20, offset, cache_idx;
 	gboolean is_virtual_generic = FALSE;
 
-	static guint8 *cache[4] = { NULL, NULL, NULL, NULL };
+	// static guint8 *cache[4] = { NULL, NULL, NULL, NULL };
 
 	if (!method)
 		return NULL;
@@ -8098,11 +8098,11 @@ mono_arch_get_delegate_virtual_invoke_impl (MonoMethodSignature *sig, MonoMethod
 	if (method->is_inflated)
 		is_virtual_generic = mono_method_get_declaring_generic_method (method)->is_generic;
 
-	cache_idx  = is_virtual_generic ? 1 : 0;
-	cache_idx |= (method->klass->flags & TYPE_ATTRIBUTE_INTERFACE ? 1 : 0) << 2;
-
-	if (cache [cache_idx])
-		return cache [cache_idx];
+	// cache_idx  = is_virtual_generic ? 1 : 0;
+	// cache_idx |= (method->klass->flags & TYPE_ATTRIBUTE_INTERFACE ? 1 : 0) << 2;
+	//
+	// if (cache [cache_idx])
+	// 	return cache [cache_idx];
 
 	/*
 	 * The stack contains:
@@ -8131,10 +8131,10 @@ mono_arch_get_delegate_virtual_invoke_impl (MonoMethodSignature *sig, MonoMethod
 	amd64_mov_reg_membase (code, AMD64_RAX, AMD64_ARG_REG1, G_STRUCT_OFFSET (MonoObject, vtable), 8);
 	amd64_jump_membase (code, AMD64_RAX, offset);
 
-	mono_memory_barrier ();
+	// mono_memory_barrier ();
 
-	cache [cache_idx] = start;
-	
+	// cache [cache_idx] = start;
+
 	return start;
 }
 

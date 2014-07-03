@@ -1137,6 +1137,8 @@ mono_delegate_trampoline (mgreg_t *regs, guint8 *code, gpointer *arg, guint8* tr
 		}
 	}
 
+	/* How to support virtual calls ? */
+
 	/* The general, unoptimized case */
 	m = mono_marshal_get_delegate_invoke (invoke, delegate);
 	code = mono_compile_method (m);

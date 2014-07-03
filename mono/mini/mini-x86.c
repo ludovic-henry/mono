@@ -6266,6 +6266,58 @@ gpointer
 mono_arch_get_delegate_virtual_invoke_impl (MonoMethodSignature *sig, MonoMethod *method)
 {
 	return NULL;
+	// guint8 *code, *start;
+	// int size = 20, offset, cache_idx;
+	// gboolean is_virtual_generic = FALSE;
+	//
+	// static guint8 *cache[4] = { NULL, NULL, NULL, NULL };
+	//
+	// /* FIXME Support more cases */
+	// if (MONO_TYPE_ISSTRUCT (sig->ret))
+	// 	return NULL;
+	//
+	// if (method->is_inflated)
+	// 	is_virtual_generic = mono_method_get_declaring_generic_method (method)->is_generic;
+	//
+	// cache_idx  = is_virtual_generic ? 1 : 0;
+	// cache_idx |= (method->klass->flags & TYPE_ATTRIBUTE_INTERFACE ? 1 : 0) << 2;
+	//
+	// if (cache [cache_idx])
+	// 	return cache [cache_idx];
+	//
+	// /*
+	//  * The stack contains:
+	//  * <delegate>
+	//  * <return addr>
+	//  */
+	// start = code = mono_global_codeman_reserve (size);
+	//
+	// /* Replace the this argument with the target */
+	// x86_mov_reg_membase (code, X86_EAX, X86_ESP, 4, 4);
+	// x86_mov_reg_membase (code, X86_ECX, X86_EAX, G_STRUCT_OFFSET (MonoDelegate, target), 4);
+	// x86_mov_membase_reg (code, X86_ESP, 4, X86_ECX, 4);
+	//
+	// if ((method->klass->flags & TYPE_ATTRIBUTE_INTERFACE) || is_virtual_generic) {
+	// 	//Load the IMT reg
+	// 	x86_mov_reg_membase (code, MONO_ARCH_IMT_REG, X86_EAX, G_STRUCT_OFFSET (MonoDelegate, method), 8);
+	//
+	// 	if (is_virtual_generic)
+	// 		offset = G_STRUCT_OFFSET (MonoVTable, vtable) + ((mono_method_get_vtable_index (method)) * (SIZEOF_VOID_P));
+	// 	else
+	// 		offset = ((gint32)mono_method_get_imt_slot (method) - MONO_IMT_SIZE) * SIZEOF_VOID_P;
+	// } else {
+	// 	offset = G_STRUCT_OFFSET (MonoVTable, vtable) + ((mono_method_get_vtable_index (method)) * (SIZEOF_VOID_P));
+	// }
+	//
+	// //Load the vtable
+	// x86_mov_reg_membase (code, X86_EAX, X86_ARG_REG1, G_STRUCT_OFFSET (MonoObject, vtable), 8);
+	// x86_jump_membase (code, X86_EAX, offset);
+	//
+	// mono_memory_barrier ();
+	//
+	// cache [cache_idx] = start;
+	//
+	// return start;
 }
 
 mgreg_t
