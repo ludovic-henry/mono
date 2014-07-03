@@ -4544,7 +4544,7 @@ handle_delegate_ctor (MonoCompile *cfg, MonoClass *klass, MonoInst *target, Mono
 	MONO_EMIT_NEW_STORE_MEMBASE (cfg, OP_STORE_MEMBASE_REG, obj->dreg, MONO_STRUCT_OFFSET (MonoDelegate, method), method_ins->dreg);
 
 	if (!context_used && !cfg->compile_aot) {
-		trampoline = mono_create_delegate_trampoline_info (cfg->domain, klass, method);
+		trampoline = mono_create_delegate_trampoline_info (cfg->domain, klass, method, virtual);
 		EMIT_NEW_PCONST (cfg, tramp_ins, trampoline);
 	} else {
 		info = mono_mempool_alloc0 (cfg->mempool, sizeof (MonoDelegateClassMethodPair));
