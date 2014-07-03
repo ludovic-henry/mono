@@ -981,34 +981,28 @@ mono_monitor_exit_trampoline (mgreg_t *regs, guint8 *code, MonoObject *obj, guin
 
 #ifdef MONO_ARCH_HAVE_CREATE_DELEGATE_TRAMPOLINE
 
-typedef struct {
-	MonoMethod *invoke;
-	gpointer impl_this;
-	gpointer impl_nothis;
-	MonoMethod *method;
-	MonoMethodSignature *invoke_sig;
-	MonoMethodSignature *sig;
-	gboolean need_rgctx_tramp;
-} DelegateTrampInfo;
-
 /*
  * Precompute data to speed up mono_delegate_trampoline ().
  * METHOD might be NULL.
  */
-static gpointer
+static MonoDelegateTrampInfo*
 create_delegate_trampoline_data (MonoDomain *domain, MonoClass *klass, MonoMethod *method)
 {
-	DelegateTrampInfo *tramp_data;
+	MonoDelegateTrampInfo *tramp_data;
 	MonoMethod *invoke;
 	MonoError err;
+	guint32 code_size = 0;
 
 	// Precompute the delegate invoke impl and pass it to the delegate trampoline
 	invoke = mono_get_delegate_invoke (klass);
 	g_assert (invoke);
 
-	tramp_data = mono_domain_alloc (domain, sizeof (DelegateTrampInfo));
+	tramp_data = mono_domain_alloc (domain, sizeof (MonoDelegateTrampInfo));
+	tramp_data->method = method;
 	tramp_data->invoke = invoke;
 	tramp_data->invoke_sig = mono_method_signature (invoke);
+	tramp_data->invoke_impl = mono_create_specific_trampoline (tramp_data, MONO_TRAMPOLINE_DELEGATE, domain, &code_size);
+	g_assert (code_size);
 	tramp_data->impl_this = mono_arch_get_delegate_invoke_impl (mono_method_signature (invoke), TRUE);
 	tramp_data->impl_nothis = mono_arch_get_delegate_invoke_impl (mono_method_signature (invoke), FALSE);
 	tramp_data->method = method;
@@ -1039,7 +1033,7 @@ mono_delegate_trampoline (mgreg_t *regs, guint8 *code, gpointer *arg, guint8* tr
 	gboolean need_rgctx_tramp = FALSE;
 	gboolean need_unbox_tramp = FALSE;
 	gboolean enable_caching = TRUE;
-	DelegateTrampInfo *tramp_info = (DelegateTrampInfo*)arg;
+	MonoDelegateTrampInfo *tramp_info = (MonoDelegateTrampInfo*)arg;
 	MonoMethod *invoke = tramp_info->invoke;
 	guint8 *impl_this = tramp_info->impl_this;
 	guint8 *impl_nothis = tramp_info->impl_nothis;
@@ -1540,41 +1534,34 @@ mono_create_jit_trampoline_from_token (MonoImage *image, guint32 token)
 
 
 /*
- * mono_create_delegate_trampoline_with_method:
+ * mono_create_delegate_trampoline_info:
  *
  *   Create a delegate trampoline for the KLASS+METHOD pair.
  */
-gpointer
-mono_create_delegate_trampoline_with_method (MonoDomain *domain, MonoClass *klass, MonoMethod *method)
+MonoDelegateTrampInfo*
+mono_create_delegate_trampoline_info (MonoDomain *domain, MonoClass *klass, MonoMethod *method)
 {
 #ifdef MONO_ARCH_HAVE_CREATE_DELEGATE_TRAMPOLINE
-	gpointer ptr;
-	guint32 code_size = 0;
-	gpointer tramp_info;
-	MonoClassMethodPair pair, *dpair;
+	MonoDelegateTrampInfo *info;
+	MonoClassMethodPair *dpair, pair = { klass, method };
+	GHashTable *hashtable;
 
-	pair.klass = klass;
-	pair.method = method;
 	mono_domain_lock (domain);
-	ptr = g_hash_table_lookup (domain_jit_info (domain)->delegate_trampoline_hash, &pair);
+	hashtable = domain_jit_info (domain)->delegate_trampoline_hash;
 	mono_domain_unlock (domain);
-	if (ptr)
-		return ptr;
 
-	tramp_info = create_delegate_trampoline_data (domain, klass, method);
+	if ((info = g_hash_table_lookup (hashtable, &pair)))
+		return info;
 
-	ptr = mono_create_specific_trampoline (tramp_info, MONO_TRAMPOLINE_DELEGATE, domain, &code_size);
-	g_assert (code_size);
+	info = create_delegate_trampoline_data (domain, klass, method);
 
 	dpair = mono_domain_alloc0 (domain, sizeof (MonoClassMethodPair));
 	memcpy (dpair, &pair, sizeof (MonoClassMethodPair));
 
 	/* store trampoline address */
-	mono_domain_lock (domain);
-	g_hash_table_insert (domain_jit_info (domain)->delegate_trampoline_hash, dpair, ptr);
-	mono_domain_unlock (domain);
+	g_hash_table_insert (hashtable, dpair, info);
 
-	return ptr;
+	return info;
 #else
 	return NULL;
 #endif
@@ -1583,7 +1570,11 @@ mono_create_delegate_trampoline_with_method (MonoDomain *domain, MonoClass *klas
 gpointer
 mono_create_delegate_trampoline (MonoDomain *domain, MonoClass *klass)
 {
-	return mono_create_delegate_trampoline_with_method (domain, klass, NULL);
+#ifdef MONO_ARCH_HAVE_CREATE_DELEGATE_TRAMPOLINE
+	return mono_create_delegate_trampoline_info (domain, klass, NULL)->invoke_impl;
+#else
+	return NULL;
+#endif
 }
 
 gpointer
