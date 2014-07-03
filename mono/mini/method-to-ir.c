@@ -4520,7 +4520,7 @@ handle_delegate_ctor (MonoCompile *cfg, MonoClass *klass, MonoInst *target, Mono
 	int dreg;
 	MonoDelegateClassMethodPair *info;
 	MonoDelegateTrampInfo *trampoline;
-	MonoInst *obj, *tramp_ins;
+	MonoInst *obj, *method_ins, *tramp_ins;
 
 	obj = handle_alloc (cfg, klass, FALSE, 0);
 	if (!obj)
@@ -4559,10 +4559,6 @@ handle_delegate_ctor (MonoCompile *cfg, MonoClass *klass, MonoInst *target, Mono
 		else
 			EMIT_NEW_AOTCONST (cfg, tramp_ins, MONO_PATCH_INFO_DELEGATE_TRAMPOLINE, info);
 	}
-
-	dreg = alloc_preg (cfg);
-	MONO_EMIT_NEW_LOAD_MEMBASE (cfg, dreg, tramp_ins->dreg, G_STRUCT_OFFSET (MonoDelegateTrampInfo, method));
-	MONO_EMIT_NEW_STORE_MEMBASE (cfg, OP_STORE_MEMBASE_REG, obj->dreg, G_STRUCT_OFFSET (MonoDelegate, method), dreg);
 
 	dreg = alloc_preg (cfg);
 	MONO_EMIT_NEW_LOAD_MEMBASE (cfg, dreg, tramp_ins->dreg, G_STRUCT_OFFSET (MonoDelegateTrampInfo, method_ptr));
