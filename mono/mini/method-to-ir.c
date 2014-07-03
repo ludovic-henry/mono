@@ -4522,6 +4522,10 @@ handle_delegate_ctor (MonoCompile *cfg, MonoClass *klass, MonoInst *target, Mono
 	MonoDelegateTrampInfo *trampoline;
 	MonoInst *obj, *method_ins, *tramp_ins;
 
+	/* Deactivate optimization for virtual functions delegate (ldvirtftn) */
+	if (virtual)
+		return NULL;
+
 	obj = handle_alloc (cfg, klass, FALSE, 0);
 	if (!obj)
 		return NULL;
