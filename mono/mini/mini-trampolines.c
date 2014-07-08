@@ -1021,6 +1021,29 @@ create_delegate_trampoline_data (MonoDomain *domain, MonoClass *klass, MonoMetho
 	return tramp_data;
 }
 
+/*
+ * Precompute data to speed up mono_cached_delegate_trampoline ().
+ * METHOD might be NULL.
+ */
+static gpointer
+create_cached_delegate_trampoline_data (MonoDomain *domain, MonoClass *klass, MonoMethod *method)
+{
+	MonoCachedDelegateTrampInfo *tramp_data;
+	MonoMethod *invoke;
+	guint32 code_size = 0;
+
+	// Precompute the delegate invoke impl and pass it to the delegate trampoline
+	invoke = mono_get_delegate_invoke (klass);
+	g_assert (invoke);
+
+	tramp_data = mono_domain_alloc (domain, sizeof (MonoCachedDelegateTrampInfo));
+
+	tramp_data->invoke_impl = mono_create_specific_trampoline (tramp_data, MONO_TRAMPOLINE_CACHED_DELEGATE, domain, &code_size);
+	g_assert (code_size);
+
+	return tramp_data;
+}
+
 /**
  * mono_delegate_trampoline:
  *
@@ -1184,6 +1207,17 @@ mono_delegate_trampoline (mgreg_t *regs, guint8 *code, gpointer *arg, guint8* tr
 	return code;
 }
 
+/**
+ * mono_delegate_trampoline:
+ *
+ *   This trampoline handles calls made to Delegate:Invoke ().
+ * This is called once the first time a delegate is invoked, so it must be fast.
+ */
+gpointer
+mono_cached_delegate_trampoline (mgreg_t *regs, guint8 *code, gpointer *arg, guint8* tramp)
+{
+}
+
 #endif
 
 #ifdef MONO_ARCH_HAVE_HANDLER_BLOCK_GUARD
@@ -1270,6 +1304,8 @@ mono_get_trampoline_func (MonoTrampolineType tramp_type)
 #ifdef MONO_ARCH_HAVE_CREATE_DELEGATE_TRAMPOLINE
 	case MONO_TRAMPOLINE_DELEGATE:
 		return mono_delegate_trampoline;
+	case MONO_TRAMPOLINE_CACHED_DELEGATE:
+		return mono_cached_delegate_trampoline;
 #endif
 	case MONO_TRAMPOLINE_RESTORE_STACK_PROT:
 		return mono_altstack_restore_prot;
@@ -1324,6 +1360,7 @@ mono_trampolines_init (void)
 #endif
 #ifdef MONO_ARCH_HAVE_CREATE_DELEGATE_TRAMPOLINE
 	mono_trampoline_code [MONO_TRAMPOLINE_DELEGATE] = create_trampoline_code (MONO_TRAMPOLINE_DELEGATE);
+	mono_trampoline_code [MONO_TRAMPOLINE_CACHED_DELEGATE] = create_trampoline_code (MONO_TRAMPOLINE_CACHED_DELEGATE);
 #endif
 	mono_trampoline_code [MONO_TRAMPOLINE_RESTORE_STACK_PROT] = create_trampoline_code (MONO_TRAMPOLINE_RESTORE_STACK_PROT);
 #ifndef DISABLE_REMOTING
@@ -1584,6 +1621,42 @@ gpointer
 mono_create_delegate_trampoline (MonoDomain *domain, MonoClass *klass)
 {
 	return mono_create_delegate_trampoline_with_method (domain, klass, NULL);
+}
+
+/*
+ * mono_create_cached_delegate_trampoline_with_method:
+ *
+ *   Create a delegate trampoline for the KLASS+METHOD pair.
+ */
+MonoCachedDelegateTrampInfo*
+mono_create_cached_delegate_trampoline_with_method (MonoDomain *domain, MonoClass *klass, MonoMethod *method)
+{
+#ifdef MONO_ARCH_HAVE_CREATE_DELEGATE_TRAMPOLINE
+	MonoCachedDelegateTrampInfo *info;
+	MonoClassMethodPair pair, *dpair;
+
+	pair.klass = klass;
+	pair.method = method;
+	mono_domain_lock (domain);
+	info = g_hash_table_lookup (domain_jit_info (domain)->cached_delegate_trampoline_hash, &pair);
+	mono_domain_unlock (domain);
+	if (info)
+		return info;
+
+	info = create_cached_delegate_trampoline_data (domain, klass, method);
+
+	dpair = mono_domain_alloc0 (domain, sizeof (MonoClassMethodPair));
+	memcpy (dpair, &pair, sizeof (MonoClassMethodPair));
+
+	/* store trampoline address */
+	mono_domain_lock (domain);
+	g_hash_table_insert (domain_jit_info (domain)->cached_delegate_trampoline_hash, dpair, info);
+	mono_domain_unlock (domain);
+
+	return info;
+#else
+	return NULL;
+#endif
 }
 
 gpointer
