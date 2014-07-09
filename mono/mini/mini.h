@@ -122,7 +122,7 @@
 #endif
 
 /* Version number of the AOT file format */
-#define MONO_AOT_FILE_VERSION 100
+#define MONO_AOT_FILE_VERSION 102
 
 //TODO: This is x86/amd64 specific.
 #define mono_simd_shuffle_mask(a,b,c,d) ((a) | ((b) << 2) | ((c) << 4) | ((d) << 6))
@@ -289,6 +289,13 @@ typedef struct
 	MonoMethod *method;
 } MonoClassMethodPair;
 
+typedef struct
+{
+	MonoClass *klass;
+	MonoMethod *method;
+	gboolean has_target;
+} MonoDelegateClassMethodPair;
+
 /* Per-domain information maintained by the JIT */
 typedef struct
 {
@@ -301,6 +308,8 @@ typedef struct
 	GHashTable *jit_trampoline_hash;
 	/* Maps ClassMethodPair -> DelegateTrampInfo */
 	GHashTable *delegate_trampoline_hash;
+	/* Maps MonoDelegateClassMethodPair -> MonoCachedDelegateTrampInfo */
+	GHashTable *cached_delegate_trampoline_hash;
 	GHashTable *static_rgctx_trampoline_hash;
 	GHashTable *llvm_vcall_trampoline_hash;
 	/* maps MonoMethod -> MonoJitDynamicMethodInfo */
@@ -1164,6 +1173,19 @@ typedef struct {
 	gpointer entries [MONO_ZERO_LEN_ARRAY];
 } MonoGSharedVtMethodRuntimeInfo;
 
+typedef struct
+{
+	MonoMethod *invoke;
+	MonoMethod *method;
+	MonoMethodSignature *invoke_sig;
+	MonoMethodSignature *sig;
+	gpointer method_ptr;
+	gpointer invoke_impl;
+	gpointer impl_this;
+	gpointer impl_nothis;
+	gboolean need_rgctx_tramp;
+} MonoCachedDelegateTrampInfo;
+
 typedef enum {
 #define PATCH_INFO(a,b) MONO_PATCH_INFO_ ## a,
 #include "patch-info.h"
@@ -1232,7 +1254,7 @@ struct MonoJumpInfo {
 		MonoJumpInfoGSharedVtCall *gsharedvt;
 		MonoGSharedVtMethodInfo *gsharedvt_method;
 		MonoMethodSignature *sig;
-		MonoClassMethodPair *del_tramp;
+		MonoDelegateClassMethodPair *del_tramp;
 	} data;
 };
  
@@ -1267,6 +1289,7 @@ typedef enum {
 	MONO_TRAMPOLINE_MONITOR_EXIT,
 	MONO_TRAMPOLINE_VCALL,
 	MONO_TRAMPOLINE_HANDLER_BLOCK_GUARD,
+	MONO_TRAMPOLINE_CACHED_DELEGATE,
 	MONO_TRAMPOLINE_NUM
 } MonoTrampolineType;
 
@@ -2208,6 +2231,7 @@ gpointer          mono_create_jit_trampoline_from_token (MonoImage *image, guint
 gpointer          mono_create_jit_trampoline_in_domain (MonoDomain *domain, MonoMethod *method) MONO_LLVM_INTERNAL;
 gpointer          mono_create_delegate_trampoline (MonoDomain *domain, MonoClass *klass) MONO_INTERNAL;
 gpointer          mono_create_delegate_trampoline_with_method (MonoDomain *domain, MonoClass *klass, MonoMethod *method) MONO_INTERNAL;
+MonoCachedDelegateTrampInfo* mono_create_cached_delegate_trampoline_with_method (MonoDomain *domain, MonoClass *klass, MonoMethod *method, gboolean has_target) MONO_INTERNAL;
 gpointer          mono_create_rgctx_lazy_fetch_trampoline (guint32 offset) MONO_INTERNAL;
 gpointer          mono_create_monitor_enter_trampoline (void) MONO_INTERNAL;
 gpointer          mono_create_monitor_exit_trampoline (void) MONO_INTERNAL;
@@ -2220,6 +2244,7 @@ gpointer          mono_magic_trampoline (mgreg_t *regs, guint8 *code, gpointer a
 gpointer          mono_generic_virtual_remoting_trampoline (mgreg_t *regs, guint8 *code, MonoMethod *m, guint8 *tramp) MONO_INTERNAL;
 #endif
 gpointer          mono_delegate_trampoline (mgreg_t *regs, guint8 *code, gpointer *tramp_data, guint8* tramp) MONO_INTERNAL;
+gpointer          mono_cached_delegate_trampoline (mgreg_t *regs, guint8 *code, gpointer *tramp_data, guint8* tramp) MONO_INTERNAL;
 gpointer          mono_aot_trampoline (mgreg_t *regs, guint8 *code, guint8 *token_info, 
 									   guint8* tramp) MONO_INTERNAL;
 gpointer          mono_aot_plt_trampoline (mgreg_t *regs, guint8 *code, guint8 *token_info, 
