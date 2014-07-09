@@ -1021,29 +1021,6 @@ create_delegate_trampoline_data (MonoDomain *domain, MonoClass *klass, MonoMetho
 	return tramp_data;
 }
 
-/*
- * Precompute data to speed up mono_cached_delegate_trampoline ().
- * METHOD might be NULL.
- */
-static gpointer
-create_cached_delegate_trampoline_data (MonoDomain *domain, MonoClass *klass, MonoMethod *method)
-{
-	MonoCachedDelegateTrampInfo *tramp_data;
-	MonoMethod *invoke;
-	guint32 code_size = 0;
-
-	// Precompute the delegate invoke impl and pass it to the delegate trampoline
-	invoke = mono_get_delegate_invoke (klass);
-	g_assert (invoke);
-
-	tramp_data = mono_domain_alloc (domain, sizeof (MonoCachedDelegateTrampInfo));
-
-	tramp_data->invoke_impl = mono_create_specific_trampoline (tramp_data, MONO_TRAMPOLINE_CACHED_DELEGATE, domain, &code_size);
-	g_assert (code_size);
-
-	return tramp_data;
-}
-
 /**
  * mono_delegate_trampoline:
  *
@@ -1205,6 +1182,39 @@ mono_delegate_trampoline (mgreg_t *regs, guint8 *code, gpointer *arg, guint8* tr
 	delegate->invoke_impl = mono_get_addr_from_ftnptr (code);
 
 	return code;
+}
+
+/*
+ * Precompute data to speed up mono_cached_delegate_trampoline ().
+ * METHOD might be NULL.
+ */
+static gpointer
+create_cached_delegate_trampoline_data (MonoDomain *domain, MonoClass *klass, MonoMethod *method, gboolean has_target)
+{
+	MonoCachedDelegateTrampInfo *tramp_data;
+	MonoMethod *invoke;
+	MonoError err;
+
+	// Precompute the delegate invoke impl and pass it to the delegate trampoline
+	invoke = mono_get_delegate_invoke (klass);
+	g_assert (invoke);
+
+	tramp_data = mono_domain_alloc (domain, sizeof (MonoCachedDelegateTrampInfo));
+	tramp_data->klass = klass;
+	tramp_data->method = method;
+	tramp_data->invoke = invoke;
+	tramp_data->invoke_sig = mono_method_signature (invoke);
+	tramp_data->has_target = has_target;
+
+	tramp_data->impl = mono_arch_get_delegate_invoke_impl (mono_method_signature (invoke), has_target);
+
+	if (method) {
+		mono_error_init (&err);
+		tramp_data->sig = mono_method_signature_checked (method, &err);
+		tramp_data->need_rgctx_tramp = mono_method_needs_static_rgctx_invoke (method, FALSE);
+	}
+
+	return tramp_data;
 }
 
 /**
