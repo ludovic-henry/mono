@@ -4501,6 +4501,7 @@ handle_delegate_ctor (MonoCompile *cfg, MonoClass *klass, MonoInst *target, Mono
 {
 	MonoInst *ptr;
 	int dreg;
+	gboolean has_target;
 	MonoCachedDelegateTrampInfo *trampoline;
 	MonoInst *obj, *method_ins, *tramp_ins;
 	MonoDomain *domain;
@@ -4556,16 +4557,19 @@ handle_delegate_ctor (MonoCompile *cfg, MonoClass *klass, MonoInst *target, Mono
 		MONO_EMIT_NEW_STORE_MEMBASE (cfg, OP_STORE_MEMBASE_REG, obj->dreg, MONO_STRUCT_OFFSET (MonoDelegate, method_code), code_slot_ins->dreg);		
 	}
 
+	has_target = !(target->opcode == OP_PCONST && target->inst_p0 == 0);
+
 	/* Set invoke_impl field */
 	if (cfg->compile_aot) {
-		MonoClassMethodPair *del_tramp;
+		MonoDelegateClassMethodPair *del_tramp;
 
-		del_tramp = mono_mempool_alloc0 (cfg->mempool, sizeof (MonoClassMethodPair));
+		del_tramp = mono_mempool_alloc0 (cfg->mempool, sizeof (MonoDelegateClassMethodPair));
 		del_tramp->klass = klass;
 		del_tramp->method = context_used ? NULL : method;
+		del_tramp->has_target = has_target;
 		EMIT_NEW_AOTCONST (cfg, tramp_ins, MONO_PATCH_INFO_DELEGATE_TRAMPOLINE, del_tramp);
 	} else {
-		trampoline = mono_create_cached_delegate_trampoline_with_method (cfg->domain, klass, context_used ? NULL : method);
+		trampoline = mono_create_cached_delegate_trampoline_with_method (cfg->domain, klass, context_used ? NULL : method, has_target);
 		EMIT_NEW_PCONST (cfg, tramp_ins, trampoline);
 	}
 
