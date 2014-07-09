@@ -1218,7 +1218,7 @@ create_cached_delegate_trampoline_data (MonoDomain *domain, MonoClass *klass, Mo
 }
 
 /**
- * mono_delegate_trampoline:
+ * mono_cached_delegate_trampoline:
  *
  *   This trampoline handles calls made to Delegate:Invoke ().
  * This is called once the first time a delegate is invoked, so it must be fast.
@@ -1226,6 +1226,152 @@ create_cached_delegate_trampoline_data (MonoDomain *domain, MonoClass *klass, Mo
 gpointer
 mono_cached_delegate_trampoline (mgreg_t *regs, guint8 *code, gpointer *arg, guint8* tramp)
 {
+	MonoDomain *domain = mono_domain_get ();
+	MonoDelegate *delegate;
+	MonoJitInfo *ji;
+	MonoMethod *m;
+	MonoMethod *method = NULL;
+	gboolean multicast, callvirt = FALSE, closed_over_null = FALSE;
+	gboolean need_rgctx_tramp = FALSE;
+	gboolean need_unbox_tramp = FALSE;
+	gboolean enable_caching = TRUE;
+	MonoCachedDelegateTrampInfo *tramp_info = (MonoCachedDelegateTrampInfo*)arg;
+	MonoMethod *invoke = tramp_info->invoke;
+	MonoError err;
+	MonoMethodSignature *sig;
+	gpointer addr, compiled_method;
+	gboolean is_remote = FALSE;
+
+	trampoline_calls ++;
+
+	/* Obtain the delegate object according to the calling convention */
+	delegate = mono_arch_get_this_arg_from_call (regs, code);
+
+	if (delegate->method) {
+		method = delegate->method;
+
+		/*
+		 * delegate->method_ptr == NULL means the delegate was initialized by 
+		 * mini_delegate_ctor, while != NULL means it is initialized by 
+		 * mono_delegate_ctor_with_method (). In both cases, we need to add wrappers
+		 * (ctor_with_method () does this, but it doesn't store the wrapper back into
+		 * delegate->method).
+		 */
+#ifndef DISABLE_REMOTING
+		if (delegate->target && delegate->target->vtable->klass == mono_defaults.transparent_proxy_class) {
+			is_remote = TRUE;
+#ifndef DISABLE_COM
+			if (((MonoTransparentProxy *)delegate->target)->remote_class->proxy_class != mono_class_get_com_object_class () &&
+			   !mono_class_is_com_object (((MonoTransparentProxy *)delegate->target)->remote_class->proxy_class))
+#endif
+				method = mono_marshal_get_remoting_invoke (method);
+		}
+#endif
+		if (!is_remote) {
+			sig = tramp_info->sig;
+			if (!(sig && method == tramp_info->method)) {
+				mono_error_init (&err);
+				sig = mono_method_signature_checked (method, &err);
+				if (!sig)
+					mono_error_raise_exception (&err);
+			}
+
+			if (sig->hasthis && method->klass->valuetype) {
+				if (mono_aot_only)
+					need_unbox_tramp = TRUE;
+				else
+					method = mono_marshal_get_unbox_wrapper (method);
+			}
+		}
+	} else {
+		ji = mono_jit_info_table_find (domain, mono_get_addr_from_ftnptr (delegate->method_ptr));
+		if (ji)
+			method = jinfo_get_method (ji);
+	}
+
+	if (method) {
+		sig = tramp_info->sig;
+		if (!(sig && method == tramp_info->method)) {
+			mono_error_init (&err);
+			sig = mono_method_signature_checked (method, &err);
+			if (!sig)
+				mono_error_raise_exception (&err);
+		}
+
+		callvirt = !delegate->target && sig->hasthis;
+		if (callvirt)
+			closed_over_null = tramp_info->invoke_sig->param_count == sig->param_count;
+
+		if (callvirt && !closed_over_null) {
+			/*
+			 * The delegate needs to make a virtual call to the target method using its
+			 * first argument as the receiver. This is hard to support in full-aot, so
+			 * optimize it in some cases if possible.
+			 * If the target method is not virtual or is in a sealed class,
+			 * the vcall will call it directly.
+			 * If the call doesn't return a valuetype, then the vcall uses the same calling
+			 * convention as a normal call.
+			 */
+			if (((method->klass->flags & TYPE_ATTRIBUTE_SEALED) || !(method->flags & METHOD_ATTRIBUTE_VIRTUAL)) && !MONO_TYPE_ISSTRUCT (sig->ret)) {
+				callvirt = FALSE;
+				enable_caching = FALSE;
+			}
+		}
+
+		if (delegate->target && 
+			method->flags & METHOD_ATTRIBUTE_VIRTUAL && 
+			method->flags & METHOD_ATTRIBUTE_ABSTRACT &&
+			method->klass->flags & TYPE_ATTRIBUTE_ABSTRACT) {
+			method = mono_object_get_virtual_method (delegate->target, method);
+			enable_caching = FALSE;
+		}
+
+		if (method->iflags & METHOD_IMPL_ATTRIBUTE_SYNCHRONIZED)
+			method = mono_marshal_get_synchronized_wrapper (method);
+
+		if (method == tramp_info->method)
+			need_rgctx_tramp = tramp_info->need_rgctx_tramp;
+		else if (mono_method_needs_static_rgctx_invoke (method, FALSE))
+			need_rgctx_tramp = TRUE;
+	}
+
+	/* 
+	 * If the called address is a trampoline, replace it with the compiled method so
+	 * further calls don't have to go through the trampoline.
+	 */
+	if (method && !callvirt) {
+		/* Avoid the overhead of looking up an already compiled method if possible */
+		if (enable_caching && delegate->method_code && *delegate->method_code) {
+			delegate->method_ptr = tramp_info->method_ptr = *delegate->method_code;
+		} else {
+			compiled_method = addr = mono_compile_method (method);
+			addr = mini_add_method_trampoline (NULL, method, compiled_method, need_rgctx_tramp, need_unbox_tramp);
+			delegate->method_ptr = tramp_info->method_ptr = addr;
+			if (enable_caching && delegate->method_code)
+				*delegate->method_code = delegate->method_ptr;
+		}
+	} else {
+		if (need_rgctx_tramp)
+			delegate->method_ptr = tramp_info->method_ptr = mono_create_static_rgctx_trampoline (method, delegate->method_ptr);
+	}
+
+	multicast = ((MonoMulticastDelegate*)delegate)->prev != NULL;
+	if (!multicast && !callvirt)
+		code = tramp_info->impl;
+
+	if (!code) {
+		/* The general, unoptimized case */
+		m = mono_marshal_get_delegate_invoke (invoke, delegate);
+		code = mono_compile_method (m);
+		code = mini_add_method_trampoline (NULL, m, code, mono_method_needs_static_rgctx_invoke (m, FALSE), FALSE);
+	}
+
+	delegate->invoke_impl = mono_get_addr_from_ftnptr (code);
+
+	if (tramp_info->method)
+		tramp_info->invoke_impl = delegate->invoke_impl;
+
+	return code;
 }
 
 #endif
@@ -1636,27 +1782,29 @@ mono_create_delegate_trampoline (MonoDomain *domain, MonoClass *klass)
 /*
  * mono_create_cached_delegate_trampoline_with_method:
  *
- *   Create a delegate trampoline for the KLASS+METHOD pair.
+ *   Create a cached delegate trampoline for the KLASS+METHOD pair.
  */
 MonoCachedDelegateTrampInfo*
-mono_create_cached_delegate_trampoline_with_method (MonoDomain *domain, MonoClass *klass, MonoMethod *method)
+mono_create_cached_delegate_trampoline_with_method (MonoDomain *domain, MonoClass *klass, MonoMethod *method, gboolean has_target)
 {
 #ifdef MONO_ARCH_HAVE_CREATE_DELEGATE_TRAMPOLINE
 	MonoCachedDelegateTrampInfo *info;
-	MonoClassMethodPair pair, *dpair;
+	MonoDelegateClassMethodPair *dpair, pair = { klass, method, has_target };
+	guint32 code_size = 0;
 
-	pair.klass = klass;
-	pair.method = method;
 	mono_domain_lock (domain);
 	info = g_hash_table_lookup (domain_jit_info (domain)->cached_delegate_trampoline_hash, &pair);
 	mono_domain_unlock (domain);
 	if (info)
 		return info;
 
-	info = create_cached_delegate_trampoline_data (domain, klass, method);
+	info = create_cached_delegate_trampoline_data (domain, klass, method, has_target);
 
-	dpair = mono_domain_alloc0 (domain, sizeof (MonoClassMethodPair));
-	memcpy (dpair, &pair, sizeof (MonoClassMethodPair));
+	info->invoke_impl = mono_create_specific_trampoline (info, MONO_TRAMPOLINE_CACHED_DELEGATE, domain, &code_size);
+	g_assert (code_size);
+
+	dpair = mono_domain_alloc0 (domain, sizeof (MonoDelegateClassMethodPair));
+	memcpy (dpair, &pair, sizeof (MonoDelegateClassMethodPair));
 
 	/* store trampoline address */
 	mono_domain_lock (domain);

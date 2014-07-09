@@ -1175,8 +1175,16 @@ typedef struct {
 
 typedef struct
 {
+	MonoMethod *invoke;
+	MonoClass *klass;
+	MonoMethod *method;
+	MonoMethodSignature *sig;
+	MonoMethodSignature *invoke_sig;
 	gpointer method_ptr;
 	gpointer invoke_impl;
+	gpointer impl;
+	gboolean need_rgctx_tramp;
+	gboolean has_target;
 } MonoCachedDelegateTrampInfo;
 
 typedef enum {
