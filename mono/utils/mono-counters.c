@@ -8,6 +8,7 @@
 #include "config.h"
 #include "mono-counters.h"
 #include "mono-proclib.h"
+#include "mono-mutex.h"
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
@@ -22,8 +23,15 @@ struct _MonoCounter {
 };
 
 static MonoCounter *counters = NULL;
+
 static int valid_mask = 0;
 static int set_mask = 0;
+
+static mono_once_t init_once = MONO_ONCE_INIT;
+
+static mono_mutex_t counters_mutex;
+
+static void init ();
 
 /**
  * mono_counter_get_variance:
@@ -123,6 +131,48 @@ mono_counters_enable (int section_mask)
 	valid_mask = section_mask & MONO_COUNTER_SECTION_MASK;
 }
 
+static void
+register_internal (const char *name, int type, void *addr, int size)
+{
+	MonoCounter *counter;
+
+	g_assert (size >= 0);
+	if ((type & MONO_COUNTER_VARIANCE_MASK) == 0)
+		type |= MONO_COUNTER_MONOTONIC;
+
+	mono_mutex_lock (&counters_mutex);
+
+	for (counter = counters; counter; counter = counter->next) {
+		if (counter->addr == addr) {
+			g_warning ("you are registering twice the same counter address");
+			goto unlock;
+		}
+	}
+
+	counter = malloc (sizeof (MonoCounter));
+	if (!counter)
+		goto unlock;
+	counter->name = g_strdup (name);
+	counter->type = type;
+	counter->addr = addr;
+	counter->next = NULL;
+	counter->size = size;
+
+	set_mask |= type;
+
+	/* Append */
+	if (counters) {
+		MonoCounter *item = counters;
+		while (item->next)
+			item = item->next;
+		item->next = counter;
+	} else {
+		counters = counter;
+	}
+unlock:
+	mono_mutex_unlock (&counters_mutex);
+}
+
 /**
  * mono_counters_register:
  * @name: The name for this counters.
@@ -170,7 +220,9 @@ mono_counters_register (const char* name, int type, void *addr)
 	default:
 		g_assert_not_reached ();
 	}
-	mono_counters_register_with_size (name, type, addr, size);
+
+	mono_once (&init_once, init);
+	register_internal (name, type, addr, size);
 }
 
 /**
@@ -196,33 +248,8 @@ mono_counters_register (const char* name, int type, void *addr)
 void
 mono_counters_register_with_size (const char *name, int type, void *addr, int size)
 {
-	MonoCounter *counter;
-
-	if ((type & MONO_COUNTER_VARIANCE_MASK) == 0)
-		type |= MONO_COUNTER_MONOTONIC;
-	if (size < 0)
-		size = 0;
-
-	counter = malloc (sizeof (MonoCounter));
-	if (!counter)
-		return;
-	counter->name = name;
-	counter->type = type;
-	counter->addr = addr;
-	counter->next = NULL;
-	counter->size = size;
-
-	set_mask |= type;
-
-	/* Append */
-	if (counters) {
-		MonoCounter *item = counters;
-		while (item->next)
-			item = item->next;
-		item->next = counter;
-	} else {
-		counters = counter;
-	}
+	mono_once (&init_once, init);
+	register_internal (name, type, addr, size);
 }
 
 typedef int (*IntFunc) (void);
@@ -366,8 +393,6 @@ cpu_load_15min (void)
 	return cpu_load (2);
 }
 
-static gboolean system_counters_initialized = FALSE;
-
 #define SYSCOUNTER_TIME (MONO_COUNTER_SYSTEM | MONO_COUNTER_LONG | MONO_COUNTER_TIME | MONO_COUNTER_MONOTONIC | MONO_COUNTER_CALLBACK)
 #define SYSCOUNTER_BYTES (MONO_COUNTER_SYSTEM | MONO_COUNTER_LONG | MONO_COUNTER_BYTES | MONO_COUNTER_VARIABLE | MONO_COUNTER_CALLBACK)
 #define SYSCOUNTER_COUNT (MONO_COUNTER_SYSTEM | MONO_COUNTER_LONG | MONO_COUNTER_COUNT | MONO_COUNTER_MONOTONIC | MONO_COUNTER_CALLBACK)
@@ -376,18 +401,16 @@ static gboolean system_counters_initialized = FALSE;
 static void
 initialize_system_counters (void)
 {
-	mono_counters_register ("User Time", SYSCOUNTER_TIME, &user_time);
-	mono_counters_register ("System Time", SYSCOUNTER_TIME, &system_time);
-	mono_counters_register ("Total Time", SYSCOUNTER_TIME, &total_time);
-	mono_counters_register ("Working Set", SYSCOUNTER_BYTES, &working_set);
-	mono_counters_register ("Private Bytes", SYSCOUNTER_BYTES, &private_bytes);
-	mono_counters_register ("Virtual Bytes", SYSCOUNTER_BYTES, &virtual_bytes);
-	mono_counters_register ("Page Faults", SYSCOUNTER_COUNT, &page_faults);
-	mono_counters_register ("CPU Load Average - 1min", SYSCOUNTER_LOAD, &cpu_load_1min);
-	mono_counters_register ("CPU Load Average - 5min", SYSCOUNTER_LOAD, &cpu_load_5min);
-	mono_counters_register ("CPU Load Average - 15min", SYSCOUNTER_LOAD, &cpu_load_15min);
-
-	system_counters_initialized = TRUE;
+	register_internal ("User Time", SYSCOUNTER_TIME, &user_time, sizeof (gint64));
+	register_internal ("System Time", SYSCOUNTER_TIME, &system_time, sizeof (gint64));
+	register_internal ("Total Time", SYSCOUNTER_TIME, &total_time, sizeof (gint64));
+	register_internal ("Working Set", SYSCOUNTER_BYTES, &working_set, sizeof (gint64));
+	register_internal ("Private Bytes", SYSCOUNTER_BYTES, &private_bytes, sizeof (gint64));
+	register_internal ("Virtual Bytes", SYSCOUNTER_BYTES, &virtual_bytes, sizeof (gint64));
+	register_internal ("Page Faults", SYSCOUNTER_COUNT, &page_faults, sizeof (gint64));
+	register_internal ("CPU Load Average - 1min", SYSCOUNTER_LOAD, &cpu_load_1min, sizeof (double));
+	register_internal ("CPU Load Average - 5min", SYSCOUNTER_LOAD, &cpu_load_5min, sizeof (double));
+	register_internal ("CPU Load Average - 15min", SYSCOUNTER_LOAD, &cpu_load_15min, sizeof (double));
 }
 
 /**
@@ -404,29 +427,36 @@ mono_counters_foreach (CountersEnumCallback cb, gpointer user_data)
 {
 	MonoCounter *counter;
 
-	if (!system_counters_initialized)
-		initialize_system_counters ();
+	mono_once (&init_once, init);
+	mono_mutex_lock (&counters_mutex);
 
 	for (counter = counters; counter; counter = counter->next) {
 		if (!cb (counter, user_data))
-			return;
+			goto unlock;
 	}
+
+unlock:
+	mono_mutex_unlock (&counters_mutex);
 }
 
 #define COPY_COUNTER(type,functype) do {	\
 		size = sizeof (type);	\
 		if (buffer_size < size)	\
-			return -1;	\
-		*(type*)buffer = cb ? ((functype)counter->addr) () : *(type*)counter->addr; \
+			size = -1;	\
+		else			\
+			*(type*)buffer = cb ? ((functype)counter->addr) () : *(type*)counter->addr; \
 	} while (0);
 
 int
 mono_counters_sample (MonoCounter *counter, void *buffer, int buffer_size)
 {
-	int cb = counter->type & MONO_COUNTER_CALLBACK;
-	int size = -1;
-
+	int cb, size;
 	char *strval;
+
+	mono_mutex_lock (&counters_mutex);
+
+	cb = counter->type & MONO_COUNTER_CALLBACK;
+	size = -1;
 
 	switch (mono_counter_get_type (counter)) {
 	case MONO_COUNTER_INT:
@@ -449,17 +479,23 @@ mono_counters_sample (MonoCounter *counter, void *buffer, int buffer_size)
 		COPY_COUNTER (double, DoubleFunc);
 		break;
 	case MONO_COUNTER_STRING:
-		if (buffer_size < counter->size)
-			return -1;
-		if (counter->size == 0)
-			return 0;
-		strval = cb ? ((StrFunc)counter->addr) () : (char*)counter->addr;
-		if (!strval)
-			return 0;
-		size = counter->size;
-		strncpy (buffer, strval, size - 1);
-		((char*)buffer)[size - 1] = '\0';
+		if (buffer_size < counter->size) {
+			size = -1;
+		} else if (counter->size == 0) {
+			size = 0;
+		} else {
+			strval = cb ? ((StrFunc)counter->addr) () : (char*)counter->addr;
+			if (!strval) {
+				size = 0;
+			} else {
+				size = counter->size;
+				strncpy (buffer, strval, size - 1);
+				((char*)buffer)[size - 1] = '\0';
+			}
+		}
 	}
+
+	mono_mutex_unlock (&counters_mutex);
 
 	return size;
 }
@@ -501,8 +537,12 @@ mono_counters_dump (int section_mask, FILE *outfile)
 	int i, j;
 	int variance;
 	section_mask &= valid_mask;
+
+	mono_once (&init_once, init);
+	mono_mutex_lock (&counters_mutex);
+
 	if (!counters)
-		return;
+		goto unlock;
 
 	variance = section_mask & MONO_COUNTER_VARIANCE_MASK;
 
@@ -519,6 +559,9 @@ mono_counters_dump (int section_mask, FILE *outfile)
 	}
 
 	fflush (outfile);
+
+unlock:
+	mono_mutex_unlock (&counters_mutex);
 }
 
 /**
@@ -529,13 +572,27 @@ mono_counters_dump (int section_mask, FILE *outfile)
 void
 mono_counters_cleanup (void)
 {
+	mono_once (&init_once, init);
+	mono_mutex_lock (&counters_mutex);
+
 	MonoCounter *counter = counters;
 	counters = NULL;
 	while (counter) {
 		MonoCounter *tmp = counter;
 		counter = counter->next;
+		free ((void*)tmp->name);
 		free (tmp);
 	}
+
+	mono_mutex_unlock (&counters_mutex);
+}
+
+static void
+init ()
+{
+	mono_mutex_init (&counters_mutex);
+
+	initialize_system_counters ();
 }
 
 static MonoResourceCallback limit_reached = NULL;
