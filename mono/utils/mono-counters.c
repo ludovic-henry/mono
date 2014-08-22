@@ -252,6 +252,46 @@ mono_counters_register_with_size (const char *name, int type, void *addr, int si
 	register_internal (name, type, addr, size);
 }
 
+
+/**
+ * mono_counters_delete:
+ * @addr: The address to register.
+ *
+ * Delete the counter which has addr as addr value.
+ * 
+ * If addr is not registered, then it will be silently ignored.
+ */
+void
+mono_counters_delete (void *addr)
+{
+	MonoCounter *counter, *next, *previous;
+
+	mono_once (&init_once, init);
+	mono_mutex_lock (&counters_mutex);
+
+	counter = counters;
+	previous = NULL;
+	while (counter) {
+		next = counter->next;
+		if (counter->addr != addr) {
+			previous = counter;
+		} else {
+			if (counter == counters)
+				counters = next;
+			else
+				previous->next = next;
+
+			free ((void*)counter->name);
+			free (counter);
+
+			goto unlock;
+		}
+		counter = next;
+	}
+
+unlock:
+	mono_mutex_unlock (&counters_mutex);
+}
 typedef int (*IntFunc) (void);
 typedef guint (*UIntFunc) (void);
 typedef gint64 (*LongFunc) (void);
@@ -501,7 +541,7 @@ mono_counters_sample (MonoCounter *counter, void *buffer, int buffer_size)
 }
 
 static const char
-section_names [][10] = {
+section_names [][25] = {
 	"JIT",
 	"GC",
 	"Metadata",
@@ -509,6 +549,7 @@ section_names [][10] = {
 	"Security",
 	"Runtime",
 	"System",
+	"Performance Counters",
 };
 
 static void

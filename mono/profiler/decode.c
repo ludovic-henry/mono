@@ -306,6 +306,7 @@ section_name (int section)
 	case MONO_COUNTER_SECURITY: return "Mono Security";
 	case MONO_COUNTER_RUNTIME: return "Mono Runtime";
 	case MONO_COUNTER_SYSTEM: return "Mono System";
+	case MONO_COUNTER_PERFCOUNTER: return "Mono Performance Counters";
 	default: return "<unknown>";
 	}
 }

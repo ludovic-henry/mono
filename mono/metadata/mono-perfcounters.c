@@ -39,6 +39,7 @@
 #include "utils/mono-networkinterfaces.h"
 #include "utils/mono-error-internals.h"
 #include "utils/atomic.h"
+#include "utils/mono-counters.h"
 #include <mono/io-layer/io-layer.h>
 
 /* map of CounterSample.cs */
@@ -1198,12 +1199,21 @@ custom_vtable (SharedCounter *scounter, SharedInstance* inst, char *data)
 	return (ImplVtable*)vtable;
 }
 
+static gpointer
+custom_get_value_address (SharedCounter *scounter, SharedInstance* sinst)
+{
+	int offset = sizeof (SharedInstance) + strlen (sinst->instance_name);
+	offset += 7;
+	offset &= ~7;
+	offset += scounter->seq_num * sizeof (guint64);
+	return (char*)sinst + offset;
+}
+
 static void*
 custom_get_impl (SharedCategory *cat, MonoString* counter, MonoString* instance, int *type)
 {
 	SharedCounter *scounter;
 	SharedInstance* inst;
-	int size;
 
 	scounter = find_custom_counter (cat, counter);
 	if (!scounter)
@@ -1212,10 +1222,7 @@ custom_get_impl (SharedCategory *cat, MonoString* counter, MonoString* instance,
 	inst = custom_get_instance (cat, scounter, counter);
 	if (!inst)
 		return NULL;
-	size = sizeof (SharedInstance) + strlen (inst->instance_name);
-	size += 7;
-	size &= ~7;
-	return custom_vtable (scounter, inst, (char*)inst + size + scounter->seq_num * sizeof (guint64));
+	return custom_vtable (scounter, inst, custom_get_value_address (scounter, inst));
 }
 
 static const CategoryDesc*
@@ -1302,6 +1309,11 @@ mono_perfcounter_category_del (MonoString *name)
 {
 	const CategoryDesc *cdesc;
 	SharedCategory *cat;
+	// SharedCounter *counter;
+	// SharedInstance *inst;
+	// MonoString *cname;
+	// char *p;
+	// int i;
 	cdesc = find_category (name);
 	/* can't delete a predefined category */
 	if (cdesc)
@@ -1313,6 +1325,29 @@ mono_perfcounter_category_del (MonoString *name)
 		perfctr_unlock ();
 		return FALSE;
 	}
+
+	/*
+	 * FIXME: this code is untested because we cannot delete a category :
+	 *  - we cannot delete a PerformanceCounterCategory : "System.InvalidOperationException: Operation is not valid due to the current state of the object"
+	 *  - we cannot delete a PerformanceCounter : "System.NotImplementedException: The requested feature is not implemented"
+	 *  - we cannot create a PerformanceCounterCategory without a PerformanceCounter : "System.ArgumentException: counterData"
+	 */
+	// p = cat->name;
+	// p += strlen (p) + 1; /* SharedCategory->name */
+	// p += strlen (p) + 1; /* SharedCategory->help */
+	// for (i = 0; i < cat->num_counters; i++) {
+	// 	counter = (SharedCounter*)p;
+	// 	p++; /* perfctr_type_compress (CounterCreationData->type) */
+	// 	p++; /* i */
+	// 	cname = mono_string_new_wrapper (p);
+	// 	p += strlen (p) + 1; /* CounterCreationData->name */
+	// 	p += strlen (p) + 1; /* CounterCreationData->help */
+	// 	inst = custom_get_instance (cat, counter, cname);
+	// 	if (!inst)
+	// 		continue;
+	// 	mono_counters_delete (custom_get_value_address (counter, inst));
+	// }
+
 	cat->header.ftype = FTYPE_DELETED;
 	perfctr_unlock ();
 	return TRUE;
@@ -1390,6 +1425,8 @@ mono_perfcounter_create (MonoString *category, MonoString *help, int type, MonoA
 	char **counter_info = NULL;
 	char *p;
 	SharedCategory *cat;
+	SharedCounter *counter;
+	SharedInstance *inst;
 
 	/* FIXME: ensure there isn't a category created already */
 	mono_error_init (&error);
@@ -1439,12 +1476,18 @@ mono_perfcounter_create (MonoString *category, MonoString *help, int type, MonoA
 	for (i = 0; i < num_counters; ++i) {
 		CounterCreationData *data = mono_array_get (items, CounterCreationData*, i);
 		/* emit the SharedCounter structures */
+		counter = (SharedCounter*)p;
 		*p++ = perfctr_type_compress (data->type);
 		*p++ = i;
 		strcpy (p, counter_info [i * 2]);
 		p += strlen (counter_info [i * 2]) + 1;
 		strcpy (p, counter_info [i * 2 + 1]);
 		p += strlen (counter_info [i * 2 + 1]) + 1;
+
+		inst = custom_get_instance (cat, counter, data->name);
+		if (!inst)
+			continue;
+		mono_counters_register (counter_info [i * 2], MONO_COUNTER_PERFCOUNTER | MONO_COUNTER_LONG | MONO_COUNTER_RAW | MONO_COUNTER_VARIABLE, custom_get_value_address (counter, inst));
 	}
 
 	perfctr_unlock ();
