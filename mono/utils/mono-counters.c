@@ -31,6 +31,9 @@ static mono_once_t init_once = MONO_ONCE_INIT;
 
 static mono_mutex_t counters_mutex;
 
+static GSList *register_callbacks = NULL;
+static GSList *delete_callbacks = NULL;
+
 static void init ();
 
 /**
@@ -265,6 +268,7 @@ void
 mono_counters_delete (void *addr)
 {
 	MonoCounter *counter, *next, *previous;
+	GSList *item;
 
 	mono_once (&init_once, init);
 	mono_mutex_lock (&counters_mutex);
@@ -281,6 +285,9 @@ mono_counters_delete (void *addr)
 			else
 				previous->next = next;
 
+			for (item = delete_callbacks; item; item = item->next)
+				((MonoCounterDeleteCallback) item->data) (counter);
+
 			free ((void*)counter->name);
 			free (counter);
 
@@ -292,6 +299,37 @@ mono_counters_delete (void *addr)
 unlock:
 	mono_mutex_unlock (&counters_mutex);
 }
+
+/**
+ * mono_counters_on_register
+ * @callback : function to callback when a counter is registered
+ *
+ * Add a callback that is going to be called when a counter is registered
+ */
+void
+mono_counters_on_register (MonoCounterRegisterCallback callback)
+{
+	mono_once (&init_once, init);
+	mono_mutex_lock (&counters_mutex);
+	register_callbacks = g_slist_append (register_callbacks, callback);
+	mono_mutex_unlock (&counters_mutex);
+}
+
+/**
+ * mono_counters_on_delete
+ * @callback : function to callback when a counter is deleted
+ *
+ * Add a callback that is going to be called when a counter is deleted
+ */
+void
+mono_counters_on_delete (MonoCounterDeleteCallback callback)
+{
+	mono_once (&init_once, init);
+	mono_mutex_lock (&counters_mutex);
+	delete_callbacks = g_slist_append (delete_callbacks, callback);
+	mono_mutex_unlock (&counters_mutex);
+}
+
 typedef int (*IntFunc) (void);
 typedef guint (*UIntFunc) (void);
 typedef gint64 (*LongFunc) (void);
