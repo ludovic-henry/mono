@@ -7329,6 +7329,8 @@ mini_init (const char *filename, const char *runtime_version)
 
 	mono_mutex_init_recursive (&jit_mutex);
 
+	mono_counters_init ();
+
 	mono_cross_helpers_run ();
 
 	/* Happens when using the embedding interface */
