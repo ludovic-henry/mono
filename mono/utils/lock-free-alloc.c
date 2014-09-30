@@ -123,12 +123,29 @@ struct _MonoLockFreeAllocDescriptor {
 
 #define NUM_DESC_BATCH	64
 
-#define SB_SIZE		16384
+#define SB_MAX_SIZE	16384
 #define SB_HEADER_SIZE	16
-#define SB_USABLE_SIZE	(SB_SIZE - SB_HEADER_SIZE)
+#define SB_USABLE_SIZE(sb_size)	((sb_size) - SB_HEADER_SIZE)
 
-#define SB_HEADER_FOR_ADDR(a)	((gpointer)((size_t)(a) & ~(size_t)(SB_SIZE-1)))
-#define DESCRIPTOR_FOR_ADDR(a)	(*(Descriptor**)SB_HEADER_FOR_ADDR (a))
+static MONO_ALWAYS_INLINE gpointer
+SB_HEADER_FOR_ADDR (gpointer a, size_t size)
+{
+	size_t r = (size_t) a;
+	r &= ~(size - 1);
+
+	return (gpointer)r;
+}
+
+static size_t
+SB_SIZE (size_t slot_size)
+{
+	int size, pagesize = mono_pagesize ();
+	for (size = pagesize; size < SB_MAX_SIZE; size += pagesize) {
+		if (slot_size * 2 <= size)
+			return size;
+	}
+	return SB_MAX_SIZE;
+}
 
 /* Taken from SGen */
 
@@ -142,19 +159,19 @@ prot_flags_for_activate (int activate)
 static gpointer
 alloc_sb (Descriptor *desc)
 {
-	gpointer sb_header = mono_valloc_aligned (SB_SIZE, SB_SIZE, prot_flags_for_activate (TRUE));
-	g_assert (sb_header == SB_HEADER_FOR_ADDR (sb_header));
-	DESCRIPTOR_FOR_ADDR (sb_header) = desc;
+	gpointer sb_header = mono_valloc_aligned (SB_SIZE (desc->slot_size), SB_SIZE (desc->slot_size), prot_flags_for_activate (TRUE));
+	g_assert (sb_header == SB_HEADER_FOR_ADDR (sb_header, SB_SIZE (desc->slot_size)));
+	*(Descriptor**)sb_header = desc;
 	//g_print ("sb %p for %p\n", sb_header, desc);
 	return (char*)sb_header + SB_HEADER_SIZE;
 }
 
 static void
-free_sb (gpointer sb)
+free_sb (gpointer sb, size_t size)
 {
-	gpointer sb_header = SB_HEADER_FOR_ADDR (sb);
+	gpointer sb_header = SB_HEADER_FOR_ADDR (sb, size);
 	g_assert ((char*)sb_header + SB_HEADER_SIZE == sb);
-	mono_vfree (sb_header, SB_SIZE);
+	mono_vfree (sb_header, size);
 	//g_print ("free sb %p\n", sb_header);
 }
 
@@ -232,7 +249,7 @@ desc_retire (Descriptor *desc)
 	g_assert (desc->anchor.data.state == STATE_EMPTY);
 	g_assert (desc->in_use);
 	desc->in_use = FALSE;
-	free_sb (desc->sb);
+	free_sb (desc->sb, SB_SIZE (desc->slot_size));
 	mono_thread_hazardous_free_or_queue (desc, desc_enqueue_avail, FALSE, TRUE);
 }
 #else
@@ -252,7 +269,7 @@ desc_alloc (void)
 static void
 desc_retire (Descriptor *desc)
 {
-	free_sb (desc->sb);
+	free_sb (desc->sb, SB_SIZE (desc->slot_size));
 	mono_lock_free_queue_enqueue (&available_descs, &desc->node);
 }
 #endif
@@ -369,7 +386,7 @@ alloc_from_active_or_partial (MonoLockFreeAllocator *heap)
 		mono_memory_read_barrier ();
 
 		next = *(unsigned int*)addr;
-		g_assert (next < SB_USABLE_SIZE / desc->slot_size);
+		g_assert (next < SB_USABLE_SIZE(SB_SIZE (desc->slot_size)) / desc->slot_size);
 
 		new_anchor.data.avail = next;
 		--new_anchor.data.count;
@@ -393,14 +410,8 @@ alloc_from_new_sb (MonoLockFreeAllocator *heap)
 	unsigned int slot_size, count, i;
 	Descriptor *desc = desc_alloc ();
 
-	desc->sb = alloc_sb (desc);
-
 	slot_size = desc->slot_size = heap->sc->slot_size;
-	count = SB_USABLE_SIZE / slot_size;
-
-	/* Organize blocks into linked list. */
-	for (i = 1; i < count - 1; ++i)
-		*(unsigned int*)((char*)desc->sb + i * slot_size) = i + 1;
+	count = SB_USABLE_SIZE (SB_SIZE (slot_size)) / slot_size;
 
 	desc->heap = heap;
 	/*
@@ -413,6 +424,12 @@ alloc_from_new_sb (MonoLockFreeAllocator *heap)
 
 	desc->anchor.data.count = desc->max_count - 1;
 	desc->anchor.data.state = STATE_PARTIAL;
+
+	desc->sb = alloc_sb (desc);
+
+	/* Organize blocks into linked list. */
+	for (i = 1; i < count - 1; ++i)
+		*(unsigned int*)((char*)desc->sb + i * slot_size) = i + 1;
 
 	mono_memory_write_barrier ();
 
@@ -446,22 +463,25 @@ mono_lock_free_alloc (MonoLockFreeAllocator *heap)
 }
 
 void
-mono_lock_free_free (gpointer ptr)
+mono_lock_free_free (gpointer ptr, size_t size)
 {
 	Anchor old_anchor, new_anchor;
 	Descriptor *desc;
 	gpointer sb;
 	MonoLockFreeAllocator *heap = NULL;
 
-	desc = DESCRIPTOR_FOR_ADDR (ptr);
+	int s = SB_SIZE (size);
+
+	desc = *(Descriptor**) SB_HEADER_FOR_ADDR (ptr, s);
+	g_assert (size == desc->slot_size);
+
 	sb = desc->sb;
-	g_assert (SB_HEADER_FOR_ADDR (ptr) == SB_HEADER_FOR_ADDR (sb));
 
 	do {
 		new_anchor = old_anchor = *(volatile Anchor*)&desc->anchor.value;
 		*(unsigned int*)ptr = old_anchor.data.avail;
 		new_anchor.data.avail = ((char*)ptr - (char*)sb) / desc->slot_size;
-		g_assert (new_anchor.data.avail < SB_USABLE_SIZE / desc->slot_size);
+		g_assert (new_anchor.data.avail < SB_USABLE_SIZE (SB_SIZE (desc->slot_size)) / desc->slot_size);
 
 		if (old_anchor.data.state == STATE_FULL)
 			new_anchor.data.state = STATE_PARTIAL;
@@ -511,7 +531,7 @@ static void
 descriptor_check_consistency (Descriptor *desc, gboolean print)
 {
 	int count = desc->anchor.data.count;
-	int max_count = SB_USABLE_SIZE / desc->slot_size;
+	int max_count = SB_USABLE_SIZE (SB_SIZE (desc->slot_size)) / desc->slot_size;
 #if _MSC_VER
 	gboolean* linked = alloca(max_count*sizeof(gboolean));
 #else
@@ -592,7 +612,7 @@ mono_lock_free_allocator_init_size_class (MonoLockFreeAllocSizeClass *sc, unsign
 {
 	g_assert (SB_SIZE > 0);
 	g_assert (SB_SIZE & (SB_SIZE - 1) == 0); /* check if power of 2 */
-	g_assert (slot_size <= SB_USABLE_SIZE / 2);
+	g_assert (slot_size <= SB_USABLE_SIZE (SB_MAX_SIZE) / 2);
 
 	mono_lock_free_queue_init (&sc->partial);
 	sc->slot_size = slot_size;
