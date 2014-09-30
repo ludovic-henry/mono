@@ -165,18 +165,13 @@ sgen_alloc_internal_dynamic (size_t size, int type, gboolean assert_on_failure)
 void
 sgen_free_internal_dynamic (void *addr, size_t size, int type)
 {
-	int index;
-
 	if (!addr)
 		return;
 
-	if (size > allocator_sizes [NUM_ALLOCATORS - 1]) {
+	if (size > allocator_sizes [NUM_ALLOCATORS - 1])
 		sgen_free_os_memory (addr, size, SGEN_ALLOC_INTERNAL);
-	} else {
-		index = index_for_size (size);
-
-		mono_lock_free_free (addr, allocator_sizes [index]);
-	}
+	else
+		mono_lock_free_free (addr);
 
 	MONO_GC_INTERNAL_DEALLOC ((mword)addr, size, type);
 }
@@ -217,7 +212,7 @@ sgen_free_internal (void *addr, int type)
 
 	size = allocator_sizes [index];
 
-	mono_lock_free_free (addr, size);
+	mono_lock_free_free (addr);
 
 	if (MONO_GC_INTERNAL_DEALLOC_ENABLED ()) {
 		MONO_GC_INTERNAL_DEALLOC ((mword)addr, size, type);

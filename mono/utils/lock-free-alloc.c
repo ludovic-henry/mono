@@ -128,19 +128,19 @@ struct _MonoLockFreeAllocDescriptor {
 #define SB_USABLE_SIZE(sb_size)	((sb_size) - SB_HEADER_SIZE)
 
 static MONO_ALWAYS_INLINE gpointer
-SB_HEADER_FOR_ADDR (gpointer a, size_t size)
+SB_HEADER_FOR_ADDR (gpointer addr)
 {
-	size_t r = (size_t) a;
-	r &= ~(size - 1);
+	size_t r = (size_t) addr;
+	r &= ~(SB_MAX_SIZE - 1);
 
-	return (gpointer)r;
+	return (gpointer) r;
 }
 
 static size_t
 SB_SIZE (size_t slot_size)
 {
 	int size, pagesize = mono_pagesize ();
-	for (size = pagesize; size < SB_MAX_SIZE; size += pagesize) {
+	for (size = pagesize; size < SB_MAX_SIZE; size <<= 1) {
 		if (slot_size * 2 <= size)
 			return size;
 	}
@@ -159,8 +159,8 @@ prot_flags_for_activate (int activate)
 static gpointer
 alloc_sb (Descriptor *desc)
 {
-	gpointer sb_header = mono_valloc_aligned (SB_SIZE (desc->slot_size), SB_SIZE (desc->slot_size), prot_flags_for_activate (TRUE));
-	g_assert (sb_header == SB_HEADER_FOR_ADDR (sb_header, SB_SIZE (desc->slot_size)));
+	gpointer sb_header = mono_valloc_aligned (SB_SIZE (desc->slot_size), SB_MAX_SIZE, prot_flags_for_activate (TRUE));
+	g_assert (sb_header == SB_HEADER_FOR_ADDR (sb_header));
 	*(Descriptor**)sb_header = desc;
 	//g_print ("sb %p for %p\n", sb_header, desc);
 	return (char*)sb_header + SB_HEADER_SIZE;
@@ -169,7 +169,7 @@ alloc_sb (Descriptor *desc)
 static void
 free_sb (gpointer sb, size_t size)
 {
-	gpointer sb_header = SB_HEADER_FOR_ADDR (sb, size);
+	gpointer sb_header = SB_HEADER_FOR_ADDR (sb);
 	g_assert ((char*)sb_header + SB_HEADER_SIZE == sb);
 	mono_vfree (sb_header, size);
 	//g_print ("free sb %p\n", sb_header);
@@ -463,19 +463,16 @@ mono_lock_free_alloc (MonoLockFreeAllocator *heap)
 }
 
 void
-mono_lock_free_free (gpointer ptr, size_t size)
+mono_lock_free_free (gpointer ptr)
 {
 	Anchor old_anchor, new_anchor;
 	Descriptor *desc;
 	gpointer sb;
 	MonoLockFreeAllocator *heap = NULL;
 
-	int s = SB_SIZE (size);
-
-	desc = *(Descriptor**) SB_HEADER_FOR_ADDR (ptr, s);
-	g_assert (size == desc->slot_size);
-
+	desc = *(Descriptor**) SB_HEADER_FOR_ADDR (ptr);
 	sb = desc->sb;
+	g_assert (SB_HEADER_FOR_ADDR (ptr) == SB_HEADER_FOR_ADDR (sb));
 
 	do {
 		new_anchor = old_anchor = *(volatile Anchor*)&desc->anchor.value;
