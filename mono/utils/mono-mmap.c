@@ -338,7 +338,11 @@ mono_valloc (void *addr, size_t length, int flags)
 int
 mono_vfree (void *addr, size_t length)
 {
+#ifdef HAVE_MADVISE
+	return madvise (addr, length, MADV_FREE);
+#else
 	return munmap (addr, length);
+#endif
 }
 
 /**
