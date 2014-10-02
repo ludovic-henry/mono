@@ -2981,59 +2981,13 @@ create_write_barrier_bitmap (MonoCompile *cfg, MonoClass *klass, unsigned *wb_bi
 static void
 emit_write_barrier (MonoCompile *cfg, MonoInst *ptr, MonoInst *value)
 {
-	int card_table_shift_bits;
-	gpointer card_table_mask;
-	guint8 *card_table;
 	MonoInst *dummy_use;
-	int nursery_shift_bits;
-	size_t nursery_size;
-	gboolean has_card_table_wb = FALSE;
 
 	if (!cfg->gen_write_barriers)
 		return;
 
-	card_table = mono_gc_get_card_table (&card_table_shift_bits, &card_table_mask);
-
-	mono_gc_get_nursery (&nursery_shift_bits, &nursery_size);
-
-#ifdef MONO_ARCH_HAVE_CARD_TABLE_WBARRIER
-	has_card_table_wb = TRUE;
-#endif
-
-	if (has_card_table_wb && !cfg->compile_aot && card_table && nursery_shift_bits > 0 && !COMPILE_LLVM (cfg)) {
-		MonoInst *wbarrier;
-
-		MONO_INST_NEW (cfg, wbarrier, OP_CARD_TABLE_WBARRIER);
-		wbarrier->sreg1 = ptr->dreg;
-		wbarrier->sreg2 = value->dreg;
-		MONO_ADD_INS (cfg->cbb, wbarrier);
-	} else if (card_table) {
-		int offset_reg = alloc_preg (cfg);
-		int card_reg  = alloc_preg (cfg);
-		MonoInst *ins;
-
-		MONO_EMIT_NEW_BIALU_IMM (cfg, OP_SHR_UN_IMM, offset_reg, ptr->dreg, card_table_shift_bits);
-		if (card_table_mask)
-			MONO_EMIT_NEW_BIALU_IMM (cfg, OP_PAND_IMM, offset_reg, offset_reg, card_table_mask);
-
-		/*We can't use PADD_IMM since the cardtable might end up in high addresses and amd64 doesn't support
-		 * IMM's larger than 32bits.
-		 */
-		if (cfg->compile_aot) {
-			MONO_EMIT_NEW_AOTCONST (cfg, card_reg, NULL, MONO_PATCH_INFO_GC_CARD_TABLE_ADDR);
-		} else {
-			MONO_INST_NEW (cfg, ins, OP_PCONST);
-			ins->inst_p0 = card_table;
-			ins->dreg = card_reg;
-			MONO_ADD_INS (cfg->cbb, ins);
-		}
-
-		MONO_EMIT_NEW_BIALU (cfg, OP_PADD, offset_reg, offset_reg, card_reg);
-		MONO_EMIT_NEW_STORE_MEMBASE_IMM (cfg, OP_STOREI1_MEMBASE_IMM, offset_reg, 0, 1);
-	} else {
-		MonoMethod *write_barrier = mono_gc_get_write_barrier ();
-		mono_emit_method_call (cfg, write_barrier, &ptr, NULL);
-	}
+	MonoMethod *write_barrier = mono_gc_get_write_barrier ();
+	mono_emit_method_call (cfg, write_barrier, &ptr, NULL);
 
 	EMIT_NEW_DUMMY_USE (cfg, dummy_use, value);
 }

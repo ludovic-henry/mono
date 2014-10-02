@@ -106,13 +106,8 @@ typedef guint64 mword;
  */
 //#define SGEN_OBJECT_LAYOUT_STATISTICS
 
-#ifndef SGEN_HEAVY_BINARY_PROTOCOL
-#ifndef HEAVY_STATISTICS
+#if !defined(SGEN_HEAVY_BINARY_PROTOCOL) && !defined(HEAVY_STATISTICS)
 #define MANAGED_ALLOCATION
-#ifndef XDOMAIN_CHECKS_IN_WBARRIER
-#define MANAGED_WBARRIER
-#endif
-#endif
 #endif
 
 /*

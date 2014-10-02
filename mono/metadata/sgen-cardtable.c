@@ -455,21 +455,7 @@ sgen_card_table_finish_scan_remsets (void *start_nursery, void *end_nursery, Sge
 guint8*
 mono_gc_get_card_table (int *shift_bits, gpointer *mask)
 {
-#ifndef MANAGED_WBARRIER
 	return NULL;
-#else
-	if (!sgen_cardtable)
-		return NULL;
-
-	*shift_bits = CARD_BITS;
-#ifdef SGEN_HAVE_OVERLAPPING_CARDS
-	*mask = (gpointer)CARD_MASK;
-#else
-	*mask = NULL;
-#endif
-
-	return sgen_cardtable;
-#endif
 }
 
 gboolean
