@@ -90,6 +90,7 @@ static int do_mono_sample = 0;
 static int in_shutdown = 0;
 static int do_debug = 0;
 static int do_counters = 0;
+static int counters_sample_int = 1000; /* milliseconds */
 static MonoProfileSamplingMode sampling_mode = MONO_PROFILER_STAT_MODE_PROCESS;
 
 /* For linux compile with:
@@ -394,6 +395,7 @@ struct _MonoProfiler {
 	int pipes [2];
 #ifndef HOST_WIN32
 	pthread_t helper_thread;
+	pthread_t counters_sampling_thread;
 #endif
 	BinaryObject *binary_objects;
 };
@@ -683,7 +685,7 @@ static void
 runtime_initialized (MonoProfiler *profiler)
 {
 	runtime_inited = 1;
-#ifndef DISABLE_HELPER_THREAD
+#ifndef HOST_WIN32
 	counters_init (profiler);
 	counters_sample (profiler);
 #endif
@@ -2105,16 +2107,19 @@ counters_sample (MonoProfiler *profiler)
 static void
 log_shutdown (MonoProfiler *prof)
 {
+	G_GNUC_UNUSED void *res;
+
 	in_shutdown = 1;
 #ifndef DISABLE_HELPER_THREAD
-	counters_sample (prof);
-
 	if (prof->command_port) {
 		char c = 1;
-		void *res;
 		ign_res (write (prof->pipes [1], &c, 1));
 		pthread_join (prof->helper_thread, &res);
 	}
+#endif
+#ifndef HOST_WIN32
+	counters_sample (prof);
+	pthread_join (prof->counters_sampling_thread, &res);
 #endif
 #if USE_PERF_EVENTS
 	if (perf_data) {
@@ -2199,6 +2204,19 @@ new_filename (const char* filename)
 	return res;
 }
 
+static void*
+counters_sampling_thread (void *arg)
+{
+	MonoProfiler* prof = arg;
+
+	while (!in_shutdown) {
+		counters_sample (prof);
+		usleep (counters_sample_int * 1000);
+	}
+
+	return NULL;
+}
+
 #ifndef DISABLE_HELPER_THREAD
 static void*
 helper_thread (void* arg)
@@ -2239,7 +2257,6 @@ helper_thread (void* arg)
 		}
 #endif
 
-		counters_sample (prof);
 
 		tv.tv_sec = 1;
 		tv.tv_usec = 0;
@@ -2451,9 +2468,6 @@ create_profiler (const char *filename)
 		prof->stat_buffers = create_stat_buffer ();
 		need_helper_thread = 1;
 	}
-	if (do_counters && !need_helper_thread) {
-		need_helper_thread = 1;
-	}
 #ifndef DISABLE_HELPER_THREAD
 	if (hs_mode_ondemand || need_helper_thread) {
 		if (!start_helper_thread (prof))
@@ -2462,6 +2476,11 @@ create_profiler (const char *filename)
 #else
 	if (hs_mode_ondemand)
 		fprintf (stderr, "Ondemand heapshot unavailable on this arch.\n");
+#endif
+#ifndef HOST_WIN32
+	if (do_counters) {
+		pthread_create (&prof->counters_sampling_thread, NULL, counters_sampling_thread, prof);
+	}
 #endif
 	prof->startup_time = current_time ();
 	dump_header (prof);
@@ -2474,24 +2493,24 @@ usage (int do_exit)
 	printf ("Log profiler version %d.%d (format: %d)\n", LOG_VERSION_MAJOR, LOG_VERSION_MINOR, LOG_DATA_VERSION);
 	printf ("Usage: mono --profile=log[:OPTION1[,OPTION2...]] program.exe\n");
 	printf ("Options:\n");
-	printf ("\thelp             show this usage info\n");
-	printf ("\t[no]alloc        enable/disable recording allocation info\n");
-	printf ("\t[no]calls        enable/disable recording enter/leave method events\n");
-	printf ("\theapshot[=MODE]  record heap shot info (by default at each major collection)\n");
-	printf ("\t                 MODE: every XXms milliseconds, every YYgc collections, ondemand\n");
-	printf ("\tcounters         sample counters every 1s\n");
-	printf ("\tsample[=TYPE]    use statistical sampling mode (by default cycles/1000)\n");
-	printf ("\t                 TYPE: cycles,instr,cacherefs,cachemiss,branches,branchmiss\n");
-	printf ("\t                 TYPE can be followed by /FREQUENCY\n");
-	printf ("\ttime=fast        use a faster (but more inaccurate) timer\n");
-	printf ("\tmaxframes=NUM    collect up to NUM stack frames\n");
-	printf ("\tcalldepth=NUM    ignore method events for call chain depth bigger than NUM\n");
-	printf ("\toutput=FILENAME  write the data to file FILENAME (-FILENAME to overwrite)\n");
-	printf ("\toutput=|PROGRAM  write the data to the stdin of PROGRAM\n");
-	printf ("\t                 %%t is subtituted with date and time, %%p with the pid\n");
-	printf ("\treport           create a report instead of writing the raw data to a file\n");
-	printf ("\tzip              compress the output data\n");
-	printf ("\tport=PORTNUM     use PORTNUM for the listening command server\n");
+	printf ("\thelp                show this usage info\n");
+	printf ("\t[no]alloc           enable/disable recording allocation info\n");
+	printf ("\t[no]calls           enable/disable recording enter/leave method events\n");
+	printf ("\theapshot[=MODE]     record heap shot info (by default at each major collection)\n");
+	printf ("\t                    MODE: every XXms milliseconds, every YYgc collections, ondemand\n");
+	printf ("\tcounters[=INTERVAL] sample counters every FREQ milliseconds (by default 1000ms)\n");
+	printf ("\tsample[=TYPE]       use statistical sampling mode (by default cycles/1000)\n");
+	printf ("\t                    TYPE: cycles,instr,cacherefs,cachemiss,branches,branchmiss\n");
+	printf ("\t                    TYPE can be followed by /FREQUENCY\n");
+	printf ("\ttime=fast           use a faster (but more inaccurate) timer\n");
+	printf ("\tmaxframes=NUM       collect up to NUM stack frames\n");
+	printf ("\tcalldepth=NUM       ignore method events for call chain depth bigger than NUM\n");
+	printf ("\toutput=FILENAME     write the data to file FILENAME (-FILENAME to overwrite)\n");
+	printf ("\toutput=|PROGRAM     write the data to the stdin of PROGRAM\n");
+	printf ("\t                    %%t is subtituted with date and time, %%p with the pid\n");
+	printf ("\treport              create a report instead of writing the raw data to a file\n");
+	printf ("\tzip                 compress the output data\n");
+	printf ("\tport=PORTNUM        use PORTNUM for the listening command server\n");
 	if (do_exit)
 		exit (1);
 }
@@ -2614,6 +2633,22 @@ set_hsmode (char* val, int allow_empty)
 	else
 		usage (1);
 	free (val);
+}
+
+static void
+set_countersmode (char *val)
+{
+	char *end;
+	unsigned int count;
+	if (!val) {
+		counters_sample_int = 1000;
+	} else {
+		count = strtoul (val, &end, 10);
+		if (val == end)
+			usage (1);
+		counters_sample_int = count;
+		free (val);
+	}
 }
 
 /* 
@@ -2759,8 +2794,9 @@ mono_profiler_startup (const char *desc)
 			free (val);
 			continue;
 		}
-		if ((opt = match_option (p, "counters", NULL)) != p) {
+		if ((opt = match_option (p, "counters", &val)) != p) {
 			do_counters = 1;
+			set_countersmode (val);
 			continue;
 		}
 		if (opt == p) {
