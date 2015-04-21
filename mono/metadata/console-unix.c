@@ -33,7 +33,7 @@
 #include <mono/metadata/domain-internals.h>
 #include <mono/metadata/gc-internal.h>
 #include <mono/metadata/metadata.h>
-#include <mono/metadata/threadpool.h>
+#include <mono/metadata/threadpool-ms.h>
 #include <mono/utils/mono-signal-handler.h>
 #include <mono/utils/mono-proclib.h>
 
@@ -254,7 +254,7 @@ do_console_cancel_event (void)
 	g_assert (method != NULL);
 	im = mono_get_delegate_invoke (method->klass);
 	msg = mono_method_call_message_new (method, NULL, im, NULL, NULL);
-	mono_thread_pool_add ((MonoObject *) load_value, msg, NULL, NULL);
+	mono_threadpool_ms_add ((MonoObject *) load_value, msg, NULL, NULL);
 }
 
 static int need_cancel = FALSE;

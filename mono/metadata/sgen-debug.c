@@ -32,7 +32,6 @@
 #include "metadata/sgen-protocol.h"
 #include "metadata/sgen-memory-governor.h"
 #include "metadata/sgen-pinning.h"
-#include "metadata/threadpool-internals.h"
 
 #define LOAD_VTABLE	SGEN_LOAD_VTABLE
 
@@ -863,13 +862,6 @@ is_xdomain_ref_allowed (gpointer *ptr, char *obj, MonoDomain *domain)
 			!strcmp (ref->vtable->klass->name, "Byte[]") &&
 			!strcmp (o->vtable->klass->name_space, "System.IO") &&
 			!strcmp (o->vtable->klass->name, "MemoryStream"))
-		return TRUE;
-	/* append_job() in threadpool.c */
-	if (!strcmp (ref->vtable->klass->name_space, "System.Runtime.Remoting.Messaging") &&
-			!strcmp (ref->vtable->klass->name, "AsyncResult") &&
-			!strcmp (o->vtable->klass->name_space, "System") &&
-			!strcmp (o->vtable->klass->name, "Object[]") &&
-			mono_thread_pool_is_queue_array ((MonoArray*) o))
 		return TRUE;
 	return FALSE;
 }

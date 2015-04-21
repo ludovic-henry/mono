@@ -75,7 +75,6 @@
 #include "metadata/method-builder.h"
 #include "metadata/profiler-private.h"
 #include "metadata/monitor.h"
-#include "metadata/threadpool-internals.h"
 #include "metadata/mempool-internals.h"
 #include "metadata/marshal.h"
 #include "utils/mono-mmap.h"
