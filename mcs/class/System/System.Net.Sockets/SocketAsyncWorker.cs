@@ -59,7 +59,7 @@ namespace System.Net.Sockets
 		static void DispatcherCB (SocketAsyncResult sar)
 		{
 			/* SendPackets and ReceiveMessageFrom are not implemented yet */
-			switch (sar.operation) {
+			switch (sar.socket_operation) {
 			case SocketOperation.Receive:
 			case SocketOperation.ReceiveGeneric:
 			case SocketOperation.RecvJustCallback:
@@ -95,7 +95,7 @@ namespace System.Net.Sockets
 			// 	sar.Worker.SendPackets ();
 			// 	break;
 			default:
-				throw new NotImplementedException (String.Format ("Operation {0} is not implemented", sar.operation));
+				throw new NotImplementedException (String.Format ("Operation {0} is not implemented", sar.socket_operation));
 			}
 		}
 
@@ -276,7 +276,7 @@ namespace System.Net.Sockets
 
 		public void Receive ()
 		{
-			if (result.operation == SocketOperation.ReceiveGeneric) {
+			if (result.socket_operation == SocketOperation.ReceiveGeneric) {
 				ReceiveGeneric ();
 				return;
 			}
@@ -330,7 +330,7 @@ namespace System.Net.Sockets
 
 		public void Send ()
 		{
-			if (result.operation == SocketOperation.SendGeneric) {
+			if (result.socket_operation == SocketOperation.SendGeneric) {
 				SendGeneric ();
 				return;
 			}
