@@ -35,19 +35,18 @@ using System.Threading;
 namespace System.Net.Sockets
 {
 	[StructLayout (LayoutKind.Sequential)]
-	internal sealed class SocketAsyncResult: IAsyncResult, IThreadPoolWorkItem
+	internal sealed class SocketAsyncResult : IOAsyncResult
 	{
-		/* Same structure in the runtime. Keep this in sync with
-		 * MonoSocketAsyncResult in metadata/socket-io.h and
-		 * ProcessAsyncReader in System.Diagnostics/Process.cs. */
+		Exception delayed_exception;
+
+		bool is_blocking;
+
+		Socket accept_socket;
+		int total;
 
 		public Socket socket;
-		IntPtr handle;
-		object state;
-		AsyncCallback callback; // used from the runtime
-		WaitHandle wait_handle;
 
-		Exception delayed_exception;
+		public SocketOperation socket_operation;
 
 		public EndPoint EndPoint;                 // Connect,ReceiveFrom,SendTo
 		public byte [] Buffer;                    // Receive,ReceiveFrom,Send,SendTo
@@ -59,22 +58,12 @@ namespace System.Net.Sockets
 		public int Port;                          // Connect
 		public IList<ArraySegment<byte>> Buffers; // Receive, Send
 		public bool ReuseSocket;                  // Disconnect
+		public int CurrentAddress;                // Connect
 
-		// Return values
-		Socket accept_socket;
-		int total;
-
-		bool completed_synchronously;
-		bool completed;
-		bool is_blocking;
-		internal int error;
-		public SocketOperation operation;
-		AsyncResult async_result;
+		public int error;
 		public int EndCalled;
 
-		/* These fields are not in MonoSocketAsyncResult */
 		public SocketAsyncWorker Worker;
-		public int CurrentAddress;                // Connect
 
 		public SocketAsyncResult ()
 		{
@@ -83,45 +72,6 @@ namespace System.Net.Sockets
 		public SocketAsyncResult (Socket socket, object state, AsyncCallback callback, SocketOperation operation)
 		{
 			Init (socket, state, callback, operation, new SocketAsyncWorker (this));
-		}
-
-		public object AsyncState {
-			get {
-				return state;
-			}
-		}
-
-		public WaitHandle AsyncWaitHandle {
-			get {
-				lock (this) {
-					if (wait_handle == null)
-						wait_handle = new ManualResetEvent (completed);
-				}
-
-				return wait_handle;
-			}
-			set {
-				wait_handle = value;
-			}
-		}
-
-		public bool CompletedSynchronously {
-			get {
-				return completed_synchronously;
-			}
-		}
-
-		public bool IsCompleted {
-			get {
-				return completed;
-			}
-			set {
-				completed = value;
-				lock (this) {
-					if (wait_handle != null && value)
-						((ManualResetEvent) wait_handle).Set ();
-				}
-			}
 		}
 
 		public Socket Socket {
@@ -154,11 +104,32 @@ namespace System.Net.Sockets
 			this.is_blocking = socket != null ? socket.is_blocking : true;
 			this.handle = socket != null ? socket.Handle : IntPtr.Zero;
 			this.state = state;
-			this.callback = callback;
-			this.operation = operation;
+			this.async_callback = callback;
+			this.socket_operation = operation;
+
+			switch (this.socket_operation) {
+			case SocketOperation.Accept:
+			case SocketOperation.AcceptReceive:
+			case SocketOperation.Receive:
+			case SocketOperation.ReceiveFrom:
+			case SocketOperation.ReceiveGeneric:
+			case SocketOperation.RecvJustCallback:
+				this.operation = IOOperation.In;
+				break;
+			case SocketOperation.Connect:
+			case SocketOperation.Disconnect:
+			case SocketOperation.Send:
+			case SocketOperation.SendGeneric:
+			case SocketOperation.SendJustCallback:
+			case SocketOperation.SendTo:
+				this.operation = IOOperation.Out;
+				break;
+			default:
+				throw new NotImplementedException ();
+			}
 
 			if (wait_handle != null)
-				((ManualResetEvent) wait_handle).Reset ();
+				wait_handle.Reset ();
 
 			delayed_exception = null;
 
@@ -186,9 +157,9 @@ namespace System.Net.Sockets
 
 		public void DoMConnectCallback ()
 		{
-			if (callback == null)
+			if (async_callback == null)
 				return;
-			ThreadPool.UnsafeQueueUserWorkItem (_ => callback (this), null);
+			ThreadPool.UnsafeQueueUserWorkItem (_ => async_callback (this), null);
 		}
 
 		public void Dispose ()
@@ -220,13 +191,17 @@ namespace System.Net.Sockets
 
 		public void Complete ()
 		{
-			if (operation != SocketOperation.Receive && socket.is_disposed)
+			if (socket_operation != SocketOperation.Receive && socket.is_disposed)
 				delayed_exception = new ObjectDisposedException (socket.GetType ().ToString ());
 
-			IsCompleted = true;
+			completed = true;
+			lock (this) {
+				if (wait_handle != null)
+					wait_handle.Set ();
+			}
 
 			Queue<SocketAsyncWorker> queue = null;
-			switch (operation) {
+			switch (socket_operation) {
 			case SocketOperation.Receive:
 			case SocketOperation.ReceiveFrom:
 			case SocketOperation.ReceiveGeneric:
@@ -261,7 +236,7 @@ namespace System.Net.Sockets
 				}
 			}
 
-			// IMPORTANT: 'callback', if any is scheduled from unmanaged code
+			// IMPORTANT: 'async_callback', if any is scheduled from unmanaged code
 		}
 
 		public void Complete (bool synch)
@@ -302,17 +277,13 @@ namespace System.Net.Sockets
 			Complete ();
 		}
 
-		void IThreadPoolWorkItem.ExecuteWorkItem()
+		protected override void Invoke()
 		{
 			async_result.Invoke ();
 
-			if (completed && callback != null) {
-				ThreadPool.UnsafeQueueCustomWorkItem (new AsyncResult (state => callback ((IAsyncResult) state), this, false), false);
+			if (completed && async_callback != null) {
+				ThreadPool.UnsafeQueueCustomWorkItem (new AsyncResult (state => async_callback ((IAsyncResult) state), this, false), false);
 			}
-		}
-
-		void IThreadPoolWorkItem.MarkAborted(ThreadAbortException tae)
-		{
 		}
 	}
 }

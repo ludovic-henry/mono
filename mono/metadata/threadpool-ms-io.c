@@ -28,29 +28,30 @@
 #include <mono/utils/mono-poll.h>
 #include <mono/utils/mono-threads.h>
 
-/* Keep in sync with System.Net.Sockets.Socket.SocketOperation */
-enum {
-	AIO_OP_FIRST,
-	AIO_OP_ACCEPT = 0,
-	AIO_OP_CONNECT,
-	AIO_OP_RECEIVE,
-	AIO_OP_RECEIVEFROM,
-	AIO_OP_SEND,
-	AIO_OP_SENDTO,
-	AIO_OP_RECV_JUST_CALLBACK,
-	AIO_OP_SEND_JUST_CALLBACK,
-	AIO_OP_READPIPE,
-	AIO_OP_CONSOLE2,
-	AIO_OP_DISCONNECT,
-	AIO_OP_ACCEPTRECEIVE,
-	AIO_OP_RECEIVE_BUFFERS,
-	AIO_OP_SEND_BUFFERS,
-	AIO_OP_LAST
+/* Keep in sync with System.Threading.IOOperation */
+typedef enum {
+	IO_OP_UNDEFINED = 0,
+	IO_OP_IN        = 1,
+	IO_OP_OUT       = 2,
+} MonoIOOperation;
+
+/* Keep in sync with System.Threading.IOAsyncResult */
+struct _MonoIOAsyncResult {
+	MonoObject obj;
+	MonoObject *state;
+	MonoObject *wait_handle;
+	MonoBoolean completed_synchronously;
+	MonoBoolean completed;
+	gchar __dummy [SIZEOF_VOID_P - 2]; // align on SIZEOF_VOID_P bytes
+	gpointer handle;
+	MonoAsyncResult *async_result;
+	MonoObject *async_callback;
+	MonoIOOperation operation;
 };
 
 typedef struct {
 	gint fd;
-	gint events;
+	gint operations;
 	gboolean is_new;
 } ThreadPoolIOUpdate;
 
@@ -61,65 +62,41 @@ typedef struct {
 	gint     (*event_wait) (void);
 	gint     (*event_max) (void);
 	gint     (*event_fd_at) (guint i);
-	gboolean (*event_create_sockares_at) (guint i, gint fd, MonoMList **list);
+	gboolean (*event_create_ioares_at) (guint i, gint fd, MonoMList **list);
 } ThreadPoolIOBackend;
 
-static int
-get_events_from_sockares (MonoSocketAsyncResult *ares)
+static MonoIOAsyncResult*
+get_ioares_for_operation (MonoMList **list, MonoIOOperation operation)
 {
-	switch (ares->operation) {
-	case AIO_OP_ACCEPT:
-	case AIO_OP_RECEIVE:
-	case AIO_OP_RECV_JUST_CALLBACK:
-	case AIO_OP_RECEIVEFROM:
-	case AIO_OP_READPIPE:
-	case AIO_OP_ACCEPTRECEIVE:
-	case AIO_OP_RECEIVE_BUFFERS:
-		return MONO_POLLIN;
-	case AIO_OP_SEND:
-	case AIO_OP_SEND_JUST_CALLBACK:
-	case AIO_OP_SENDTO:
-	case AIO_OP_CONNECT:
-	case AIO_OP_SEND_BUFFERS:
-	case AIO_OP_DISCONNECT:
-		return MONO_POLLOUT;
-	default:
-		g_assert_not_reached ();
-	}
-}
-
-static MonoSocketAsyncResult*
-get_sockares_for_event (MonoMList **list, gint event)
-{
-	MonoSocketAsyncResult *state = NULL;
+	MonoIOAsyncResult *ioares = NULL;
 	MonoMList *current;
 
 	g_assert (list);
 
 	for (current = *list; current; current = mono_mlist_next (current)) {
-		state = (MonoSocketAsyncResult*) mono_mlist_get_data (current);
-		if (get_events_from_sockares ((MonoSocketAsyncResult*) state) == event)
+		ioares = (MonoIOAsyncResult*) mono_mlist_get_data (current);
+		if ((ioares->operation & operation) != 0)
 			break;
-		state = NULL;
+		ioares = NULL;
 	}
 
 	if (current)
 		*list = mono_mlist_remove_item (*list, current);
 
-	return state;
+	return ioares;
 }
 
-static gint
-get_events (MonoMList *list)
+static MonoIOOperation
+get_operations (MonoMList *list)
 {
-	MonoSocketAsyncResult *ares;
-	gint events = 0;
+	MonoIOAsyncResult *ioares;
+	gint operations = 0;
 
 	for (; list; list = mono_mlist_next (list))
-		if ((ares = (MonoSocketAsyncResult*) mono_mlist_get_data (list)))
-			events |= get_events_from_sockares (ares);
+		if ((ioares = (MonoIOAsyncResult*) mono_mlist_get_data (list)))
+			operations |= ioares->operation;
 
-	return events;
+	return operations;
 }
 
 #include "threadpool-ms-io-epoll.c"
@@ -251,7 +228,7 @@ selector_thread (gpointer data)
 
 			list = mono_g_hash_table_lookup (threadpool_io->states, GINT_TO_POINTER (fd));
 
-			valid_fd = threadpool_io->backend.event_create_sockares_at (i, fd, &list);
+			valid_fd = threadpool_io->backend.event_create_ioares_at (i, fd, &list);
 			if (!valid_fd)
 				continue;
 
@@ -424,46 +401,16 @@ ensure_cleanedup (void)
 	io_status = STATUS_CLEANED_UP;
 }
 
-static gboolean
-is_socket_async_callback (MonoImage *system_image, MonoClass *class)
-{
-	MonoClass *socket_async_callback_class = NULL;
-
-	socket_async_callback_class = mono_class_from_name (system_image, "System.Net.Sockets", "SocketAsyncCallback");
-	g_assert (socket_async_callback_class);
-
-	return class == socket_async_callback_class;
-}
-
-static gboolean
-is_async_read_handler (MonoImage *system_image, MonoClass *class)
-{
-	MonoClass *process_class = NULL;
-
-	process_class = mono_class_from_name (system_image, "System.Diagnostics", "Process");
-	g_assert (process_class);
-
-	return class->nested_in && class->nested_in == process_class && strcmp (class->name, "AsyncReadHandler") == 0;
-}
-
 gboolean
 mono_threadpool_ms_is_io (MonoObject *target, MonoObject *state)
 {
-	MonoImage *system_image;
-	MonoSocketAsyncResult *sockares;
+	static MonoClass *io_async_result_class = NULL;
 
-	system_image = mono_image_loaded ("System");
-	if (!system_image)
-		return FALSE;
+	if (!io_async_result_class)
+		io_async_result_class = mono_class_from_name (mono_defaults.corlib, "System.Threading", "IOAsyncResult");
+	g_assert (io_async_result_class);
 
-	if (!is_socket_async_callback (system_image, target->vtable->klass) && !is_async_read_handler (system_image, target->vtable->klass))
-		return FALSE;
-
-	sockares = (MonoSocketAsyncResult*) state;
-	if (sockares->operation < AIO_OP_FIRST || sockares->operation >= AIO_OP_LAST)
-		return FALSE;
-
-	return TRUE;
+	return mono_class_has_parent (target->vtable->klass, io_async_result_class);
 }
 
 void
@@ -473,43 +420,37 @@ mono_threadpool_ms_io_cleanup (void)
 }
 
 MonoAsyncResult *
-mono_threadpool_ms_io_add (MonoAsyncResult *ares, MonoSocketAsyncResult *sockares)
+mono_threadpool_ms_io_add (MonoAsyncResult *ares, MonoIOAsyncResult *ioares)
 {
 	ThreadPoolIOUpdate *update;
 	MonoMList *list;
 	gboolean is_new;
-	gint events;
-	gint fd;
 
 	g_assert (ares);
-	g_assert (sockares);
+	g_assert (ioares);
 
 	if (mono_runtime_is_shutting_down ())
 		return NULL;
 
 	ensure_initialized ();
 
-	MONO_OBJECT_SETREF (sockares, ares, ares);
-
-	fd = GPOINTER_TO_INT (sockares->handle);
+	MONO_OBJECT_SETREF (ioares, async_result, ares);
 
 	mono_mutex_lock (&threadpool_io->states_lock);
 	g_assert (threadpool_io->states);
 
-	list = mono_g_hash_table_lookup (threadpool_io->states, GINT_TO_POINTER (fd));
+	list = mono_g_hash_table_lookup (threadpool_io->states, ioares->handle);
 	is_new = list == NULL;
-	list = mono_mlist_append (list, (MonoObject*) sockares);
-	mono_g_hash_table_replace (threadpool_io->states, sockares->handle, list);
-
-	events = get_events (list);
+	list = mono_mlist_append (list, (MonoObject*) ioares);
+	mono_g_hash_table_replace (threadpool_io->states, ioares->handle, list);
 
 	mono_mutex_lock (&threadpool_io->updates_lock);
 	threadpool_io->updates_size += 1;
 	threadpool_io->updates = g_renew (ThreadPoolIOUpdate, threadpool_io->updates, threadpool_io->updates_size);
 
 	update = &threadpool_io->updates [threadpool_io->updates_size - 1];
-	update->fd = fd;
-	update->events = events;
+	update->fd = GPOINTER_TO_INT (ioares->handle);
+	update->operations = get_operations (list);;
 	update->is_new = is_new;
 	mono_mutex_unlock (&threadpool_io->updates_lock);
 
@@ -535,25 +476,10 @@ mono_threadpool_ms_io_remove_socket (int fd)
 		mono_g_hash_table_remove (threadpool_io->states, GINT_TO_POINTER (fd));
 	mono_mutex_unlock (&threadpool_io->states_lock);
 
-	while (list) {
-		MonoSocketAsyncResult *sockares, *sockares2;
-
-		sockares = (MonoSocketAsyncResult*) mono_mlist_get_data (list);
-		if (sockares->operation == AIO_OP_RECEIVE)
-			sockares->operation = AIO_OP_RECV_JUST_CALLBACK;
-		else if (sockares->operation == AIO_OP_SEND)
-			sockares->operation = AIO_OP_SEND_JUST_CALLBACK;
-
-		sockares2 = get_sockares_for_event (&list, MONO_POLLIN);
-		if (sockares2)
-			mono_threadpool_ms_enqueue_work_item (((MonoObject*) sockares2)->vtable->domain, (MonoObject*) sockares2);
-
-		if (!list)
-			break;
-
-		sockares2 = get_sockares_for_event (&list, MONO_POLLOUT);
-		if (sockares2)
-			mono_threadpool_ms_enqueue_work_item (((MonoObject*) sockares2)->vtable->domain, (MonoObject*) sockares2);
+	for (; list; list = mono_mlist_remove_item (list, list)) {
+		MonoIOAsyncResult *ioares = (MonoIOAsyncResult*) mono_mlist_get_data (list);
+		if (ioares)
+			mono_threadpool_ms_enqueue_work_item (((MonoObject*) ioares)->vtable->domain, (MonoObject*) ioares);
 	}
 }
 
@@ -586,7 +512,7 @@ mono_threadpool_ms_io_remove_domain_jobs (MonoDomain *domain)
 }
 
 void
-icall_append_io_job (MonoObject *target, MonoSocketAsyncResult *state)
+icall_append_io_job (MonoObject *target, MonoIOAsyncResult *state)
 {
 	MonoAsyncResult *ares;
 
@@ -614,7 +540,7 @@ mono_threadpool_ms_io_cleanup (void)
 }
 
 MonoAsyncResult *
-mono_threadpool_ms_io_add (MonoAsyncResult *ares, MonoSocketAsyncResult *sockares)
+mono_threadpool_ms_io_add (MonoAsyncResult *ares, MonoIOAsyncResult *ioares)
 {
 	g_assert_not_reached ();
 }
@@ -632,7 +558,7 @@ mono_threadpool_ms_io_remove_domain_jobs (MonoDomain *domain)
 }
 
 void
-icall_append_io_job (MonoObject *target, MonoSocketAsyncResult *state)
+icall_append_io_job (MonoObject *target, MonoIOAsyncResult *state)
 {
 	g_assert_not_reached ();
 }
