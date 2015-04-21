@@ -60,9 +60,9 @@ epoll_update_add (ThreadPoolIOUpdate *update)
 	struct epoll_event event;
 
 	event.data.fd = update->fd;
-	if ((update->events & MONO_POLLIN) != 0)
+	if ((update->operations & IO_OP_IN) != 0)
 		event.events |= EPOLLIN;
-	if ((update->events & MONO_POLLOUT) != 0)
+	if ((update->operations & IO_OP_OUT) != 0)
 		event.events |= EPOLLOUT;
 
 	if (epoll_ctl (epoll_fd, update->is_new ? EPOLL_CTL_ADD : EPOLL_CTL_MOD, event.data.fd, &event) == -1)
@@ -103,7 +103,7 @@ epoll_event_fd_at (guint i)
 }
 
 static gboolean
-epoll_event_create_sockares_at (guint i, gint fd, MonoMList **list)
+epoll_event_create_ioares_at (guint i, gint fd, MonoMList **list)
 {
 	struct epoll_event *epoll_event;
 
@@ -115,23 +115,23 @@ epoll_event_create_sockares_at (guint i, gint fd, MonoMList **list)
 	g_assert (fd == epoll_event->data.fd);
 
 	if (*list && (epoll_event->events & (EPOLLIN | EPOLLERR | EPOLLHUP)) != 0) {
-		MonoSocketAsyncResult *io_event = get_sockares_for_event (list, MONO_POLLIN);
+		MonoIOAsyncResult *io_event = get_ioares_for_operation (list, IO_OP_IN);
 		if (io_event)
 			mono_threadpool_ms_enqueue_work_item (((MonoObject*) io_event)->vtable->domain, (MonoObject*) io_event);
 	}
 	if (*list && (epoll_event->events & (EPOLLOUT | EPOLLERR | EPOLLHUP)) != 0) {
-		MonoSocketAsyncResult *io_event = get_sockares_for_event (list, MONO_POLLOUT);
+		MonoIOAsyncResult *io_event = get_ioares_for_operation (list, IO_OP_OUT);
 		if (io_event)
 			mono_threadpool_ms_enqueue_work_item (((MonoObject*) io_event)->vtable->domain, (MonoObject*) io_event);
 	}
 
 	if (*list) {
-		gint events = get_events (*list);
+		gint operations = get_operations (*list);
 
-		epoll_event->events = ((events & MONO_POLLOUT) ? EPOLLOUT : 0) | ((events & MONO_POLLIN) ? EPOLLIN : 0);
+		epoll_event->events = ((operations & IO_OP_OUT) ? EPOLLOUT : 0) | ((operations & IO_OP_IN) ? EPOLLIN : 0);
 		if (epoll_ctl (epoll_fd, EPOLL_CTL_MOD, fd, epoll_event) == -1) {
 			if (epoll_ctl (epoll_fd, EPOLL_CTL_ADD, fd, epoll_event) == -1)
-				g_warning ("epoll_event_create_sockares_at: epoll_ctl () failed, error (%d) %s", errno, g_strerror (errno));
+				g_warning ("epoll_event_create_ioares_at: epoll_ctl () failed, error (%d) %s", errno, g_strerror (errno));
 		}
 	} else {
 		epoll_ctl (epoll_fd, EPOLL_CTL_DEL, fd, epoll_event);
@@ -147,7 +147,7 @@ static ThreadPoolIOBackend backend_epoll = {
 	.event_wait = epoll_event_wait,
 	.event_max = epoll_event_max,
 	.event_fd_at = epoll_event_fd_at,
-	.event_create_sockares_at = epoll_event_create_sockares_at,
+	.event_create_ioares_at = epoll_event_create_ioares_at,
 };
 
 #endif

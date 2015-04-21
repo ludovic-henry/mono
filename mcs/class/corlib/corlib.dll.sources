@@ -864,6 +864,7 @@ System.Threading/EventWaitHandle.cs
 System.Threading/HostExecutionContext.cs
 System.Threading/HostExecutionContextManager.cs
 System.Threading/Interlocked.cs
+System.Threading/IOAsyncResult.cs
 System.Threading/LockCookie.cs
 System.Threading/LockQueue.cs
 System.Threading/Monitor.cs

@@ -50,13 +50,21 @@ kqueue_update_add (ThreadPoolIOUpdate *update)
 {
 	struct kevent event;
 
-	if ((update->events & MONO_POLLIN) != 0)
+	if ((update->operations & IO_OP_IN) != 0)
 		EV_SET (&event, update->fd, EVFILT_READ, EV_ADD | EV_ENABLE | EV_ONESHOT, 0, 0, 0);
-	if ((update->events & MONO_POLLOUT) != 0)
+	if ((update->operations & IO_OP_OUT) != 0)
 		EV_SET (&event, update->fd, EVFILT_WRITE, EV_ADD | EV_ENABLE | EV_ONESHOT, 0, 0, 0);
 
-	if (kevent (kqueue_fd, &event, 1, NULL, 0, NULL) == -1)
-		g_warning ("kqueue_update_add: kevent(update) failed, error (%d) %s", errno, g_strerror (errno));
+	if (kevent (kqueue_fd, &event, 1, NULL, 0, NULL) == -1) {
+		switch (errno) {
+		case EBADF:
+			g_warning ("kqueue_update_add: kevent(update) failed, error (%d) %s, fd = %d", errno, g_strerror (errno), update->fd);
+			break;
+		default:
+			g_warning ("kqueue_update_add: kevent(update) failed, error (%d) %s", errno, g_strerror (errno));
+			break;
+		}
+	}
 }
 
 static gint
@@ -93,7 +101,7 @@ kqueue_event_max (void)
 }
 
 static gboolean
-kqueue_event_create_sockares_at (guint i, gint fd, MonoMList **list)
+kqueue_event_create_ioares_at (guint i, gint fd, MonoMList **list)
 {
 	struct kevent *kqueue_event;
 
@@ -105,27 +113,27 @@ kqueue_event_create_sockares_at (guint i, gint fd, MonoMList **list)
 	g_assert (fd == kqueue_event->ident);
 
 	if (*list && (kqueue_event->filter == EVFILT_READ || (kqueue_event->flags & EV_ERROR) != 0)) {
-		MonoSocketAsyncResult *io_event = get_sockares_for_event (list, MONO_POLLIN);
+		MonoIOAsyncResult *io_event = get_ioares_for_operation (list, IO_OP_IN);
 		if (io_event)
 			mono_threadpool_ms_enqueue_work_item (((MonoObject*) io_event)->vtable->domain, (MonoObject*) io_event);
 	}
 	if (*list && (kqueue_event->filter == EVFILT_WRITE || (kqueue_event->flags & EV_ERROR) != 0)) {
-		MonoSocketAsyncResult *io_event = get_sockares_for_event (list, MONO_POLLOUT);
+		MonoIOAsyncResult *io_event = get_ioares_for_operation (list, IO_OP_OUT);
 		if (io_event)
 			mono_threadpool_ms_enqueue_work_item (((MonoObject*) io_event)->vtable->domain, (MonoObject*) io_event);
 	}
 
 	if (*list) {
-		gint events = get_events (*list);
-		if (kqueue_event->filter == EVFILT_READ && (events & MONO_POLLIN) != 0) {
+		gint operations = get_operations (*list);
+		if (kqueue_event->filter == EVFILT_READ && (operations & IO_OP_IN) != 0) {
 			EV_SET (kqueue_event, fd, EVFILT_READ, EV_ADD | EV_ENABLE | EV_ONESHOT, 0, 0, 0);
 			if (kevent (kqueue_fd, kqueue_event, 1, NULL, 0, NULL) == -1)
-				g_warning ("kqueue_event_create_sockares_at: kevent (read) failed, error (%d) %s", errno, g_strerror (errno));
+				g_warning ("kqueue_event_create_ioares_at: kevent (read) failed, error (%d) %s", errno, g_strerror (errno));
 		}
-		if (kqueue_event->filter == EVFILT_WRITE && (events & MONO_POLLOUT) != 0) {
+		if (kqueue_event->filter == EVFILT_WRITE && (operations & IO_OP_OUT) != 0) {
 			EV_SET (kqueue_event, fd, EVFILT_WRITE, EV_ADD | EV_ENABLE | EV_ONESHOT, 0, 0, 0);
 			if (kevent (kqueue_fd, kqueue_event, 1, NULL, 0, NULL) == -1)
-				g_warning ("kqueue_event_create_sockares_at: kevent (write) failed, error (%d) %s", errno, g_strerror (errno));
+				g_warning ("kqueue_event_create_ioares_at: kevent (write) failed, error (%d) %s", errno, g_strerror (errno));
 		}
 	}
 
@@ -139,7 +147,7 @@ static ThreadPoolIOBackend backend_kqueue = {
 	.event_wait = kqueue_event_wait,
 	.event_max = kqueue_event_max,
 	.event_fd_at = kqueue_event_fd_at,
-	.event_create_sockares_at = kqueue_event_create_sockares_at,
+	.event_create_ioares_at = kqueue_event_create_ioares_at,
 };
 
 #endif
