@@ -1257,7 +1257,7 @@ mono_threadpool_ms_add (MonoObject *target, MonoMethodMessage *msg, MonoDelegate
 
 #ifndef DISABLE_SOCKETS
 	if (mono_threadpool_ms_is_io (target, state))
-		return mono_threadpool_ms_io_add (ares, (MonoSocketAsyncResult*) state);
+		return mono_threadpool_ms_io_add (ares, (MonoIOAsyncResult*) state);
 #endif
 
 	mono_threadpool_ms_enqueue_work_item (domain, (MonoObject*) ares);
