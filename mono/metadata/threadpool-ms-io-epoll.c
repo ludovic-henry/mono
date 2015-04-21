@@ -55,7 +55,7 @@ epoll_cleanup (void)
 }
 
 static void
-epoll_register_fd (gint fd, gint events, gboolean is_new)
+epoll_register_fd (gint fd, gint operations, gboolean is_new)
 {
 	struct epoll_event event;
 
@@ -66,9 +66,9 @@ epoll_register_fd (gint fd, gint events, gboolean is_new)
 
 	event.data.fd = fd;
 	event.events = EPOLLONESHOT;
-	if ((events & EVENT_IN) != 0)
+	if ((operations & EVENT_IN) != 0)
 		event.events |= EPOLLIN;
-	if ((events & EVENT_OUT) != 0)
+	if ((operations & EVENT_OUT) != 0)
 		event.events |= EPOLLOUT;
 
 	if (epoll_ctl (epoll_fd, is_new ? EPOLL_CTL_ADD : EPOLL_CTL_MOD, event.data.fd, &event) == -1)

@@ -1262,7 +1262,7 @@ namespace System.Diagnostics {
 
 			DateTime start = DateTime.UtcNow;
 			if (async_output != null && !async_output.IsCompleted) {
-				if (false == async_output.WaitHandle.WaitOne (ms, false))
+				if (false == async_output.AsyncWaitHandle.WaitOne (ms, false))
 					return false; // Timed out
 
 				if (ms >= 0) {
@@ -1275,7 +1275,7 @@ namespace System.Diagnostics {
 			}
 
 			if (async_error != null && !async_error.IsCompleted) {
-				if (false == async_error.WaitHandle.WaitOne (ms, false))
+				if (false == async_error.AsyncWaitHandle.WaitOne (ms, false))
 					return false; // Timed out
 
 				if (ms >= 0) {
@@ -1348,57 +1348,25 @@ namespace System.Diagnostics {
 		}
 
 		[StructLayout (LayoutKind.Sequential)]
-		sealed class ProcessAsyncReader : IThreadPoolWorkItem
+		sealed class ProcessAsyncReader : IOAsyncResult
 		{
-			/*
-			   The following fields match those of SocketAsyncResult.
-			   This is so that changes needed in the runtime to handle
-			   asynchronous reads are trivial
-			   Keep this in sync with SocketAsyncResult in 
-			   ./System.Net.Sockets/Socket.cs and MonoSocketAsyncResult
-			   in metadata/socket-io.h.
-			*/
-			/* DON'T shuffle fields around. DON'T remove fields */
-			public object Sock;
-			public IntPtr handle;
-			public object state;
-			public AsyncCallback callback;
-			public ManualResetEvent wait_handle;
-
-			public Exception delayedException;
-
-			public object EndPoint;
 			byte [] buffer = new byte [4196];
-			public int Offset;
-			public int Size;
-			public int SockFlags;
 
-			public object AcceptSocket;
-			public object[] Addresses;
-			public int port;
-			public object Buffers;          // Reserve this slot in older profiles
-			public bool ReuseSocket;        // Disconnect
-			public object acc_socket;
-			public int total;
-			public bool completed_sync;
-			bool completed;
 			bool err_out; // true -> stdout, false -> stderr
-			internal int error;
-			public int operation = 8; // MAGIC NUMBER: see Socket.cs:AsyncOperation
-			public AsyncResult async_result;
-			public int EndCalled;
 
-			// These fields are not in SocketAsyncResult
 			Process process;
 			Stream stream;
 			StringBuilder sb = new StringBuilder ();
+
 			public AsyncReadHandler ReadHandler;
 
 			public ProcessAsyncReader (Process process, IntPtr handle, bool err_out)
 			{
-				this.process = process;
 				this.handle = handle;
-				stream = new FileStream (handle, FileAccess.Read, false);
+				this.operation = IOOperation.In;
+
+				this.process = process;
+				this.stream = new FileStream (this.handle, FileAccess.Read, false);
 				this.ReadHandler = new AsyncReadHandler (AddInput);
 				this.err_out = err_out;
 			}
@@ -1472,20 +1440,6 @@ namespace System.Diagnostics {
 				}
 			}
 
-			public bool IsCompleted {
-				get { return completed; }
-			}
-
-			public WaitHandle WaitHandle {
-				get {
-					lock (this) {
-						if (wait_handle == null)
-							wait_handle = new ManualResetEvent (completed);
-						return wait_handle;
-					}
-				}
-			}
-
 			public void Close () {
 				RemoveFromIOThreadPool (handle);
 				stream.Close ();
@@ -1494,13 +1448,9 @@ namespace System.Diagnostics {
 			[MethodImplAttribute(MethodImplOptions.InternalCall)]
 			extern static void RemoveFromIOThreadPool (IntPtr handle);
 
-			void IThreadPoolWorkItem.ExecuteWorkItem()
+			protected override void Invoke ()
 			{
 				async_result.Invoke ();
-			}
-
-			void IThreadPoolWorkItem.MarkAborted(ThreadAbortException tae)
-			{
 			}
 		}
 

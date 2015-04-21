@@ -16,10 +16,10 @@ static gint kqueue_fd;
 static struct kevent *kqueue_events;
 
 static gint
-KQUEUE_INIT_FD (gint fd, gint events, gint flags)
+KQUEUE_INIT_FD (gint fd, gint operations, gint flags)
 {
 	struct kevent event;
-	EV_SET (&event, fd, events, flags, 0, 0, 0);
+	EV_SET (&event, fd, operations, flags, 0, 0, 0);
 	return kevent (kqueue_fd, &event, 1, NULL, 0, NULL);
 }
 
@@ -51,16 +51,16 @@ kqueue_cleanup (void)
 }
 
 static void
-kqueue_register_fd (gint fd, gint events, gboolean is_new)
+kqueue_register_fd (gint fd, gint operations, gboolean is_new)
 {
-	if (events & EVENT_IN) {
+	if (operations & EVENT_IN) {
 		if (KQUEUE_INIT_FD (fd, EVFILT_READ, EV_ADD | EV_ENABLE) == -1)
 			g_error ("kqueue_register_fd: kevent(read,enable) failed, error (%d) %s", errno, g_strerror (errno));
 	} else {
 		if (KQUEUE_INIT_FD (fd, EVFILT_READ, EV_ADD | EV_DISABLE) == -1)
 			g_error ("kqueue_register_fd: kevent(read,disable) failed, error (%d) %s", errno, g_strerror (errno));
 	}
-	if (events & EVENT_OUT) {
+	if (operations & EVENT_OUT) {
 		if (KQUEUE_INIT_FD (fd, EVFILT_WRITE, EV_ADD | EV_ENABLE) == -1)
 			g_error ("kqueue_register_fd: kevent(write,enable) failed, error (%d) %s", errno, g_strerror (errno));
 	} else {

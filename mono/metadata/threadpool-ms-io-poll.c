@@ -25,10 +25,10 @@ static guint poll_fds_capacity;
 static guint poll_fds_size;
 
 static inline void
-POLL_INIT_FD (mono_pollfd *poll_fd, gint fd, gint events)
+POLL_INIT_FD (mono_pollfd *poll_fd, gint fd, gint operations)
 {
 	poll_fd->fd = fd;
-	poll_fd->events = events;
+	poll_fd->events = operations;
 	poll_fd->revents = 0;
 }
 
@@ -60,7 +60,7 @@ poll_cleanup (void)
 }
 
 static void
-poll_register_fd (gint fd, gint events, gboolean is_new)
+poll_register_fd (gint fd, gint operations, gboolean is_new)
 {
 	gint i;
 	mono_pollfd *poll_fd;
@@ -90,7 +90,7 @@ poll_register_fd (gint fd, gint events, gboolean is_new)
 		g_assert (!is_new);
 	}
 
-	POLL_INIT_FD (poll_fd, fd, ((events & EVENT_IN) ? POLLIN : 0) | ((events & EVENT_OUT) ? POLLOUT : 0));
+	POLL_INIT_FD (poll_fd, fd, ((operations & EVENT_IN) ? POLLIN : 0) | ((operations & EVENT_OUT) ? POLLOUT : 0));
 }
 
 static void

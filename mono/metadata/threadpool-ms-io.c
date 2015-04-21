@@ -32,11 +32,12 @@
 typedef struct {
 	gboolean (*init) (gint wakeup_pipe_fd);
 	void     (*cleanup) (void);
-	void     (*register_fd) (gint fd, gint events, gboolean is_new);
+	void     (*register_fd) (gint fd, gint operations, gboolean is_new);
 	void     (*remove_fd) (gint fd);
 	gint     (*event_wait) (void (*callback) (gint fd, gint events, gpointer user_data), gpointer user_data);
 } ThreadPoolIOBackend;
 
+/* Keep in sync with System.Threading.IOOperation */
 enum {
 	EVENT_IN   = 1 << 0,
 	EVENT_OUT  = 1 << 1,
@@ -48,24 +49,18 @@ enum {
 
 #define UPDATES_CAPACITY 128
 
-/* Keep in sync with System.Net.Sockets.Socket.SocketOperation */
-enum {
-	AIO_OP_FIRST,
-	AIO_OP_ACCEPT = 0,
-	AIO_OP_CONNECT,
-	AIO_OP_RECEIVE,
-	AIO_OP_RECEIVEFROM,
-	AIO_OP_SEND,
-	AIO_OP_SENDTO,
-	AIO_OP_RECV_JUST_CALLBACK,
-	AIO_OP_SEND_JUST_CALLBACK,
-	AIO_OP_READPIPE,
-	AIO_OP_CONSOLE2,
-	AIO_OP_DISCONNECT,
-	AIO_OP_ACCEPTRECEIVE,
-	AIO_OP_RECEIVE_BUFFERS,
-	AIO_OP_SEND_BUFFERS,
-	AIO_OP_LAST
+/* Keep in sync with System.Threading.IOAsyncResult */
+struct _MonoIOAsyncResult {
+	MonoObject obj;
+	MonoObject *state;
+	MonoObject *wait_handle;
+	MonoBoolean completed_synchronously;
+	MonoBoolean completed;
+	gchar __dummy [SIZEOF_VOID_P - 2]; // align on SIZEOF_VOID_P bytes
+	gpointer handle;
+	MonoAsyncResult *async_result;
+	MonoObject *async_callback;
+	gint operation;
 };
 
 typedef enum {
@@ -77,7 +72,7 @@ typedef enum {
 
 typedef struct {
 	gint fd;
-	MonoSocketAsyncResult *sockares;
+	MonoIOAsyncResult *ioares;
 } ThreadPoolIOUpdate_Add;
 
 typedef struct {
@@ -118,42 +113,18 @@ static gboolean io_selector_running = FALSE;
 
 static ThreadPoolIO* threadpool_io;
 
-static int
-get_events_from_sockares (MonoSocketAsyncResult *ares)
-{
-	switch (ares->operation) {
-	case AIO_OP_ACCEPT:
-	case AIO_OP_RECEIVE:
-	case AIO_OP_RECV_JUST_CALLBACK:
-	case AIO_OP_RECEIVEFROM:
-	case AIO_OP_READPIPE:
-	case AIO_OP_ACCEPTRECEIVE:
-	case AIO_OP_RECEIVE_BUFFERS:
-		return EVENT_IN;
-	case AIO_OP_SEND:
-	case AIO_OP_SEND_JUST_CALLBACK:
-	case AIO_OP_SENDTO:
-	case AIO_OP_CONNECT:
-	case AIO_OP_SEND_BUFFERS:
-	case AIO_OP_DISCONNECT:
-		return EVENT_OUT;
-	default:
-		g_assert_not_reached ();
-	}
-}
-
-static MonoSocketAsyncResult*
-get_sockares_for_event (MonoMList **list, gint event)
+static MonoIOAsyncResult*
+get_ioares_for_operation (MonoMList **list, gint operation)
 {
 	MonoMList *current;
 
 	g_assert (list);
 
 	for (current = *list; current; current = mono_mlist_next (current)) {
-		MonoSocketAsyncResult *ares = (MonoSocketAsyncResult*) mono_mlist_get_data (current);
-		if (get_events_from_sockares (ares) == event) {
+		MonoIOAsyncResult *ioares = (MonoIOAsyncResult*) mono_mlist_get_data (current);
+		if ((ioares->operation & operation) != 0) {
 			*list = mono_mlist_remove_item (*list, current);
-			return ares;
+			return ioares;
 		}
 	}
 
@@ -161,15 +132,14 @@ get_sockares_for_event (MonoMList **list, gint event)
 }
 
 static gint
-get_events (MonoMList *list)
+get_operations (MonoMList *list)
 {
-	MonoMList *current;
-	gint events = 0;
+	gint operations = 0;
 
-	for (current = list; current; current = mono_mlist_next (current))
-		events |= get_events_from_sockares ((MonoSocketAsyncResult*) mono_mlist_get_data (current));
+	for (; list; list = mono_mlist_next (list))
+		operations |= ((MonoIOAsyncResult*) mono_mlist_get_data (list))->operation;
 
-	return events;
+	return operations;
 }
 
 static void
@@ -231,12 +201,12 @@ selector_thread_wakeup_drain_pipes (void)
 typedef struct {
 	MonoDomain *domain;
 	MonoGHashTable *states;
-} FilterSockaresForDomainData;
+} FilterIOAresForDomainData;
 
 static void
-filter_sockares_for_domain (gpointer key, gpointer value, gpointer user_data)
+filter_ioares_for_domain (gpointer key, gpointer value, gpointer user_data)
 {
-	FilterSockaresForDomainData *data;
+	FilterIOAresForDomainData *data;
 	MonoMList *list = value, *element;
 	MonoDomain *domain;
 	MonoGHashTable *states;
@@ -247,8 +217,8 @@ filter_sockares_for_domain (gpointer key, gpointer value, gpointer user_data)
 	states = data->states;
 
 	for (element = list; element; element = mono_mlist_next (element)) {
-		MonoSocketAsyncResult *sockares = (MonoSocketAsyncResult*) mono_mlist_get_data (element);
-		if (mono_object_domain (sockares) == domain)
+		MonoIOAsyncResult *ioares = (MonoIOAsyncResult*) mono_mlist_get_data (element);
+		if (mono_object_domain (ioares) == domain)
 			mono_mlist_set_data (element, NULL);
 	}
 
@@ -289,6 +259,7 @@ wait_callback (gint fd, gint events, gpointer user_data)
 		MonoGHashTable *states;
 		MonoMList *list = NULL;
 		gpointer k;
+		gint operations;
 
 		g_assert (user_data);
 		states = user_data;
@@ -300,24 +271,24 @@ wait_callback (gint fd, gint events, gpointer user_data)
 			g_error ("wait_callback: fd %d not found in states table", fd);
 
 		if (list && (events & EVENT_IN) != 0) {
-			MonoSocketAsyncResult *sockares = get_sockares_for_event (&list, EVENT_IN);
-			if (sockares)
-				mono_threadpool_ms_enqueue_work_item (((MonoObject*) sockares)->vtable->domain, (MonoObject*) sockares);
+			MonoIOAsyncResult *ioares = get_ioares_for_operation (&list, EVENT_IN);
+			if (ioares)
+				mono_threadpool_ms_enqueue_work_item (((MonoObject*) ioares)->vtable->domain, (MonoObject*) ioares);
 		}
 		if (list && (events & EVENT_OUT) != 0) {
-			MonoSocketAsyncResult *sockares = get_sockares_for_event (&list, EVENT_OUT);
-			if (sockares)
-				mono_threadpool_ms_enqueue_work_item (((MonoObject*) sockares)->vtable->domain, (MonoObject*) sockares);
+			MonoIOAsyncResult *ioares = get_ioares_for_operation (&list, EVENT_OUT);
+			if (ioares)
+				mono_threadpool_ms_enqueue_work_item (((MonoObject*) ioares)->vtable->domain, (MonoObject*) ioares);
 		}
 
 		mono_g_hash_table_replace (states, GINT_TO_POINTER (fd), list);
 
-		events = get_events (list);
+		operations = get_operations (list);
 
-		mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_IO_THREADPOOL, "io threadpool: res fd %3d, events = %2s | %2s",
-			fd, (events & EVENT_IN) ? "RD" : "..", (events & EVENT_OUT) ? "WR" : "..");
+		mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_IO_THREADPOOL, "io threadpool: res fd %3d, operations = %2s | %2s",
+			fd, (operations & EVENT_IN) ? "RD" : "..", (operations & EVENT_OUT) ? "WR" : "..");
 
-		threadpool_io->backend.register_fd (fd, events, FALSE);
+		threadpool_io->backend.register_fd (fd, operations, FALSE);
 	}
 }
 
@@ -349,28 +320,28 @@ selector_thread (gpointer data)
 				break;
 			case UPDATE_ADD: {
 				gint fd;
-				gint events;
+				gint operations;
 				gpointer k;
 				gboolean exists;
 				MonoMList *list = NULL;
-				MonoSocketAsyncResult *sockares;
+				MonoIOAsyncResult *ioares;
 
 				fd = update->data.add.fd;
 				g_assert (fd >= 0);
 
-				sockares = update->data.add.sockares;
-				g_assert (sockares);
+				ioares = update->data.add.ioares;
+				g_assert (ioares);
 
 				exists = mono_g_hash_table_lookup_extended (states, GINT_TO_POINTER (fd), &k, (gpointer*) &list);
-				list = mono_mlist_append (list, (MonoObject*) sockares);
-				mono_g_hash_table_replace (states, sockares->handle, list);
+				list = mono_mlist_append (list, (MonoObject*) ioares);
+				mono_g_hash_table_replace (states, ioares->handle, list);
 
-				events = get_events (list);
+				operations = get_operations (list);
 
-				mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_IO_THREADPOOL, "io threadpool: %3s fd %3d, events = %2s | %2s",
-					exists ? "mod" : "add", fd, (events & EVENT_IN) ? "RD" : "..", (events & EVENT_OUT) ? "WR" : "..");
+				mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_IO_THREADPOOL, "io threadpool: %3s fd %3d, operations = %2s | %2s",
+					exists ? "mod" : "add", fd, (operations & EVENT_IN) ? "RD" : "..", (operations & EVENT_OUT) ? "WR" : "..");
 
-				threadpool_io->backend.register_fd (fd, events, !exists);
+				threadpool_io->backend.register_fd (fd, operations, !exists);
 
 				break;
 			}
@@ -418,12 +389,12 @@ selector_thread (gpointer data)
 				domain = update->data.remove_domain.domain;
 				g_assert (domain);
 
-				FilterSockaresForDomainData user_data = { .domain = domain, .states = states };
-				mono_g_hash_table_foreach (states, filter_sockares_for_domain, &user_data);
+				FilterIOAresForDomainData user_data = { .domain = domain, .states = states };
+				mono_g_hash_table_foreach (states, filter_ioares_for_domain, &user_data);
 
 				for (j = i + 1; j < threadpool_io->updates_size; ++j) {
 					ThreadPoolIOUpdate *update = &threadpool_io->updates [j];
-					if (update->type == UPDATE_ADD && mono_object_domain (update->data.add.sockares) == domain)
+					if (update->type == UPDATE_ADD && mono_object_domain (update->data.add.ioares) == domain)
 						memset (update, 0, sizeof (ThreadPoolIOUpdate));
 				}
 
@@ -598,44 +569,16 @@ cleanup (void)
 	g_assert (!threadpool_io);
 }
 
-static gboolean
-is_socket_async_callback (MonoImage *system_image, MonoClass *class)
-{
-	MonoClass *socket_async_callback_class = NULL;
-
-	socket_async_callback_class = mono_class_from_name (system_image, "System.Net.Sockets", "SocketAsyncCallback");
-
-	return class == socket_async_callback_class;
-}
-
-static gboolean
-is_async_read_handler (MonoImage *system_image, MonoClass *class)
-{
-	MonoClass *async_read_handler_class = NULL;
-
-	async_read_handler_class = mono_class_from_name (system_image, "System.Diagnostics", "Process/AsyncReadHandler");
-
-	return class == async_read_handler_class;
-}
-
 gboolean
 mono_threadpool_ms_is_io (MonoObject *target, MonoObject *state)
 {
-	MonoImage *system_image;
-	MonoSocketAsyncResult *sockares;
+	static MonoClass *io_async_result_class = NULL;
 
-	system_image = mono_image_loaded ("System");
-	if (!system_image)
-		return FALSE;
+	if (!io_async_result_class)
+		io_async_result_class = mono_class_from_name (mono_defaults.corlib, "System.Threading", "IOAsyncResult");
+	g_assert (io_async_result_class);
 
-	if (!is_socket_async_callback (system_image, target->vtable->klass) && !is_async_read_handler (system_image, target->vtable->klass))
-		return FALSE;
-
-	sockares = (MonoSocketAsyncResult*) state;
-	if (sockares->operation < AIO_OP_FIRST || sockares->operation >= AIO_OP_LAST)
-		return FALSE;
-
-	return TRUE;
+	return mono_class_has_parent (target->vtable->klass, io_async_result_class);
 }
 
 void
@@ -645,28 +588,28 @@ mono_threadpool_ms_io_cleanup (void)
 }
 
 MonoAsyncResult *
-mono_threadpool_ms_io_add (MonoAsyncResult *ares, MonoSocketAsyncResult *sockares)
+mono_threadpool_ms_io_add (MonoAsyncResult *ares, MonoIOAsyncResult *ioares)
 {
 	ThreadPoolIOUpdate *update;
 
 	g_assert (ares);
-	g_assert (sockares);
+	g_assert (ioares);
 
 	if (mono_runtime_is_shutting_down ())
 		return NULL;
-	if (mono_domain_is_unloading (mono_object_domain (sockares)))
+	if (mono_domain_is_unloading (mono_object_domain (ioares)))
 		return NULL;
 
 	mono_lazy_initialize (&io_status, initialize);
 
-	MONO_OBJECT_SETREF (sockares, ares, ares);
+	MONO_OBJECT_SETREF (ioares, async_result, ares);
 
 	mono_mutex_lock (&threadpool_io->updates_lock);
 
 	update = update_get_new ();
 	update->type = UPDATE_ADD;
-	update->data.add.fd = GPOINTER_TO_INT (sockares->handle);
-	update->data.add.sockares = sockares;
+	update->data.add.fd = GPOINTER_TO_INT (ioares->handle);
+	update->data.add.ioares = ioares;
 
 	selector_thread_wakeup ();
 
@@ -718,7 +661,7 @@ mono_threadpool_ms_io_remove_domain_jobs (MonoDomain *domain)
 }
 
 void
-icall_append_io_job (MonoObject *target, MonoSocketAsyncResult *state)
+icall_append_io_job (MonoObject *target, MonoIOAsyncResult *state)
 {
 	MonoAsyncResult *ares;
 
@@ -746,7 +689,7 @@ mono_threadpool_ms_io_cleanup (void)
 }
 
 MonoAsyncResult *
-mono_threadpool_ms_io_add (MonoAsyncResult *ares, MonoSocketAsyncResult *sockares)
+mono_threadpool_ms_io_add (MonoAsyncResult *ares, MonoIOAsyncResult *ioares)
 {
 	g_assert_not_reached ();
 }
@@ -764,7 +707,7 @@ mono_threadpool_ms_io_remove_domain_jobs (MonoDomain *domain)
 }
 
 void
-icall_append_io_job (MonoObject *target, MonoSocketAsyncResult *state)
+icall_append_io_job (MonoObject *target, MonoIOAsyncResult *state)
 {
 	g_assert_not_reached ();
 }

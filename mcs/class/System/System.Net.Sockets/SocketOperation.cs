@@ -28,7 +28,6 @@
 
 namespace System.Net.Sockets
 {
-	// Used by the runtime
 	internal enum SocketOperation {
 		Accept,
 		Connect,
@@ -38,8 +37,6 @@ namespace System.Net.Sockets
 		SendTo,
 		RecvJustCallback,
 		SendJustCallback,
-		UsedInProcess,
-		UsedInConsole2,
 		Disconnect,
 		AcceptReceive,
 		ReceiveGeneric,
