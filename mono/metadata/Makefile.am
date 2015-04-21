@@ -154,8 +154,6 @@ common_sources = \
 	mono-basic-block.c	\
 	mono-basic-block.h	\
 	mono-config.c		\
-	mono-cq.c		\
-	mono-cq.h		\
 	mono-debug.h		\
 	mono-debug.c		\
 	mono-debug-debugger.h	\
@@ -170,8 +168,6 @@ common_sources = \
 	mono-ptr-array.h	\
 	mono-route.c		\
 	mono-route.h		\
-	mono-wsq.c		\
-	mono-wsq.h		\
 	monitor.h		\
 	nacl-stub.c		\
 	normalization-tables.h	\
@@ -202,14 +198,10 @@ common_sources = \
 	tabledefs.h 		\
 	threads.c		\
 	threads-types.h		\
-	threadpool.c		\
-	threadpool.h		\
-	threadpool-internals.h	\
 	threadpool-ms.c	\
 	threadpool-ms.h	\
 	threadpool-ms-io.c	\
 	threadpool-ms-io.h	\
-	tpool-poll.c	\
 	verify.c		\
 	verify-internals.h	\
 	wrapper-types.h	\
@@ -375,5 +367,4 @@ endif
 endif
 
 EXTRA_DIST = $(win32_sources) $(unix_sources) $(null_sources) runtime.h \
-		tpool-poll.c tpool-epoll.c tpool-kqueue.c \
 		threadpool-ms-io-poll.c threadpool-ms-io-epoll.c threadpool-ms-io-kqueue.c
