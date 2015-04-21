@@ -25,7 +25,6 @@
 #include "metadata/appdomain.h"
 #include "mono/metadata/abi-details.h"
 #include "mono/metadata/debug-helpers.h"
-#include "mono/metadata/threadpool.h"
 #include "mono/metadata/threads.h"
 #include "mono/metadata/monitor.h"
 #include "mono/metadata/metadata-internals.h"
@@ -38,6 +37,7 @@
 #include "mono/metadata/cominterop.h"
 #include "mono/metadata/remoting.h"
 #include "mono/metadata/reflection-internals.h"
+#include "mono/metadata/threadpool-ms.h"
 #include "mono/utils/mono-counters.h"
 #include "mono/utils/mono-tls.h"
 #include "mono/utils/mono-memory-model.h"
@@ -2109,7 +2109,7 @@ mono_delegate_begin_invoke (MonoDelegate *delegate, gpointer *params)
 	im = mono_get_delegate_invoke (method->klass);
 	msg = mono_method_call_message_new (method, params, im, &async_callback, &state);
 
-	return mono_thread_pool_add ((MonoObject *)delegate, msg, async_callback, state);
+	return mono_threadpool_ms_add ((MonoObject *)delegate, msg, async_callback, state);
 }
 
 #ifndef DISABLE_JIT
@@ -2824,7 +2824,7 @@ mono_delegate_end_invoke (MonoDelegate *delegate, gpointer *params)
 	} else
 #endif
 	{
-		res = mono_thread_pool_finish (ares, &out_args, &exc);
+		res = mono_threadpool_ms_finish (ares, &out_args, &exc);
 	}
 
 	if (exc) {

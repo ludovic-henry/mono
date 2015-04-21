@@ -22,7 +22,6 @@
 
 #include <mono/metadata/gc-internal.h>
 #include <mono/metadata/mono-mlist.h>
-#include <mono/metadata/threadpool-internals.h>
 #include <mono/metadata/threadpool-ms.h>
 #include <mono/metadata/threadpool-ms-io.h>
 #include <mono/utils/atomic.h>
@@ -586,6 +585,20 @@ mono_threadpool_ms_io_remove_domain_jobs (MonoDomain *domain)
 	}
 }
 
+void
+icall_append_io_job (MonoObject *target, MonoSocketAsyncResult *state)
+{
+	MonoAsyncResult *ares;
+
+	/* Don't call mono_async_result_new() to avoid capturing the context */
+	ares = (MonoAsyncResult *) mono_object_new (mono_domain_get (), mono_defaults.asyncresult_class);
+	MONO_OBJECT_SETREF (ares, async_delegate, target);
+	MONO_OBJECT_SETREF (ares, async_state, state);
+
+	mono_threadpool_ms_io_add (ares, state);
+	return;
+}
+
 #else
 
 gboolean
@@ -614,6 +627,12 @@ mono_threadpool_ms_io_remove_socket (int fd)
 
 void
 mono_threadpool_ms_io_remove_domain_jobs (MonoDomain *domain)
+{
+	g_assert_not_reached ();
+}
+
+void
+icall_append_io_job (MonoObject *target, MonoSocketAsyncResult *state)
 {
 	g_assert_not_reached ();
 }

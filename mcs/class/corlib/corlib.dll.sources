@@ -926,7 +926,6 @@ System.Threading/ReaderWriterLock.cs
 System.Threading/RegisteredWaitHandle.cs
 System.Threading/SynchronizationContext.cs
 System.Threading/Thread.cs
-System.Threading/ThreadPool.cs
 System.Threading/Timer.cs
 System.Threading/TimerCallback.cs
 System.Threading/Volatile.cs
