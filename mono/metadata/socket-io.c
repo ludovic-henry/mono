@@ -53,7 +53,7 @@
 #include <mono/metadata/file-io.h>
 #include <mono/metadata/threads.h>
 #include <mono/metadata/threads-types.h>
-#include <mono/metadata/threadpool-ms-io.h>
+#include <mono/metadata/io-selector.h>
 #include <mono/utils/mono-poll.h>
 /* FIXME change this code to not mess so much with the internals */
 #include <mono/metadata/class-internals.h>

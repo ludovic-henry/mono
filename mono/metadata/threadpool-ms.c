@@ -36,7 +36,7 @@
 #include <mono/metadata/object.h>
 #include <mono/metadata/object-internals.h>
 #include <mono/metadata/threadpool-ms.h>
-#include <mono/metadata/threadpool-ms-io.h>
+#include <mono/metadata/io-selector.h>
 #include <mono/utils/atomic.h>
 #include <mono/utils/mono-compiler.h>
 #include <mono/utils/mono-proclib.h>

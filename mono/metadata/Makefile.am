@@ -198,8 +198,8 @@ common_sources = \
 	threads-types.h		\
 	threadpool-ms.c	\
 	threadpool-ms.h	\
-	threadpool-ms-io.c	\
-	threadpool-ms-io.h	\
+	io-selector.c	\
+	io-selector.h	\
 	verify.c		\
 	verify-internals.h	\
 	wrapper-types.h	\

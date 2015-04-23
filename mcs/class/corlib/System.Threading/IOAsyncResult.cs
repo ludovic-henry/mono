@@ -30,7 +30,7 @@
  * IAsyncResult implementation used by the IO threadpool.
  *
  * See :
- *  - metadata/threadpool-ms-io.c
+ *  - metadata/io-selector.c
  */
 
 using System.Runtime.InteropServices;
@@ -41,7 +41,7 @@ namespace System.Threading
 	internal enum IOOperation : int
 	{
 		/* Same enum in the runtime. Keep this in sync with
-		 * MonoIOOperation in metadata/threadpool-ms-io.c */
+		 * MonoIOOperation in metadata/io-selector.c */
 
 		Undefined = 0,
 		In        = 1,
@@ -52,7 +52,7 @@ namespace System.Threading
 	internal abstract class IOAsyncResult : IAsyncResult, IThreadPoolWorkItem
 	{
 		/* Same fields in the runtime. Keep this in sync with
-		 * MonoIOAsyncResult in metadata/threadpool-ms-io.c */
+		 * MonoIOAsyncResult in metadata/io-selector.c */
 
 		protected object state;
 		protected ManualResetEvent wait_handle;

@@ -23,7 +23,7 @@ namespace System.Threading
 	}
 
 	/* This implementation is based on epoll/kqueue/poll (depending on the
-	 * platform), and the runtime support is implemented in threadpool-ms-io.c
+	 * platform), and the runtime support is implemented in io-selector.c
 	 *
 	 * Whenever there is an IO event, the associated IOAsyncResult will be enqueued
 	 * on the threadpool. Maybe we should have our own threads, to respect entirely
@@ -31,7 +31,7 @@ namespace System.Threading
 	[StructLayout (LayoutKind.Sequential)]
 	internal sealed class NativePollingIOSelector : IIOSelector
 	{
-		/* Keep in sync with MonoIOSelector in metadata/threadpool-ms-io.c */
+		/* Keep in sync with MonoIOSelector in metadata/io-selector.c */
 		IntPtr backend;
 		IntPtr backend_data;
 

@@ -1,5 +1,5 @@
 /*
- * threadpool-ms-io.c: Microsoft IO threadpool runtime support
+ * io-selector.c: Microsoft IO threadpool runtime support
  *
  * Author:
  *	Ludovic Henry (ludovic.henry@xamarin.com)
@@ -20,7 +20,7 @@
 #endif
 
 #include <mono/metadata/exception.h>
-#include <mono/metadata/threadpool-ms-io.h>
+#include <mono/metadata/io-selector.h>
 
 /* Keep in sync with System.Threading.IOOperation */
 enum {
@@ -46,9 +46,9 @@ typedef struct {
 	gint (*event_reset_fd_at) (gpointer backend_data, gint i, gint operations, gchar *error, gint error_size);
 } IOSelectorBackend;
 
-#include "threadpool-ms-io-epoll.c"
-#include "threadpool-ms-io-kqueue.c"
-#include "threadpool-ms-io-poll.c"
+#include "io-selector-epoll.c"
+#include "io-selector-kqueue.c"
+#include "io-selector-poll.c"
 
 /* Keep in sync with System.Threading.IOSelector */
 struct _MonoIOSelector {
