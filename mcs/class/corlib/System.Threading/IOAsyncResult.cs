@@ -38,7 +38,7 @@ using System.Runtime.Remoting.Messaging;
 
 namespace System.Threading
 {
-	internal enum IOOperation
+	internal enum IOOperation : int
 	{
 		/* Same enum in the runtime. Keep this in sync with
 		 * MonoIOOperation in metadata/threadpool-ms-io.c */
@@ -59,10 +59,10 @@ namespace System.Threading
 		protected bool completed_synchronously;
 		protected bool completed;
 
-		protected IntPtr handle;
-		protected AsyncResult async_result;
-		protected AsyncCallback async_callback;
-		protected IOOperation operation;
+		protected internal IntPtr handle;
+		protected internal AsyncResult async_result;
+		protected internal AsyncCallback async_callback;
+		protected internal IOOperation operation;
 
 		public object AsyncState
 		{

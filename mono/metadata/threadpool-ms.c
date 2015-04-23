@@ -1221,9 +1221,6 @@ heuristic_adjust ()
 void
 mono_threadpool_ms_cleanup (void)
 {
-#ifndef DISABLE_SOCKETS
-	mono_threadpool_ms_io_cleanup ();
-#endif
 	ensure_cleanedup ();
 }
 
@@ -1257,7 +1254,7 @@ mono_threadpool_ms_add (MonoObject *target, MonoMethodMessage *msg, MonoDelegate
 
 #ifndef DISABLE_SOCKETS
 	if (mono_threadpool_ms_is_io (target, state))
-		return mono_threadpool_ms_io_add (ares, (MonoIOAsyncResult*) state);
+		g_assert_not_reached ();
 #endif
 
 	mono_threadpool_ms_enqueue_work_item (domain, (MonoObject*) ares);
@@ -1325,14 +1322,6 @@ mono_threadpool_ms_remove_domain_jobs (MonoDomain *domain, int timeout)
 	if (timeout != -1)
 		start = mono_msec_ticks ();
 
-#ifndef DISABLE_SOCKETS
-	mono_threadpool_ms_io_remove_domain_jobs (domain);
-	if (timeout != -1) {
-		timeout -= mono_msec_ticks () - start;
-		if (timeout < 0)
-			return FALSE;
-	}
-#endif
 	/*
 	 * There might be some threads out that could be about to execute stuff from the given domain.
 	 * We avoid that by setting up a semaphore to be pulsed by the thread that reaches zero.

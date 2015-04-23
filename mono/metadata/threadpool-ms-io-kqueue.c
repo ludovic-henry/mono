@@ -12,67 +12,94 @@
 
 #define KQUEUE_NEVENTS 128
 
-static gint kqueue_fd;
-static struct kevent *kqueue_events;
+typedef struct {
+	gint kqueue_fd;
+	struct kevent *kqueue_events;
+} IOSelectorBackendKqueue;
 
-static gboolean
-kqueue_init (gint wakeup_pipe_fd)
+static gint
+kqueue_init (gpointer *backend_data, gint wakeup_fd, gchar *error, gint error_size)
 {
+	IOSelectorBackendKqueue *kqueue_backend_data;
 	struct kevent event;
 
-	kqueue_fd = kqueue ();
-	if (kqueue_fd == -1) {
-		g_warning ("kqueue_init: kqueue () failed, error (%d) %s", errno, g_strerror (errno));
-		return FALSE;
+	g_assert (backend_data);
+
+	*backend_data = kqueue_backend_data = g_new0 (IOSelectorBackendKqueue, 1);
+
+	kqueue_backend_data->kqueue_fd = kqueue ();
+	if (kqueue_backend_data->kqueue_fd == -1) {
+		g_snprintf (error, error_size, "kqueue_init: kqueue () failed, error (%d) %s", errno, g_strerror (errno));
+		return -1;
 	}
 
-	EV_SET (&event, wakeup_pipe_fd, EVFILT_READ, EV_ADD | EV_ENABLE, 0, 0, 0);
-	if (kevent (kqueue_fd, &event, 1, NULL, 0, NULL) == -1) {
-		g_warning ("kqueue_init: kevent () failed, error (%d) %s", errno, g_strerror (errno));
-		close (kqueue_fd);
-		return FALSE;
+	EV_SET (&event, wakeup_fd, EVFILT_READ, EV_ADD | EV_ENABLE, 0, 0, 0);
+	if (kevent (kqueue_backend_data->kqueue_fd, &event, 1, NULL, 0, NULL) == -1) {
+		g_snprintf (error, error_size, "kqueue_init: kevent () failed, error (%d) %s", errno, g_strerror (errno));
+		close (kqueue_backend_data->kqueue_fd);
+		return -1;
 	}
 
-	kqueue_events = g_new0 (struct kevent, KQUEUE_NEVENTS);
+	kqueue_backend_data->kqueue_events = g_new0 (struct kevent, KQUEUE_NEVENTS);
 
-	return TRUE;
+	return 0;
 }
 
 static void
-kqueue_cleanup (void)
+kqueue_cleanup (gpointer backend_data)
 {
-	g_free (kqueue_events);
-	close (kqueue_fd);
-}
+	IOSelectorBackendKqueue *kqueue_backend_data;
 
-static void
-kqueue_update_add (ThreadPoolIOUpdate *update)
-{
-	struct kevent event;
+	g_assert (backend_data);
 
-	if ((update->operations & IO_OP_IN) != 0)
-		EV_SET (&event, update->fd, EVFILT_READ, EV_ADD | EV_ENABLE | EV_ONESHOT, 0, 0, 0);
-	if ((update->operations & IO_OP_OUT) != 0)
-		EV_SET (&event, update->fd, EVFILT_WRITE, EV_ADD | EV_ENABLE | EV_ONESHOT, 0, 0, 0);
+	kqueue_backend_data = backend_data;
 
-	if (kevent (kqueue_fd, &event, 1, NULL, 0, NULL) == -1) {
-		switch (errno) {
-		case EBADF:
-			g_warning ("kqueue_update_add: kevent(update) failed, error (%d) %s, fd = %d", errno, g_strerror (errno), update->fd);
-			break;
-		default:
-			g_warning ("kqueue_update_add: kevent(update) failed, error (%d) %s", errno, g_strerror (errno));
-			break;
-		}
-	}
+	close (kqueue_backend_data->kqueue_fd);
+	g_free (kqueue_backend_data->kqueue_events);
+	g_free (kqueue_backend_data);
 }
 
 static gint
-kqueue_event_wait (void)
+kqueue_update_add (gpointer backend_data, MonoIOSelectorUpdate *update, gchar *error, gint error_size)
 {
+	IOSelectorBackendKqueue *kqueue_backend_data;
+	struct kevent event;
+
+	g_assert (backend_data);
+
+	kqueue_backend_data = backend_data;
+
+	if ((update->operations & IO_OP_IN) != 0)
+		EV_SET (&event, GPOINTER_TO_INT (update->fd), EVFILT_READ, EV_ADD | EV_ENABLE | EV_ONESHOT, 0, 0, 0);
+	if ((update->operations & IO_OP_OUT) != 0)
+		EV_SET (&event, GPOINTER_TO_INT (update->fd), EVFILT_WRITE, EV_ADD | EV_ENABLE | EV_ONESHOT, 0, 0, 0);
+
+	if (kevent (kqueue_backend_data->kqueue_fd, &event, 1, NULL, 0, NULL) == -1) {
+		switch (errno) {
+		case EBADF:
+			g_snprintf (error, error_size, "kqueue_update_add: kevent(update) failed, error (%d) %s, fd = %d", errno, g_strerror (errno), GPOINTER_TO_INT (update->fd));
+			break;
+		default:
+			g_snprintf (error, error_size, "kqueue_update_add: kevent(update) failed, error (%d) %s", errno, g_strerror (errno));
+			break;
+		}
+		return -1;
+	}
+
+	return 0;
+}
+
+static gint
+kqueue_event_wait (gpointer backend_data, gchar *error, gint error_size)
+{
+	IOSelectorBackendKqueue *kqueue_backend_data;
 	gint ready;
 
-	ready = kevent (kqueue_fd, NULL, 0, kqueue_events, KQUEUE_NEVENTS, NULL);
+	g_assert (backend_data);
+
+	kqueue_backend_data = backend_data;
+
+	ready = kevent (kqueue_backend_data->kqueue_fd, NULL, 0, kqueue_backend_data->kqueue_events, KQUEUE_NEVENTS, NULL);
 	if (ready == -1) {
 		switch (errno) {
 		case EINTR:
@@ -80,7 +107,7 @@ kqueue_event_wait (void)
 			ready = 0;
 			break;
 		default:
-			g_warning ("kqueue_event_wait: kevent () failed, error (%d) %s", errno, g_strerror (errno));
+			g_snprintf (error, error_size, "kqueue_event_wait: kevent () failed, error (%d) %s", errno, g_strerror (errno));
 			break;
 		}
 	}
@@ -88,66 +115,67 @@ kqueue_event_wait (void)
 	return ready;
 }
 
-static inline gint
-kqueue_event_fd_at (guint i)
-{
-	return kqueue_events [i].ident;
-}
-
 static gint
-kqueue_event_max (void)
+kqueue_event_get_fd_max (gpointer backend_data)
 {
 	return KQUEUE_NEVENTS;
 }
 
-static gboolean
-kqueue_event_create_ioares_at (guint i, gint fd, MonoMList **list)
+static gint
+kqueue_event_get_fd_at (gpointer backend_data, gint i, gint *operations)
 {
+	IOSelectorBackendKqueue *kqueue_backend_data;
 	struct kevent *kqueue_event;
 
-	g_assert (list);
+	g_assert (backend_data);
+	g_assert (operations);
 
-	kqueue_event = &kqueue_events [i];
-	g_assert (kqueue_event);
+	kqueue_backend_data = backend_data;
+	kqueue_event = &kqueue_backend_data->kqueue_events [i];
 
-	g_assert (fd == kqueue_event->ident);
+	*operations = ((kqueue_event->filter == EVFILT_READ || (kqueue_event->flags & EV_ERROR) != 0) ? IO_OP_IN : 0)
+	                | ((kqueue_event->filter == EVFILT_WRITE || (kqueue_event->flags & EV_ERROR) != 0) ? IO_OP_OUT : 0);
 
-	if (*list && (kqueue_event->filter == EVFILT_READ || (kqueue_event->flags & EV_ERROR) != 0)) {
-		MonoIOAsyncResult *io_event = get_ioares_for_operation (list, IO_OP_IN);
-		if (io_event)
-			mono_threadpool_ms_enqueue_work_item (((MonoObject*) io_event)->vtable->domain, (MonoObject*) io_event);
-	}
-	if (*list && (kqueue_event->filter == EVFILT_WRITE || (kqueue_event->flags & EV_ERROR) != 0)) {
-		MonoIOAsyncResult *io_event = get_ioares_for_operation (list, IO_OP_OUT);
-		if (io_event)
-			mono_threadpool_ms_enqueue_work_item (((MonoObject*) io_event)->vtable->domain, (MonoObject*) io_event);
-	}
-
-	if (*list) {
-		MonoIOOperation operations = get_operations (*list);
-		if (kqueue_event->filter == EVFILT_READ && (operations & IO_OP_IN) != 0) {
-			EV_SET (kqueue_event, fd, EVFILT_READ, EV_ADD | EV_ENABLE | EV_ONESHOT, 0, 0, 0);
-			if (kevent (kqueue_fd, kqueue_event, 1, NULL, 0, NULL) == -1)
-				g_warning ("kqueue_event_create_ioares_at: kevent (read) failed, error (%d) %s", errno, g_strerror (errno));
-		}
-		if (kqueue_event->filter == EVFILT_WRITE && (operations & IO_OP_OUT) != 0) {
-			EV_SET (kqueue_event, fd, EVFILT_WRITE, EV_ADD | EV_ENABLE | EV_ONESHOT, 0, 0, 0);
-			if (kevent (kqueue_fd, kqueue_event, 1, NULL, 0, NULL) == -1)
-				g_warning ("kqueue_event_create_ioares_at: kevent (write) failed, error (%d) %s", errno, g_strerror (errno));
-		}
-	}
-
-	return TRUE;
+	return kqueue_event->ident;
 }
 
-static ThreadPoolIOBackend backend_kqueue = {
+static gint
+kqueue_event_reset_fd_at (gpointer backend_data, gint i, gint operations, gchar *error, gint error_size)
+{
+	IOSelectorBackendKqueue *kqueue_backend_data;
+	struct kevent *kqueue_event;
+
+	g_assert (backend_data);
+
+	kqueue_backend_data = backend_data;
+	kqueue_event = &kqueue_backend_data->kqueue_events [i];
+
+	if (kqueue_event->filter == EVFILT_READ && (operations & IO_OP_IN) != 0) {
+		EV_SET (kqueue_event, kqueue_event->ident, EVFILT_READ, EV_ADD | EV_ENABLE | EV_ONESHOT, 0, 0, 0);
+		if (kevent (kqueue_backend_data->kqueue_fd, kqueue_event, 1, NULL, 0, NULL) == -1) {
+			g_snprintf (error, error_size, "kqueue_event_reset_fd_at: kevent (read) failed, error (%d) %s", errno, g_strerror (errno));
+			return -1;
+		}
+	}
+	if (kqueue_event->filter == EVFILT_WRITE && (operations & IO_OP_OUT) != 0) {
+		EV_SET (kqueue_event, kqueue_event->ident, EVFILT_WRITE, EV_ADD | EV_ENABLE | EV_ONESHOT, 0, 0, 0);
+		if (kevent (kqueue_backend_data->kqueue_fd, kqueue_event, 1, NULL, 0, NULL) == -1) {
+			g_snprintf (error, error_size, "kqueue_event_reset_fd_at: kevent (write) failed, error (%d) %s", errno, g_strerror (errno));
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
+static IOSelectorBackend backend_kqueue = {
 	.init = kqueue_init,
 	.cleanup = kqueue_cleanup,
 	.update_add = kqueue_update_add,
 	.event_wait = kqueue_event_wait,
-	.event_max = kqueue_event_max,
-	.event_fd_at = kqueue_event_fd_at,
-	.event_create_ioares_at = kqueue_event_create_ioares_at,
+	.event_get_fd_max = kqueue_event_get_fd_max,
+	.event_get_fd_at = kqueue_event_get_fd_at,
+	.event_reset_fd_at = kqueue_event_reset_fd_at,
 };
 
 #endif

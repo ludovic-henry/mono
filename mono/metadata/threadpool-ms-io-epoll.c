@@ -10,71 +10,99 @@
 
 #define EPOLL_NEVENTS 128
 
-static gint epoll_fd;
-static struct epoll_event *epoll_events;
+typedef struct {
+	gint epoll_fd;
+	struct epoll_event *epoll_events;
+} IOSelectorBackendEpoll;
 
-static gboolean
-epoll_init (gint wakeup_pipe_fd)
+static gint
+epoll_init (gpointer *backend_data, gint wakeup_fd, gchar *error, gint error_size)
 {
+	IOSelectorBackendEpoll *epoll_backend_data;
 	struct epoll_event event;
 
+	g_assert (backend_data);
+
+	*backend_data = epoll_backend_data = g_new0 (IOSelectorBackendEpoll, 1);
+
 #ifdef EPOOL_CLOEXEC
-	epoll_fd = epoll_create1 (EPOLL_CLOEXEC);
+	epoll_backend_data->epoll_fd = epoll_create1 (EPOLL_CLOEXEC);
 #else
-	epoll_fd = epoll_create (256);
-	fcntl (epoll_fd, F_SETFD, FD_CLOEXEC);
+	epoll_backend_data->epoll_fd = epoll_create (256);
+	fcntl (epoll_backend_data->epoll_fd, F_SETFD, FD_CLOEXEC);
 #endif
 
-	if (epoll_fd == -1) {
+	if (epoll_backend_data->epoll_fd == -1) {
 #ifdef EPOOL_CLOEXEC
-		g_warning ("epoll_init: epoll (EPOLL_CLOEXEC) failed, error (%d) %s\n", errno, g_strerror (errno));
+		g_snprintf (error, error_size, "epoll_init: epoll (EPOLL_CLOEXEC) failed, error (%d) %s\n", errno, g_strerror (errno));
 #else
-		g_warning ("epoll_init: epoll (256) failed, error (%d) %s\n", errno, g_strerror (errno));
+		g_snprintf (error, error_size, "epoll_init: epoll (256) failed, error (%d) %s\n", errno, g_strerror (errno));
 #endif
-		return FALSE;
+		return -1;
 	}
 
 	event.events = EPOLLIN;
-	event.data.fd = wakeup_pipe_fd;
-	if (epoll_ctl (epoll_fd, EPOLL_CTL_ADD, event.data.fd, &event) == -1) {
-		g_warning ("epoll_init: epoll_ctl () failed, error (%d) %s", errno, g_strerror (errno));
-		close (epoll_fd);
-		return FALSE;
+	event.data.fd = wakeup_fd;
+	if (epoll_ctl (epoll_backend_data->epoll_fd, EPOLL_CTL_ADD, event.data.fd, &event) == -1) {
+		g_snprintf (error, error_size, "epoll_init: epoll_ctl () failed, error (%d) %s", errno, g_strerror (errno));
+		close (epoll_backend_data->epoll_fd);
+		return -1;
 	}
 
-	epoll_events = g_new0 (struct epoll_event, EPOLL_NEVENTS);
+	epoll_backend_data->epoll_events = g_new0 (struct epoll_event, EPOLL_NEVENTS);
 
-	return TRUE;
+	return 0;
 }
 
 static void
-epoll_cleanup (void)
+epoll_cleanup (gpointer backend_data)
 {
-	g_free (epoll_events);
-	close (epoll_fd);
+	IOSelectorBackendEpoll *epoll_backend_data;
+
+	g_assert (backend_data);
+
+	epoll_backend_data = backend_data
+
+	close (epoll_backend_data->epoll_fd);
+	g_free (epoll_backend_data->epoll_events);
+	g_free (epoll_backend_data);
 }
 
-static void
-epoll_update_add (ThreadPoolIOUpdate *update)
+static gint
+epoll_update_add (gpointer backend_data, MonoIOSelectorUpdate *update, gchar *error, gint error_size)
 {
+	IOSelectorBackendEpoll *epoll_backend_data;
 	struct epoll_event event;
 
-	event.data.fd = update->fd;
+	g_assert (backend_data);
+
+	epoll_backend_data = backend_data;
+
+	event.data.fd = GPOINTER_TO_INT (update->fd);
 	if ((update->operations & IO_OP_IN) != 0)
 		event.events |= EPOLLIN;
 	if ((update->operations & IO_OP_OUT) != 0)
 		event.events |= EPOLLOUT;
 
-	if (epoll_ctl (epoll_fd, update->is_new ? EPOLL_CTL_ADD : EPOLL_CTL_MOD, event.data.fd, &event) == -1)
-		g_warning ("epoll_update_add: epoll_ctl(%s) failed, error (%d) %s", update->is_new ? "EPOLL_CTL_ADD" : "EPOLL_CTL_MOD", errno, g_strerror (errno));
+	if (epoll_ctl (epoll_backend_data->epoll_fd, update->is_new ? EPOLL_CTL_ADD : EPOLL_CTL_MOD, event.data.fd, &event) == -1) {
+		g_snprintf (error, error_size, "epoll_update_add: epoll_ctl(%s) failed, error (%d) %s", update->is_new ? "EPOLL_CTL_ADD" : "EPOLL_CTL_MOD", errno, g_strerror (errno));
+		return -1;
+	}
+
+	return 0;
 }
 
 static gint
-epoll_event_wait (void)
+epoll_event_wait (gpointer backend_data, gchar *error, gint error_size)
 {
+	IOSelectorBackendEpoll *epoll_backend_data;
 	gint ready;
 
-	ready = epoll_wait (epoll_fd, epoll_events, EPOLL_NEVENTS, -1);
+	g_assert (backend_data);
+
+	epoll_backend_data = backend_data;
+
+	ready = epoll_wait (epoll_backend_data->epoll_fd, epoll_backend_data->epoll_events, EPOLL_NEVENTS, -1);
 	if (ready == -1) {
 		switch (errno) {
 		case EINTR:
@@ -82,7 +110,7 @@ epoll_event_wait (void)
 			ready = 0;
 			break;
 		default:
-			g_warning ("epoll_event_wait: epoll_wait () failed, error (%d) %s", errno, g_strerror (errno));
+			g_snprintf (error, error_size, "epoll_event_wait: epoll_wait () failed, error (%d) %s", errno, g_strerror (errno));
 			break;
 		}
 	}
@@ -90,64 +118,66 @@ epoll_event_wait (void)
 	return ready;
 }
 
-static gint
-epoll_event_max (void)
+static guint
+epoll_event_get_fd_max (gpointer backend_data)
 {
 	return EPOLL_NEVENTS;
 }
 
 static gint
-epoll_event_fd_at (guint i)
+epoll_event_get_fd_at (gpointer backend_data, guint i, gint *operations)
 {
-	return epoll_events [i].data.fd;
-}
-
-static gboolean
-epoll_event_create_ioares_at (guint i, gint fd, MonoMList **list)
-{
+	IOSelectorBackendEpoll *epoll_backend_data;
 	struct epoll_event *epoll_event;
 
-	g_assert (list);
+	g_assert (backend_data);
+	g_assert (operations);
 
-	epoll_event = &epoll_events [i];
-	g_assert (epoll_event);
+	epoll_backend_data = backend_data;
+	epoll_event = &epoll_backend_data->epoll_events [i];
 
-	g_assert (fd == epoll_event->data.fd);
+	*operations = ((epoll_event->events & (EPOLLIN | EPOLLERR | EPOLLHUP)) ? IO_OP_IN : 0)
+	                | ((epoll_event->events & (EPOLLOUT | EPOLLERR | EPOLLHUP)) ? IO_OP_OUT : 0);
 
-	if (*list && (epoll_event->events & (EPOLLIN | EPOLLERR | EPOLLHUP)) != 0) {
-		MonoIOAsyncResult *io_event = get_ioares_for_operation (list, IO_OP_IN);
-		if (io_event)
-			mono_threadpool_ms_enqueue_work_item (((MonoObject*) io_event)->vtable->domain, (MonoObject*) io_event);
-	}
-	if (*list && (epoll_event->events & (EPOLLOUT | EPOLLERR | EPOLLHUP)) != 0) {
-		MonoIOAsyncResult *io_event = get_ioares_for_operation (list, IO_OP_OUT);
-		if (io_event)
-			mono_threadpool_ms_enqueue_work_item (((MonoObject*) io_event)->vtable->domain, (MonoObject*) io_event);
-	}
-
-	if (*list) {
-		MonoIOOperation operations = get_operations (*list);
-
-		epoll_event->events = ((operations & IO_OP_OUT) ? EPOLLOUT : 0) | ((operations & IO_OP_IN) ? EPOLLIN : 0);
-		if (epoll_ctl (epoll_fd, EPOLL_CTL_MOD, fd, epoll_event) == -1) {
-			if (epoll_ctl (epoll_fd, EPOLL_CTL_ADD, fd, epoll_event) == -1)
-				g_warning ("epoll_event_create_ioares_at: epoll_ctl () failed, error (%d) %s", errno, g_strerror (errno));
-		}
-	} else {
-		epoll_ctl (epoll_fd, EPOLL_CTL_DEL, fd, epoll_event);
-	}
-
-	return TRUE;
+	return epoll_event->data.fd;
 }
 
-static ThreadPoolIOBackend backend_epoll = {
+static gint
+epoll_event_reset_fd_at (gpointer backend_data, gint i, gint operations, gchar *error, gint error_size)
+{
+	IOSelectorBackendEpoll *epoll_backend_data;
+	struct epoll_event *epoll_event;
+
+	g_assert (backend_data);
+
+	epoll_backend_data = backend_data;
+	epoll_event = &epoll_backend_data->epoll_events [i];
+
+	if (operations == 0) {
+		if (epoll_ctl (epoll_backend_data->epoll_fd, EPOLL_CTL_DEL, epoll_event->data.fd, epoll_event) == -1) {
+			g_snprintf (error, error_size, "epoll_event_reset_fd_at: epoll_ctl (EPOLL_CTL_DEL) failed, error (%d) %s", errno, g_strerror (errno));
+			return -1;
+		}
+	} else {
+		epoll_event->events = ((operations & IO_OP_OUT) ? EPOLLOUT : 0) | ((operations & IO_OP_IN) ? EPOLLIN : 0);
+
+		if (epoll_ctl (epoll_backend_data->epoll_fd, EPOLL_CTL_MOD, epoll_event->data.fd, epoll_event) == -1) {
+			g_snprintf (error, error_size, "epoll_event_get_ioares_at: epoll_ctl (EPOLL_CTL_MOD) failed, error (%d) %s", errno, g_strerror (errno));
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
+static IOSelectorBackend backend_epoll = {
 	.init = epoll_init,
 	.cleanup = epoll_cleanup,
 	.update_add = epoll_update_add,
 	.event_wait = epoll_event_wait,
-	.event_max = epoll_event_max,
-	.event_fd_at = epoll_event_fd_at,
-	.event_create_ioares_at = epoll_event_create_ioares_at,
+	.event_get_fd_max = epoll_event_get_fd_max,
+	.event_get_fd_at = epoll_event_get_fd_at,
+	.event_reset_fd_at = epoll_event_reset_fd_at,
 };
 
 #endif

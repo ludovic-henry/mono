@@ -1374,6 +1374,7 @@ namespace System.Diagnostics {
 						if (wait_handle != null)
 							wait_handle.Set ();
 						FlushLast ();
+						FinishReading ();
 						return;
 					}
 
@@ -1387,7 +1388,7 @@ namespace System.Diagnostics {
 					}
 
 					Flush (false);
-					ReadHandler.BeginInvoke (null, this);
+					StartReading ();
 				}
 			}
 
@@ -1435,7 +1436,18 @@ namespace System.Diagnostics {
 			}
 
 			public void Close () {
+				FinishReading ();
 				stream.Close ();
+			}
+
+			public void StartReading ()
+			{
+				IOSelector.Default.Add (this.handle, new AsyncResult (_ => AddInput (), null, false), this);
+			}
+
+			public void FinishReading ()
+			{
+				IOSelector.Default.Remove (this.handle);
 			}
 
 			protected override void Invoke ()
@@ -1464,7 +1476,7 @@ namespace System.Diagnostics {
 			output_canceled = false;
 			if (async_output == null) {
 				async_output = new ProcessAsyncReader (this, stdout_rd, true);
-				async_output.ReadHandler.BeginInvoke (null, async_output);
+				async_output.StartReading ();
 			}
 		}
 
@@ -1496,7 +1508,7 @@ namespace System.Diagnostics {
 			error_canceled = false;
 			if (async_error == null) {
 				async_error = new ProcessAsyncReader (this, stderr_rd, false);
-				async_error.ReadHandler.BeginInvoke (null, async_error);
+				async_error.StartReading ();
 			}
 		}
 

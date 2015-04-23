@@ -2933,6 +2933,12 @@ namespace System.Net.Sockets
 			Dispose ();
 		}
 
+		internal static void Close (IntPtr socket, out int error)
+		{
+			IOSelector.Default.Remove (socket);
+			Close_internal (socket, out error);
+		}
+
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]
 		internal extern static void Close_internal (IntPtr socket, out int error);
 
@@ -3104,8 +3110,10 @@ namespace System.Net.Sockets
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]
 		internal static extern void cancel_blocking_socket_operation (Thread thread);
 
-		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		internal static extern void socket_pool_queue (SocketAsyncCallback d, SocketAsyncResult r);
+		internal static void socket_pool_queue (SocketAsyncCallback sockcb, SocketAsyncResult sockares)
+		{
+			IOSelector.Default.Add (sockares.handle, new System.Runtime.Remoting.Messaging.AsyncResult (s => sockcb ((SocketAsyncResult) s), sockares, false), sockares);
+		}
 	}
 }
 
