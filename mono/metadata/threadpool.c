@@ -145,7 +145,6 @@ static int get_event_from_state (MonoSocketAsyncResult *state);
 
 static MonoClass *async_call_klass;
 static MonoClass *socket_async_call_klass;
-static MonoClass *process_async_call_klass;
 
 static GPtrArray *threads;
 mono_mutex_t threads_lock;
@@ -251,21 +250,6 @@ static gboolean
 is_appdomainunloaded_exception (MonoDomain *domain, MonoClass *klass)
 {
 	check_corlib_type_cached (domain, klass, "System", "AppDomainUnloadedException", &domain->ad_unloaded_ex_class);
-}
-
-static gboolean
-is_sd_process (MonoDomain *domain, MonoClass *klass)
-{
-	check_system_type_cached (domain, klass, "System.Diagnostics", "Process", &domain->process_class);
-}
-
-static gboolean
-is_sdp_asyncreadhandler (MonoDomain *domain, MonoClass *klass)
-{
-
-	return (klass->nested_in &&
-			is_sd_process (domain, klass->nested_in) &&
-		!strcmp (klass->name, "AsyncReadHandler"));
 }
 
 
@@ -559,10 +543,7 @@ socket_io_filter (MonoObject *target, MonoObject *state)
 	if (socket_async_call_klass == NULL && is_socketasynccall (domain, klass))
 		socket_async_call_klass = klass;
 
-	if (process_async_call_klass == NULL && is_sdp_asyncreadhandler (domain, klass))
-		process_async_call_klass = klass;
-
-	if (klass != socket_async_call_klass && klass != process_async_call_klass)
+	if (klass != socket_async_call_klass)
 		return FALSE;
 
 	sock_res = (MonoSocketAsyncResult *) state;
