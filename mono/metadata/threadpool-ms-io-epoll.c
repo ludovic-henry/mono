@@ -10,22 +10,33 @@
 
 #define EPOLL_NEVENTS 128
 
-static gint epoll_fd;
-static struct epoll_event *epoll_events;
+typedef struct {
+	gint epoll_fd;
+	struct epoll_event *epoll_events;
+} ThreadPoolIOBackendEpoll;
 
 static gboolean
-epoll_init (gint wakeup_pipe_fd)
+epoll_init (gpointer *backend_data, gint wakeup_pipe_fd)
 {
+	ThreadPoolIOBackendEpoll *epoll_backend_data;
 	struct epoll_event event;
 
+	g_assert (backend_data);
+
+	*backend_data = epoll_backend_data = g_new0 (ThreadPoolIOBackendEpoll, 1);
+	if (epoll_backend_data == NULL) {
+		g_warning ("epoll_init: g_new0 (ThreadPoolIOBackendEpoll, 1) failed, error (%d) %s", errno, g_strerror (errno));
+		return FALSE;
+	}
+
 #ifdef EPOOL_CLOEXEC
-	epoll_fd = epoll_create1 (EPOLL_CLOEXEC);
+	epoll_backend_data->epoll_fd = epoll_create1 (EPOLL_CLOEXEC);
 #else
-	epoll_fd = epoll_create (256);
-	fcntl (epoll_fd, F_SETFD, FD_CLOEXEC);
+	epoll_backend_data->epoll_fd = epoll_create (256);
+	fcntl (epoll_backend_data->epoll_fd, F_SETFD, FD_CLOEXEC);
 #endif
 
-	if (epoll_fd == -1) {
+	if (epoll_backend_data->epoll_fd == -1) {
 #ifdef EPOOL_CLOEXEC
 		g_warning ("epoll_init: epoll (EPOLL_CLOEXEC) failed, error (%d) %s\n", errno, g_strerror (errno));
 #else
@@ -36,28 +47,42 @@ epoll_init (gint wakeup_pipe_fd)
 
 	event.events = EPOLLIN;
 	event.data.fd = wakeup_pipe_fd;
-	if (epoll_ctl (epoll_fd, EPOLL_CTL_ADD, event.data.fd, &event) == -1) {
+	if (epoll_ctl (epoll_backend_data->epoll_fd, EPOLL_CTL_ADD, event.data.fd, &event) == -1) {
 		g_warning ("epoll_init: epoll_ctl () failed, error (%d) %s", errno, g_strerror (errno));
-		close (epoll_fd);
+		close (epoll_backend_data->epoll_fd);
 		return FALSE;
 	}
 
-	epoll_events = g_new0 (struct epoll_event, EPOLL_NEVENTS);
+	epoll_backend_data->epoll_events = g_new0 (struct epoll_event, EPOLL_NEVENTS);
+	if (epoll_backend_data->epoll_events == NULL) {
+		g_warning ("epoll_init: g_new0 (struct epoll_event, EPOLL_NEVENTS) failed, error (%d) %s", errno, g_strerror (errno));
+		return FALSE;
+	}
 
 	return TRUE;
 }
 
 static void
-epoll_cleanup (void)
+epoll_cleanup (gpointer backend_data)
 {
-	g_free (epoll_events);
-	close (epoll_fd);
+	ThreadPoolIOBackendEpoll *epoll_backend_data;
+
+	g_assert (backend_data);
+	epoll_backend_data = backend_data;
+
+	close (epoll_backend_data->epoll_fd);
+	g_free (epoll_backend_data->epoll_events);
+	g_free (epoll_backend_data);
 }
 
 static void
-epoll_update_add (ThreadPoolIOUpdate *update)
+epoll_update_add (gpointer backend_data, ThreadPoolIOUpdate *update)
 {
+	ThreadPoolIOBackendEpoll *epoll_backend_data;
 	struct epoll_event event;
+
+	g_assert (backend_data);
+	epoll_backend_data = backend_data;
 
 	event.data.fd = GPOINTER_TO_INT (update->handle);
 	if ((update->operations & IO_OP_IN) != 0)
@@ -65,16 +90,20 @@ epoll_update_add (ThreadPoolIOUpdate *update)
 	if ((update->operations & IO_OP_OUT) != 0)
 		event.events |= EPOLLOUT;
 
-	if (epoll_ctl (epoll_fd, update->is_new ? EPOLL_CTL_ADD : EPOLL_CTL_MOD, event.data.fd, &event) == -1)
+	if (epoll_ctl (epoll_backend_data->epoll_fd, update->is_new ? EPOLL_CTL_ADD : EPOLL_CTL_MOD, event.data.fd, &event) == -1)
 		g_warning ("epoll_update_add: epoll_ctl(%s) failed, error (%d) %s", update->is_new ? "EPOLL_CTL_ADD" : "EPOLL_CTL_MOD", errno, g_strerror (errno));
 }
 
 static gint
-epoll_event_wait (void)
+epoll_event_wait (gpointer backend_data)
 {
+	ThreadPoolIOBackendEpoll *epoll_backend_data;
 	gint ready;
 
-	ready = epoll_wait (epoll_fd, epoll_events, EPOLL_NEVENTS, -1);
+	g_assert (backend_data);
+	epoll_backend_data = backend_data;
+
+	ready = epoll_wait (epoll_backend_data->epoll_fd, epoll_backend_data->epoll_events, EPOLL_NEVENTS, -1);
 	if (ready == -1) {
 		switch (errno) {
 		case EINTR:
@@ -91,20 +120,23 @@ epoll_event_wait (void)
 }
 
 static gint
-epoll_event_get_fd_max (void)
+epoll_event_get_fd_max (gpointer backend_data)
 {
 	return EPOLL_NEVENTS;
 }
 
 static gint
-epoll_event_get_fd_at (gint i, gint32 *operations)
+epoll_event_get_fd_at (gpointer backend_data, gint i, gint32 *operations)
 {
+	ThreadPoolIOBackendEpoll *epoll_backend_data;
 	struct epoll_event *epoll_event;
 
+	g_assert (backend_data);
+	epoll_backend_data = backend_data;
+
+	epoll_event = &epoll_backend_data->epoll_events [i];
+
 	g_assert (operations);
-
-	epoll_event = &epoll_events [i];
-
 	*operations = ((epoll_event->events & (EPOLLIN | EPOLLERR | EPOLLHUP)) ? IO_OP_IN : 0)
 	                | ((epoll_event->events & (EPOLLOUT | EPOLLERR | EPOLLHUP)) ? IO_OP_OUT : 0);
 
@@ -112,20 +144,24 @@ epoll_event_get_fd_at (gint i, gint32 *operations)
 }
 
 static void
-epoll_event_reset_fd_at (gint i, gint32 operations)
+epoll_event_reset_fd_at (gpointer backend_data, gint i, gint32 operations)
 {
+	ThreadPoolIOBackendEpoll *epoll_backend_data;
 	struct epoll_event *epoll_event;
 
-	epoll_event = &epoll_events [i];
+	g_assert (backend_data);
+	epoll_backend_data = backend_data;
+
+	epoll_event = &epoll_backend_data->epoll_events [i];
 
 	if (operations == 0) {
-		if (epoll_ctl (epoll_fd, EPOLL_CTL_DEL, epoll_event->data.fd, epoll_event) == -1) {
+		if (epoll_ctl (epoll_backend_data->epoll_fd, EPOLL_CTL_DEL, epoll_event->data.fd, epoll_event) == -1) {
 			g_warning ("epoll_event_reset_fd_at: epoll_ctl (EPOLL_CTL_DEL) failed, error (%d) %s", errno, g_strerror (errno));
 		}
 	} else {
 		epoll_event->events = ((operations & IO_OP_OUT) ? EPOLLOUT : 0) | ((operations & IO_OP_IN) ? EPOLLIN : 0);
 
-		if (epoll_ctl (epoll_fd, EPOLL_CTL_MOD, epoll_event->data.fd, epoll_event) == -1) {
+		if (epoll_ctl (epoll_backend_data->epoll_fd, EPOLL_CTL_MOD, epoll_event->data.fd, epoll_event) == -1) {
 			g_warning ("epoll_event_get_ioares_at: epoll_ctl (EPOLL_CTL_MOD) failed, error (%d) %s", errno, g_strerror (errno));
 		}
 	}
