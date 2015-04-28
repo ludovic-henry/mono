@@ -169,7 +169,7 @@ poll_event_get_fd_max (void)
 }
 
 static gint
-poll_event_get_fd_at (gint i, MonoIOOperation *operations)
+poll_event_get_fd_at (gint i, gint32 *operations)
 {
 	mono_pollfd *poll_fd;
 
@@ -186,7 +186,7 @@ poll_event_get_fd_at (gint i, MonoIOOperation *operations)
 }
 
 static void
-poll_event_reset_fd_at (gint i, MonoIOOperation operations)
+poll_event_reset_fd_at (gint i, gint32 operations)
 {
 	mono_pollfd *poll_fd;
 

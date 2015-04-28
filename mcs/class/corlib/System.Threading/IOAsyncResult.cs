@@ -38,7 +38,7 @@ using System.Runtime.Remoting.Messaging;
 
 namespace System.Threading
 {
-	internal enum IOOperation
+	internal enum IOOperation : int
 	{
 		/* Same enum in the runtime. Keep this in sync with
 		 * MonoIOOperation in metadata/threadpool-ms-io.c */
