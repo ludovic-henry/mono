@@ -1,4 +1,6 @@
 
+#include <mono/utils/mono-poll.h>
+
 #define POLL_NEVENTS 1024
 
 static mono_pollfd *poll_fds;
@@ -71,6 +73,7 @@ static void
 poll_update_add (ThreadPoolIOUpdate *update)
 {
 	gboolean found = FALSE;
+	gint operations;
 	gint j, k;
 
 	for (j = 1; j < poll_fds_size; ++j) {
@@ -96,7 +99,10 @@ poll_update_add (ThreadPoolIOUpdate *update)
 			POLL_INIT_FD (poll_fds + k, -1, 0);
 	}
 
-	POLL_INIT_FD (poll_fds + j, update->fd, ((update->operations & IO_OP_OUT) ? MONO_POLLOUT : 0) | ((update->operations & IO_OP_IN) ? MONO_POLLIN : 0));
+	operations = ((update->operations & IO_OP_OUT) ? MONO_POLLOUT : 0)
+	               | ((update->operations & IO_OP_IN) ? MONO_POLLIN : 0);
+
+	POLL_INIT_FD (poll_fds + j, GPOINTER_TO_INT (update->fd), operations);
 
 	if (j >= poll_fds_size)
 		poll_fds_size = j + 1;
@@ -156,50 +162,39 @@ poll_event_wait (void)
 	return ready;
 }
 
-static inline gint
-poll_event_fd_at (guint i)
-{
-	return poll_fds [i].fd;
-}
-
 static gint
-poll_event_max (void)
+poll_event_get_fd_max (void)
 {
 	return poll_fds_size;
 }
 
-static gboolean
-poll_event_create_ioares_at (guint i, gint fd, MonoMList **list)
+static gint
+poll_event_get_fd_at (gint i, MonoIOOperation *operations)
 {
 	mono_pollfd *poll_fd;
 
-	g_assert (list);
+	g_assert (operations);
 
 	poll_fd = &poll_fds [i];
-	g_assert (poll_fd);
 
-	g_assert (fd == poll_fd->fd);
+	*operations = ((poll_fd->revents & (MONO_POLLIN | MONO_POLLERR | MONO_POLLHUP | MONO_POLLNVAL)) ? IO_OP_IN : 0)
+	                | ((poll_fd->revents & (MONO_POLLOUT | MONO_POLLERR | MONO_POLLHUP | MONO_POLLNVAL)) ? IO_OP_OUT : 0);
 
-	if (fd == -1 || poll_fd->revents == 0)
-		return FALSE;
+	/* if nothing happened on the fd, then just return
+	 * an invalid fd number so managed code discard it */
+	return poll_fd->revents == 0 ? -1 : poll_fd->fd;
+}
 
-	if (*list && (poll_fd->revents & (MONO_POLLIN | MONO_POLLERR | MONO_POLLHUP | MONO_POLLNVAL)) != 0) {
-		MonoIOAsyncResult *io_event = get_ioares_for_operation (list, IO_OP_IN);
-		if (io_event)
-			mono_threadpool_ms_enqueue_work_item (((MonoObject*) io_event)->vtable->domain, (MonoObject*) io_event);
-	}
-	if (*list && (poll_fd->revents & (MONO_POLLOUT | MONO_POLLERR | MONO_POLLHUP | MONO_POLLNVAL)) != 0) {
-		MonoIOAsyncResult *io_event = get_ioares_for_operation (list, IO_OP_OUT);
-		if (io_event)
-			mono_threadpool_ms_enqueue_work_item (((MonoObject*) io_event)->vtable->domain, (MonoObject*) io_event);
-	}
+static void
+poll_event_reset_fd_at (gint i, MonoIOOperation operations)
+{
+	mono_pollfd *poll_fd;
 
-	if (*list)
-		poll_fd->events = get_operations (*list);
-	else
-		POLL_INIT_FD (poll_fd, -1, 0);
+	poll_fd = &poll_fds [i];
+	g_assert (poll_fd->fd != -1);
+	g_assert (poll_fd->revents != 0);
 
-	return TRUE;
+	POLL_INIT_FD (poll_fd, operations == 0 ? -1 : poll_fd->fd, operations);
 }
 
 static ThreadPoolIOBackend backend_poll = {
@@ -207,7 +202,7 @@ static ThreadPoolIOBackend backend_poll = {
 	.cleanup = poll_cleanup,
 	.update_add = poll_update_add,
 	.event_wait = poll_event_wait,
-	.event_max = poll_event_max,
-	.event_fd_at = poll_event_fd_at,
-	.event_create_ioares_at = poll_event_create_ioares_at,
+	.event_get_fd_max = poll_event_get_fd_max,
+	.event_get_fd_at = poll_event_get_fd_at,
+	.event_reset_fd_at = poll_event_reset_fd_at,
 };
