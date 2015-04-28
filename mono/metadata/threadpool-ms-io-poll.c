@@ -78,7 +78,7 @@ poll_update_add (ThreadPoolIOUpdate *update)
 
 	for (j = 1; j < poll_fds_size; ++j) {
 		mono_pollfd *poll_fd = poll_fds + j;
-		if (poll_fd->fd == update->fd) {
+		if (poll_fd->fd == GPOINTER_TO_INT (update->handle)) {
 			found = TRUE;
 			break;
 		}
@@ -102,7 +102,7 @@ poll_update_add (ThreadPoolIOUpdate *update)
 	operations = ((update->operations & IO_OP_OUT) ? MONO_POLLOUT : 0)
 	               | ((update->operations & IO_OP_IN) ? MONO_POLLIN : 0);
 
-	POLL_INIT_FD (poll_fds + j, GPOINTER_TO_INT (update->fd), operations);
+	POLL_INIT_FD (poll_fds + j, GPOINTER_TO_INT (update->handle), operations);
 
 	if (j >= poll_fds_size)
 		poll_fds_size = j + 1;

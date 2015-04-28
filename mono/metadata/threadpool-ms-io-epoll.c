@@ -59,7 +59,7 @@ epoll_update_add (ThreadPoolIOUpdate *update)
 {
 	struct epoll_event event;
 
-	event.data.fd = update->fd;
+	event.data.fd = GPOINTER_TO_INT (update->handle);
 	if ((update->operations & IO_OP_IN) != 0)
 		event.events |= EPOLLIN;
 	if ((update->operations & IO_OP_OUT) != 0)

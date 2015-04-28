@@ -51,14 +51,14 @@ kqueue_update_add (ThreadPoolIOUpdate *update)
 	struct kevent event;
 
 	if ((update->operations & IO_OP_IN) != 0)
-		EV_SET (&event, update->fd, EVFILT_READ, EV_ADD | EV_ENABLE | EV_ONESHOT, 0, 0, 0);
+		EV_SET (&event, GPOINTER_TO_INT (update->handle), EVFILT_READ, EV_ADD | EV_ENABLE | EV_ONESHOT, 0, 0, 0);
 	if ((update->operations & IO_OP_OUT) != 0)
-		EV_SET (&event, update->fd, EVFILT_WRITE, EV_ADD | EV_ENABLE | EV_ONESHOT, 0, 0, 0);
+		EV_SET (&event, GPOINTER_TO_INT (update->handle), EVFILT_WRITE, EV_ADD | EV_ENABLE | EV_ONESHOT, 0, 0, 0);
 
 	if (kevent (kqueue_fd, &event, 1, NULL, 0, NULL) == -1) {
 		switch (errno) {
 		case EBADF:
-			g_warning ("kqueue_update_add: kevent(update) failed, error (%d) %s, fd = %d", errno, g_strerror (errno), update->fd);
+			g_warning ("kqueue_update_add: kevent(update) failed, error (%d) %s, fd = %d", errno, g_strerror (errno), GPOINTER_TO_INT (update->handle));
 			break;
 		default:
 			g_warning ("kqueue_update_add: kevent(update) failed, error (%d) %s", errno, g_strerror (errno));

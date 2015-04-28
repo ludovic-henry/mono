@@ -35,7 +35,7 @@ enum {
 };
 
 typedef struct {
-	gint fd;
+	gpointer handle;
 	gint32 operations;
 	gboolean is_new;
 } ThreadPoolIOUpdate;
@@ -313,7 +313,7 @@ selector_thread (gpointer data)
 			if (fd == -1)
 				continue;
 
-			if (fd == GPOINTER_TO_INT (threadpool_io->wakeup_pipes [0])) {
+			if (fd == threadpool_io->wakeup_pipes [0]) {
 				selector_thread_wakeup_drain_pipes (threadpool_io->wakeup_pipes [0]);
 			} else {
 				MonoMList *list = mono_g_hash_table_lookup (threadpool_io->states, GINT_TO_POINTER (fd));
@@ -502,7 +502,7 @@ mono_threadpool_ms_io_add (MonoAsyncResult *ares, MonoIOAsyncResult *ioares)
 	threadpool_io->updates = g_renew (ThreadPoolIOUpdate, threadpool_io->updates, threadpool_io->updates_size);
 
 	update = &threadpool_io->updates [threadpool_io->updates_size - 1];
-	update->fd = GPOINTER_TO_INT (ioares->handle);
+	update->handle = ioares->handle;
 	update->operations = ioares->operation;
 	update->is_new = is_new;
 	mono_mutex_unlock (&threadpool_io->updates_lock);
