@@ -68,7 +68,7 @@ namespace System.Net.Sockets {
 				}
 			}
 
-			Socket.Close_internal (handle, out error);
+			Socket.Close (handle, out error);
 
 			return error == 0;
 		}

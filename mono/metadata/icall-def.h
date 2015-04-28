@@ -440,7 +440,6 @@ ICALL(SOCK_18, "SetSocketOption_internal(intptr,System.Net.Sockets.SocketOptionL
 ICALL(SOCK_19, "Shutdown_internal(intptr,System.Net.Sockets.SocketShutdown,int&)", ves_icall_System_Net_Sockets_Socket_Shutdown_internal)
 ICALL(SOCK_20, "Socket_internal(System.Net.Sockets.AddressFamily,System.Net.Sockets.SocketType,System.Net.Sockets.ProtocolType,int&)", ves_icall_System_Net_Sockets_Socket_Socket_internal)
 ICALL(SOCK_21a, "cancel_blocking_socket_operation", icall_cancel_blocking_socket_operation)
-ICALL(SOCK_22, "socket_pool_queue", icall_append_io_job)
 
 ICALL_TYPE(SOCKEX, "System.Net.Sockets.SocketException", SOCKEX_1)
 ICALL(SOCKEX_1, "WSAGetLastError_internal", ves_icall_System_Net_Sockets_SocketException_WSAGetLastError_internal)
@@ -886,6 +885,18 @@ ICALL(NATIVEC_2, "CreateEvent_internal(bool,bool,string,bool&)", ves_icall_Syste
 ICALL(NATIVEC_3, "OpenEvent_internal(string,System.Security.AccessControl.EventWaitHandleRights,System.IO.MonoIOError&)", ves_icall_System_Threading_Events_OpenEvent_internal)
 ICALL(NATIVEC_4, "ResetEvent_internal",  ves_icall_System_Threading_Events_ResetEvent_internal)
 ICALL(NATIVEC_5, "SetEvent_internal",    ves_icall_System_Threading_Events_SetEvent_internal)
+
+ICALL_TYPE(NATIVETHREADPIO, "System.Threading.NativeThreadPoolIOBackend", NATIVETHREADPIO_1)
+ICALL(NATIVETHREADPIO_1, "Cleanup_internal", ves_icall_System_Threading_NativeThreadPoolIOBackend_Cleanup_internal)
+ICALL(NATIVETHREADPIO_2, "EventGetHandleAt_internal", ves_icall_System_Threading_NativeThreadPoolIOBackend_EventGetHandleAt_internal)
+ICALL(NATIVETHREADPIO_3, "EventGetHandleMax_internal", ves_icall_System_Threading_NativeThreadPoolIOBackend_EventGetHandleMax_internal)
+ICALL(NATIVETHREADPIO_4, "EventResetHandleAt_internal", ves_icall_System_Threading_NativeThreadPoolIOBackend_EventResetHandleAt_internal)
+ICALL(NATIVETHREADPIO_5, "EventWait_internal", ves_icall_System_Threading_NativeThreadPoolIOBackend_EventWait_internal)
+ICALL(NATIVETHREADPIO_6, "Init_internal", ves_icall_System_Threading_NativeThreadPoolIOBackend_Init_internal)
+ICALL(NATIVETHREADPIO_7, "SelectorThreadCreateWakeupPipes_internal", ves_icall_System_Threading_NativeThreadPoolIOBackend_SelectorThreadCreateWakeupPipes_internal)
+ICALL(NATIVETHREADPIO_8, "SelectorThreadDrainWakeupPipes_internal", ves_icall_System_Threading_NativeThreadPoolIOBackend_SelectorThreadDrainWakeupPipes_internal)
+ICALL(NATIVETHREADPIO_9, "SelectorThreadWakeup_internal", ves_icall_System_Threading_NativeThreadPoolIOBackend_SelectorThreadWakeup_internal)
+ICALL(NATIVETHREADPIO_10, "UpdateAdd_internal", ves_icall_System_Threading_NativeThreadPoolIOBackend_UpdateAdd_internal)
 
 ICALL_TYPE(SEMA, "System.Threading.Semaphore", SEMA_1)
 ICALL(SEMA_1, "CreateSemaphore_internal(int,int,string,bool&)", ves_icall_System_Threading_Semaphore_CreateSemaphore_internal)

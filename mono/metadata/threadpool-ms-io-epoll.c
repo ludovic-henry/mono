@@ -76,7 +76,7 @@ epoll_cleanup (gpointer backend_data)
 }
 
 static gint
-epoll_update_add (gpointer backend_data, ThreadPoolIOUpdate *update, gchar *error, gint error_size)
+epoll_update_add (gpointer backend_data, MonoThreadPoolIOUpdate *update, gchar *error, gint error_size)
 {
 	ThreadPoolIOBackendEpoll *epoll_backend_data;
 	struct epoll_event event;

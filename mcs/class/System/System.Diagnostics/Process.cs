@@ -1352,8 +1352,6 @@ namespace System.Diagnostics {
 			Stream stream;
 			StringBuilder sb = new StringBuilder ();
 
-			public AsyncReadHandler ReadHandler;
-
 			public ProcessAsyncReader (Process process, IntPtr handle, bool err_out)
 			{
 				this.handle = handle;
@@ -1361,8 +1359,17 @@ namespace System.Diagnostics {
 
 				this.process = process;
 				this.stream = new FileStream (this.handle, FileAccess.Read, false);
-				this.ReadHandler = new AsyncReadHandler (AddInput);
 				this.err_out = err_out;
+			}
+
+			public void BeginRead ()
+			{
+				ThreadPoolIO.Default.Add (this.handle, _ => AddInput (), this);
+			}
+
+			public void EndRead ()
+			{
+				ThreadPoolIO.Default.Remove (this.handle);
 			}
 
 			public void AddInput ()
@@ -1387,7 +1394,7 @@ namespace System.Diagnostics {
 					}
 
 					Flush (false);
-					ReadHandler.BeginInvoke (null, this);
+					BeginRead ();
 				}
 			}
 
@@ -1442,6 +1449,16 @@ namespace System.Diagnostics {
 			{
 				async_result.Invoke ();
 			}
+
+			internal override void Cancel ()
+			{
+				lock (this) {
+					FlushLast ();
+					completed = true;
+					if (wait_handle != null)
+						wait_handle.Set ();
+				}
+			}
 		}
 
 		AsyncModes async_mode;
@@ -1449,7 +1466,6 @@ namespace System.Diagnostics {
 		bool error_canceled;
 		ProcessAsyncReader async_output;
 		ProcessAsyncReader async_error;
-		delegate void AsyncReadHandler ();
 
 		[ComVisibleAttribute(false)] 
 		public void BeginOutputReadLine ()
@@ -1464,7 +1480,7 @@ namespace System.Diagnostics {
 			output_canceled = false;
 			if (async_output == null) {
 				async_output = new ProcessAsyncReader (this, stdout_rd, true);
-				async_output.ReadHandler.BeginInvoke (null, async_output);
+				async_output.BeginRead ();
 			}
 		}
 
@@ -1496,7 +1512,7 @@ namespace System.Diagnostics {
 			error_canceled = false;
 			if (async_error == null) {
 				async_error = new ProcessAsyncReader (this, stderr_rd, false);
-				async_error.ReadHandler.BeginInvoke (null, async_error);
+				async_error.BeginRead ();
 			}
 		}
 

@@ -59,10 +59,10 @@ namespace System.Threading
 		protected bool completed_synchronously;
 		protected bool completed;
 
-		protected IntPtr handle;
-		protected AsyncResult async_result;
-		protected AsyncCallback async_callback;
-		protected IOOperation operation;
+		protected internal IntPtr handle;
+		protected internal AsyncResult async_result;
+		protected internal AsyncCallback async_callback;
+		protected internal IOOperation operation;
 
 		public object AsyncState
 		{
@@ -109,5 +109,7 @@ namespace System.Threading
 		}
 
 		protected abstract void Invoke ();
+
+		internal abstract void Cancel ();
 	}
 }

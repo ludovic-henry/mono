@@ -91,7 +91,7 @@ poll_mark_bad_fds (mono_pollfd *poll_fds, gint poll_fds_size)
 }
 
 static gint
-poll_update_add (gpointer backend_data, ThreadPoolIOUpdate *update, gchar *error, gint error_size)
+poll_update_add (gpointer backend_data, MonoThreadPoolIOUpdate *update, gchar *error, gint error_size)
 {
 	ThreadPoolIOBackendPoll *poll_backend_data;
 	gboolean found = FALSE;

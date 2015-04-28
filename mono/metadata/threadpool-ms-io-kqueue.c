@@ -67,7 +67,7 @@ kqueue_cleanup (gpointer backend_data)
 }
 
 static gint
-kqueue_update_add (gpointer backend_data, ThreadPoolIOUpdate *update, gchar *error, gint error_size)
+kqueue_update_add (gpointer backend_data, MonoThreadPoolIOUpdate *update, gchar *error, gint error_size)
 {
 	ThreadPoolIOBackendKqueue *kqueue_backend_data;
 	struct kevent event;

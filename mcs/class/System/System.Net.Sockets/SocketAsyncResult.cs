@@ -285,5 +285,9 @@ namespace System.Net.Sockets
 				ThreadPool.UnsafeQueueCustomWorkItem (new AsyncResult (state => async_callback ((IAsyncResult) state), this, false), false);
 			}
 		}
+
+		internal override void Cancel ()
+		{
+		}
 	}
 }
