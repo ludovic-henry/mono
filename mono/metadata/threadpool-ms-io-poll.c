@@ -3,9 +3,11 @@
 
 #define POLL_NEVENTS 1024
 
-static mono_pollfd *poll_fds;
-static guint poll_fds_capacity;
-static guint poll_fds_size;
+typedef struct {
+	mono_pollfd *poll_fds;
+	guint poll_fds_capacity;
+	guint poll_fds_size;
+} ThreadPoolIOBackendPoll;
 
 static inline void
 POLL_INIT_FD (mono_pollfd *poll_fd, gint fd, gint events)
@@ -16,25 +18,44 @@ POLL_INIT_FD (mono_pollfd *poll_fd, gint fd, gint events)
 }
 
 static gboolean
-poll_init (gint wakeup_pipe_fd)
+poll_init (gpointer *backend_data, gint wakeup_pipe_fd)
 {
+	ThreadPoolIOBackendPoll *poll_backend_data;
 	guint i;
 
-	poll_fds_size = 1;
-	poll_fds_capacity = POLL_NEVENTS;
-	poll_fds = g_new0 (mono_pollfd, poll_fds_capacity);
+	g_assert (backend_data);
 
-	POLL_INIT_FD (poll_fds, wakeup_pipe_fd, MONO_POLLIN);
-	for (i = 1; i < poll_fds_capacity; ++i)
-		POLL_INIT_FD (poll_fds + i, -1, 0);
+	*backend_data = poll_backend_data = g_new0 (ThreadPoolIOBackendPoll, 1);
+	if (poll_backend_data == NULL) {
+		g_warning ("poll_init: g_new0 (ThreadPoolIOBackendPoll, 1) failed, error (%d) %s", errno, g_strerror (errno));
+		return FALSE;
+	}
+
+	poll_backend_data->poll_fds_size = 1;
+	poll_backend_data->poll_fds_capacity = POLL_NEVENTS;
+	poll_backend_data->poll_fds = g_new0 (mono_pollfd, poll_backend_data->poll_fds_capacity);
+	if (poll_backend_data->poll_fds == NULL) {
+		g_warning ("poll_init: g_new0 (mono_pollfd, POLL_NEVENTS) failed, error (%d) %s", errno, g_strerror (errno));
+		return FALSE;
+	}
+
+	POLL_INIT_FD (&poll_backend_data->poll_fds [0], wakeup_pipe_fd, MONO_POLLIN);
+	for (i = 1; i < poll_backend_data->poll_fds_capacity; ++i)
+		POLL_INIT_FD (&poll_backend_data->poll_fds [i], -1, 0);
 
 	return TRUE;
 }
 
 static void
-poll_cleanup (void)
+poll_cleanup (gpointer backend_data)
 {
-	g_free (poll_fds);
+	ThreadPoolIOBackendPoll *poll_backend_data;
+
+	g_assert (backend_data);
+	poll_backend_data = backend_data;
+
+	g_free (poll_backend_data->poll_fds);
+	g_free (poll_backend_data);
 }
 
 static inline gint
@@ -46,7 +67,7 @@ poll_mark_bad_fds (mono_pollfd *poll_fds, gint poll_fds_size)
 	mono_pollfd *poll_fd;
 
 	for (i = 0; i < poll_fds_size; i++) {
-		poll_fd = poll_fds + i;
+		poll_fd = &poll_fds [i];
 		if (poll_fd->fd == -1)
 			continue;
 
@@ -70,14 +91,18 @@ poll_mark_bad_fds (mono_pollfd *poll_fds, gint poll_fds_size)
 }
 
 static void
-poll_update_add (ThreadPoolIOUpdate *update)
+poll_update_add (gpointer backend_data, ThreadPoolIOUpdate *update)
 {
+	ThreadPoolIOBackendPoll *poll_backend_data;
 	gboolean found = FALSE;
 	gint operations;
 	gint j, k;
 
-	for (j = 1; j < poll_fds_size; ++j) {
-		mono_pollfd *poll_fd = poll_fds + j;
+	g_assert (backend_data);
+	poll_backend_data = backend_data;
+
+	for (j = 1; j < poll_backend_data->poll_fds_size; ++j) {
+		mono_pollfd *poll_fd = &poll_backend_data->poll_fds [j];
 		if (poll_fd->fd == update->fd) {
 			found = TRUE;
 			break;
@@ -85,35 +110,39 @@ poll_update_add (ThreadPoolIOUpdate *update)
 	}
 
 	if (!found) {
-		for (j = 1; j < poll_fds_capacity; ++j) {
-			mono_pollfd *poll_fd = poll_fds + j;
+		for (j = 1; j < poll_backend_data->poll_fds_capacity; ++j) {
+			mono_pollfd *poll_fd = &poll_backend_data->poll_fds [j];
 			if (poll_fd->fd == -1)
 				break;
 		}
 	}
 
-	if (j == poll_fds_capacity) {
-		poll_fds_capacity += POLL_NEVENTS;
-		poll_fds = g_renew (mono_pollfd, poll_fds, poll_fds_capacity);
-		for (k = j; k < poll_fds_capacity; ++k)
-			POLL_INIT_FD (poll_fds + k, -1, 0);
+	if (j == poll_backend_data->poll_fds_capacity) {
+		poll_backend_data->poll_fds_capacity += POLL_NEVENTS;
+		poll_backend_data->poll_fds = g_renew (mono_pollfd, poll_backend_data->poll_fds, poll_backend_data->poll_fds_capacity);
+		for (k = j; k < poll_backend_data->poll_fds_capacity; ++k)
+			POLL_INIT_FD (&poll_backend_data->poll_fds [k], -1, 0);
 	}
 
 	operations = ((update->operations & IO_OP_OUT) ? MONO_POLLOUT : 0)
 	               | ((update->operations & IO_OP_IN) ? MONO_POLLIN : 0);
 
-	POLL_INIT_FD (poll_fds + j, GPOINTER_TO_INT (update->fd), operations);
+	POLL_INIT_FD (&poll_backend_data->poll_fds [j], update->fd, operations);
 
-	if (j >= poll_fds_size)
-		poll_fds_size = j + 1;
+	if (j >= poll_backend_data->poll_fds_size)
+		poll_backend_data->poll_fds_size = j + 1;
 }
 
 static gint
-poll_event_wait (void)
+poll_event_wait (gpointer backend_data)
 {
+	ThreadPoolIOBackendPoll *poll_backend_data;
 	gint ready;
 
-	ready = mono_poll (poll_fds, poll_fds_size, -1);
+	g_assert (backend_data);
+	poll_backend_data = backend_data;
+
+	ready = mono_poll (poll_backend_data->poll_fds, poll_backend_data->poll_fds_size, -1);
 	if (ready == -1) {
 		/*
 		 * Apart from EINTR, we only check EBADF, for the rest:
@@ -147,7 +176,7 @@ poll_event_wait (void)
 #else
 		case WSAEBADF:
 #endif
-			ready = poll_mark_bad_fds (poll_fds, poll_fds_size);
+			ready = poll_mark_bad_fds (poll_backend_data->poll_fds, poll_backend_data->poll_fds_size);
 			break;
 		default:
 #if !defined(HOST_WIN32)
@@ -163,20 +192,28 @@ poll_event_wait (void)
 }
 
 static gint
-poll_event_get_fd_max (void)
+poll_event_get_fd_max (gpointer backend_data)
 {
-	return poll_fds_size;
+	ThreadPoolIOBackendPoll *poll_backend_data;
+
+	g_assert (backend_data);
+	poll_backend_data = backend_data;
+
+	return poll_backend_data->poll_fds_size;
 }
 
 static gint
-poll_event_get_fd_at (gint i, gint *operations)
+poll_event_get_fd_at (gpointer backend_data, gint i, gint *operations)
 {
+	ThreadPoolIOBackendPoll *poll_backend_data;
 	mono_pollfd *poll_fd;
 
+	g_assert (backend_data);
+	poll_backend_data = backend_data;
+
+	poll_fd = &poll_backend_data->poll_fds [i];
+
 	g_assert (operations);
-
-	poll_fd = &poll_fds [i];
-
 	*operations = ((poll_fd->revents & (MONO_POLLIN | MONO_POLLERR | MONO_POLLHUP | MONO_POLLNVAL)) ? IO_OP_IN : 0)
 	                | ((poll_fd->revents & (MONO_POLLOUT | MONO_POLLERR | MONO_POLLHUP | MONO_POLLNVAL)) ? IO_OP_OUT : 0);
 
@@ -186,11 +223,15 @@ poll_event_get_fd_at (gint i, gint *operations)
 }
 
 static void
-poll_event_reset_fd_at (gint i, gint operations)
+poll_event_reset_fd_at (gpointer backend_data, gint i, gint operations)
 {
+	ThreadPoolIOBackendPoll *poll_backend_data;
 	mono_pollfd *poll_fd;
 
-	poll_fd = &poll_fds [i];
+	g_assert (backend_data);
+	poll_backend_data = backend_data;
+
+	poll_fd = &poll_backend_data->poll_fds [i];
 	g_assert (poll_fd->fd != -1);
 	g_assert (poll_fd->revents != 0);
 

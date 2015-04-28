@@ -41,13 +41,13 @@ typedef struct {
 } ThreadPoolIOUpdate;
 
 typedef struct {
-	gboolean (*init) (gint wakeup_pipe_fd);
-	void     (*cleanup) (void);
-	void     (*update_add) (ThreadPoolIOUpdate *update);
-	gint     (*event_wait) (void);
-	gint     (*event_get_fd_max) (void);
-	gint     (*event_get_fd_at) (gint i, gint *operations);
-	void     (*event_reset_fd_at) (gint i, gint operations);
+	gboolean (*init) (gpointer *backend_data, gint wakeup_pipe_fd);
+	void     (*cleanup) (gpointer backend_data);
+	void     (*update_add) (gpointer backend_data, ThreadPoolIOUpdate *update);
+	gint     (*event_wait) (gpointer backend_data);
+	gint     (*event_get_fd_max) (gpointer backend_data);
+	gint     (*event_get_fd_at) (gpointer backend_data, gint i, gint *operations);
+	void     (*event_reset_fd_at) (gpointer backend_data, gint i, gint operations);
 } ThreadPoolIOBackend;
 
 #include "threadpool-ms-io-epoll.c"
@@ -73,6 +73,7 @@ typedef struct {
 	mono_mutex_t states_lock;
 
 	ThreadPoolIOBackend backend;
+	gpointer backend_data;
 
 	ThreadPoolIOUpdate *updates;
 	guint updates_size;
@@ -194,7 +195,7 @@ selector_thread (gpointer data)
 
 		mono_mutex_lock (&threadpool_io->updates_lock);
 		for (i = 0; i < threadpool_io->updates_size; ++i) {
-			threadpool_io->backend.update_add (&threadpool_io->updates [i]);
+			threadpool_io->backend.update_add (threadpool_io->backend_data, &threadpool_io->updates [i]);
 		}
 		if (threadpool_io->updates_size > 0) {
 			threadpool_io->updates_size = 0;
@@ -202,19 +203,19 @@ selector_thread (gpointer data)
 		}
 		mono_mutex_unlock (&threadpool_io->updates_lock);
 
-		ready = threadpool_io->backend.event_wait ();
+		ready = threadpool_io->backend.event_wait (threadpool_io->backend_data);
 
 		mono_gc_set_skip_thread (FALSE);
 
 		if (ready == -1 || mono_runtime_is_shutting_down ())
 			break;
 
-		max = threadpool_io->backend.event_get_fd_max ();
+		max = threadpool_io->backend.event_get_fd_max (threadpool_io->backend_data);
 
 		mono_mutex_lock (&threadpool_io->states_lock);
 		for (i = 0; ready > 0 && i < max; ++i) {
 			gint operations;
-			gint fd = threadpool_io->backend.event_get_fd_at (i, &operations);
+			gint fd = threadpool_io->backend.event_get_fd_at (threadpool_io->backend_data, i, &operations);
 
 			if (fd == -1)
 				continue;
@@ -239,7 +240,7 @@ selector_thread (gpointer data)
 					mono_g_hash_table_remove (threadpool_io->states, GINT_TO_POINTER (fd));
 				} else {
 					mono_g_hash_table_replace (threadpool_io->states, GINT_TO_POINTER (fd), list);
-					threadpool_io->backend.event_reset_fd_at (i, get_operations (list));
+					threadpool_io->backend.event_reset_fd_at (threadpool_io->backend_data, i, get_operations (list));
 				}
 			}
 
@@ -344,8 +345,8 @@ ensure_initialized (void)
 	if (g_getenv ("MONO_DISABLE_AIO") != NULL)
 		threadpool_io->backend = backend_poll;
 
-	if (!threadpool_io->backend.init (threadpool_io->wakeup_pipes [0]))
-		g_error ("ensure_initialized: backend.init () failed");
+	if (!threadpool_io->backend.init (&threadpool_io->backend_data, threadpool_io->wakeup_pipes [0]))
+		g_error ("ensure_initialized: backend->init () failed");
 
 	if (!mono_thread_create_internal (mono_get_root_domain (), selector_thread, NULL, TRUE, SMALL_STACK))
 		g_error ("ensure_initialized: mono_thread_create_internal () failed");
@@ -389,7 +390,7 @@ ensure_cleanedup (void)
 	g_free (threadpool_io->updates);
 	mono_mutex_destroy (&threadpool_io->updates_lock);
 
-	threadpool_io->backend.cleanup ();
+	threadpool_io->backend.cleanup (threadpool_io->backend_data);
 
 #if !defined(HOST_WIN32)
 	close (threadpool_io->wakeup_pipes [0]);
