@@ -8,10 +8,9 @@
  */
 
 #include <config.h>
+#include <glib.h>
 
 #ifndef DISABLE_SOCKETS
-
-#include <glib.h>
 
 #if defined(HOST_WIN32)
 #include <windows.h>
@@ -35,6 +34,26 @@ typedef enum {
 	IO_OP_OUT       = 2,
 } MonoIOOperation;
 
+typedef struct {
+	gint fd;
+	MonoIOOperation operations;
+	gboolean is_new;
+} ThreadPoolIOUpdate;
+
+typedef struct {
+	gboolean (*init) (gint wakeup_pipe_fd);
+	void     (*cleanup) (void);
+	void     (*update_add) (ThreadPoolIOUpdate *update);
+	gint     (*event_wait) (void);
+	gint     (*event_get_fd_max) (void);
+	gint     (*event_get_fd_at) (gint i, MonoIOOperation *operations);
+	void     (*event_reset_fd_at) (gint i, MonoIOOperation operations);
+} ThreadPoolIOBackend;
+
+#include "threadpool-ms-io-epoll.c"
+#include "threadpool-ms-io-kqueue.c"
+#include "threadpool-ms-io-poll.c"
+
 /* Keep in sync with System.Threading.IOAsyncResult */
 struct _MonoIOAsyncResult {
 	MonoObject obj;
@@ -50,20 +69,22 @@ struct _MonoIOAsyncResult {
 };
 
 typedef struct {
-	gint fd;
-	gint operations;
-	gboolean is_new;
-} ThreadPoolIOUpdate;
+	MonoGHashTable *states;
+	mono_mutex_t states_lock;
 
-typedef struct {
-	gboolean (*init) (gint wakeup_pipe_fd);
-	void     (*cleanup) (void);
-	void     (*update_add) (ThreadPoolIOUpdate *update);
-	gint     (*event_wait) (void);
-	gint     (*event_max) (void);
-	gint     (*event_fd_at) (guint i);
-	gboolean (*event_create_ioares_at) (guint i, gint fd, MonoMList **list);
-} ThreadPoolIOBackend;
+	ThreadPoolIOBackend backend;
+
+	ThreadPoolIOUpdate *updates;
+	guint updates_size;
+	mono_mutex_t updates_lock;
+
+	gint wakeup_pipes [2];
+} ThreadPoolIO;
+
+static gint32 io_status = STATUS_NOT_INITIALIZED;
+static gint32 io_thread_status = STATUS_NOT_INITIALIZED;
+
+static ThreadPoolIO* threadpool_io;
 
 static MonoIOAsyncResult*
 get_ioares_for_operation (MonoMList **list, MonoIOOperation operation)
@@ -90,7 +111,7 @@ static MonoIOOperation
 get_operations (MonoMList *list)
 {
 	MonoIOAsyncResult *ioares;
-	gint operations = 0;
+	MonoIOOperation operations = 0;
 
 	for (; list; list = mono_mlist_next (list))
 		if ((ioares = (MonoIOAsyncResult*) mono_mlist_get_data (list)))
@@ -99,53 +120,27 @@ get_operations (MonoMList *list)
 	return operations;
 }
 
-#include "threadpool-ms-io-epoll.c"
-#include "threadpool-ms-io-kqueue.c"
-#include "threadpool-ms-io-poll.c"
-
-typedef struct {
-	MonoGHashTable *states;
-	mono_mutex_t states_lock;
-
-	ThreadPoolIOBackend backend;
-
-	ThreadPoolIOUpdate *updates;
-	guint updates_size;
-	mono_mutex_t updates_lock;
-
-#if !defined(HOST_WIN32)
-	gint wakeup_pipes [2];
-#else
-	SOCKET wakeup_pipes [2];
-#endif
-} ThreadPoolIO;
-
-static gint32 io_status = STATUS_NOT_INITIALIZED;
-static gint32 io_thread_status = STATUS_NOT_INITIALIZED;
-
-static ThreadPoolIO* threadpool_io;
-
 static void
-selector_thread_wakeup (void)
+selector_thread_wakeup (gint wrhandle)
 {
-	gchar msg = 'c';
+	gchar c = 'c';
 	gint written;
 
 	for (;;) {
 #if !defined(HOST_WIN32)
-		written = write (threadpool_io->wakeup_pipes [1], &msg, 1);
-		if (written == 1)
+		written = write (wrhandle, &c, sizeof (c));
+		if (written == sizeof (c))
 			break;
 		if (written == -1) {
 			g_warning ("selector_thread_wakeup: write () failed, error (%d) %s\n", errno, g_strerror (errno));
 			break;
 		}
 #else
-		written = send (threadpool_io->wakeup_pipes [1], &msg, 1, 0);
-		if (written == 1)
+		written = send (wrhandle, &c, sizeof (c), 0);
+		if (written == sizeof (c))
 			break;
 		if (written == SOCKET_ERROR) {
-			g_warning ("selector_thread_wakeup: write () failed, error (%d)\n", WSAGetLastError ());
+			g_warning ("selector_thread_wakeup: send () failed, error (%d)\n", WSAGetLastError ());
 			break;
 		}
 #endif
@@ -153,32 +148,130 @@ selector_thread_wakeup (void)
 }
 
 static void
-selector_thread_wakeup_drain_pipes (void)
+selector_thread_wakeup_drain_pipes (gint rdhandle)
 {
 	gchar buffer [128];
 	gint received;
 
 	for (;;) {
 #if !defined(HOST_WIN32)
-		received = read (threadpool_io->wakeup_pipes [0], buffer, sizeof (buffer));
+		received = read (rdhandle, buffer, sizeof (buffer));
 		if (received == 0)
 			break;
 		if (received == -1) {
-			if (errno != EINTR && errno != EAGAIN)
+			if (errno != EINTR && errno != EAGAIN) {
 				g_warning ("selector_thread_wakeup_drain_pipes: read () failed, error (%d) %s\n", errno, g_strerror (errno));
+			}
 			break;
 		}
 #else
-		received = recv (threadpool_io->wakeup_pipes [0], buffer, sizeof (buffer), 0);
+		received = recv (rdhandle, buffer, sizeof (buffer), 0);
 		if (received == 0)
 			break;
 		if (received == SOCKET_ERROR) {
-			if (WSAGetLastError () != WSAEINTR && WSAGetLastError () != WSAEWOULDBLOCK)
-				g_warning ("selector_thread_wakeup_drain_pipes: recv () failed, error (%d) %s\n", WSAGetLastError ());
+			if (WSAGetLastError () != WSAEINTR && WSAGetLastError () != WSAEWOULDBLOCK) {
+				g_warning ("selector_thread_wakeup_drain_pipes: recv () failed, error (%d)\n", WSAGetLastError ());
+			}
 			break;
 		}
 #endif
 	}
+}
+
+static void
+selector_thread_wakeup_create_pipes (gint *rdhandle, gint *wrhandle)
+{
+	gint wakeup_pipes [2];
+
+	g_assert (rdhandle);
+	g_assert (wrhandle);
+
+	*rdhandle = 0;
+	*wrhandle = 0;
+
+#if !defined(HOST_WIN32)
+	if (pipe (wakeup_pipes) == -1) {
+		g_error ("selector_thread_wakeup_create_pipes: pipe () failed, error (%d) %s\n", errno, g_strerror (errno));
+		return;
+	}
+	if (fcntl (wakeup_pipes [0], F_SETFL, O_NONBLOCK) == -1) {
+		g_error ("selector_thread_wakeup_create_pipes: fcntl () failed, error (%d) %s\n", errno, g_strerror (errno));
+		return;
+	}
+#else
+	SOCKET wakeup_pipes [2];
+	struct sockaddr_in client;
+	struct sockaddr_in server;
+	SOCKET server_sock;
+	gulong arg;
+	gint size;
+
+	g_assert (rdhandle);
+	g_assert (wrhandle);
+
+	*rdhandle = 0;
+	*wrhandle = 0;
+
+	server_sock = socket (AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	g_assert (server_sock != INVALID_SOCKET);
+	wakeup_pipes [1] = socket (AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	g_assert (wakeup_pipes [1] != INVALID_SOCKET);
+
+	server.sin_family = AF_INET;
+	server.sin_addr.s_addr = inet_addr ("127.0.0.1");
+	server.sin_port = 0;
+	if (bind (server_sock, (SOCKADDR*) &server, sizeof (server)) == SOCKET_ERROR) {
+		closesocket (server_sock);
+		g_error ("selector_thread_wakeup_create_pipes: bind () failed, error (%d)\n", WSAGetLastError ());
+		return;
+	}
+
+	size = sizeof (server);
+	if (getsockname (server_sock, (SOCKADDR*) &server, &size) == SOCKET_ERROR) {
+		closesocket (server_sock);
+		g_error ("selector_thread_wakeup_create_pipes: getsockname () failed, error (%d)\n", WSAGetLastError ());
+		return;
+	}
+	if (listen (server_sock, 1024) == SOCKET_ERROR) {
+		closesocket (server_sock);
+		g_error ("selector_thread_wakeup_create_pipes: listen () failed, error (%d)\n", WSAGetLastError ());
+		return;
+	}
+	if (connect ((SOCKET) wakeup_pipes [1], (SOCKADDR*) &server, sizeof (server)) == SOCKET_ERROR) {
+		closesocket (server_sock);
+		g_error ("selector_thread_wakeup_create_pipes: connect () failed, error (%d)\n", WSAGetLastError ());
+		return;
+	}
+
+	size = sizeof (client);
+	wakeup_pipes [0] = accept (server_sock, (SOCKADDR *) &client, &size);
+	g_assert (wakeup_pipes [0] != INVALID_SOCKET);
+
+	arg = 1;
+	if (ioctlsocket (wakeup_pipes [0], FIONBIO, &arg) == SOCKET_ERROR) {
+		closesocket (wakeup_pipes [0]);
+		closesocket (server_sock);
+		g_error ("selector_thread_wakeup_create_pipes: ioctlsocket () failed, error (%d)\n", WSAGetLastError ());
+		return;
+	}
+
+	closesocket (server_sock);
+#endif
+
+	*rdhandle = wakeup_pipes [0];
+	*wrhandle = wakeup_pipes [1];
+}
+
+static void
+selector_thread_cleanup (gint rdhandle, gint wrhandle)
+{
+#if !defined(HOST_WIN32)
+	close (rdhandle);
+	close (wrhandle);
+#else
+	closesocket (rdhandle);
+	closesocket (wrhandle);
+#endif
 }
 
 static void
@@ -210,32 +303,39 @@ selector_thread (gpointer data)
 		if (ready == -1 || mono_runtime_is_shutting_down ())
 			break;
 
-		max = threadpool_io->backend.event_max ();
+		max = threadpool_io->backend.event_get_fd_max ();
 
 		mono_mutex_lock (&threadpool_io->states_lock);
-		for (i = 0; i < max && ready > 0; ++i) {
-			MonoMList *list;
-			gboolean valid_fd;
-			gint fd;
+		for (i = 0; ready > 0 && i < max; ++i) {
+			MonoIOOperation operations;
+			gint fd = threadpool_io->backend.event_get_fd_at (i, &operations);
 
-			fd = threadpool_io->backend.event_fd_at (i);
-
-			if (fd == threadpool_io->wakeup_pipes [0]) {
-				selector_thread_wakeup_drain_pipes ();
-				ready -= 1;
+			if (fd == -1)
 				continue;
+
+			if (fd == GPOINTER_TO_INT (threadpool_io->wakeup_pipes [0])) {
+				selector_thread_wakeup_drain_pipes (threadpool_io->wakeup_pipes [0]);
+			} else {
+				MonoMList *list = mono_g_hash_table_lookup (threadpool_io->states, GINT_TO_POINTER (fd));
+
+				if (list && (operations & IO_OP_IN) != 0) {
+					MonoIOAsyncResult *ioares = get_ioares_for_operation (&list, IO_OP_IN);
+					if (ioares)
+						mono_threadpool_ms_enqueue_work_item (((MonoObject*) ioares)->vtable->domain, (MonoObject*) ioares);
+				}
+				if (list && (operations & IO_OP_OUT) != 0) {
+					MonoIOAsyncResult *ioares = get_ioares_for_operation (&list, IO_OP_OUT);
+					if (ioares)
+						mono_threadpool_ms_enqueue_work_item (((MonoObject*) ioares)->vtable->domain, (MonoObject*) ioares);
+				}
+
+				if (!list) {
+					mono_g_hash_table_remove (threadpool_io->states, GINT_TO_POINTER (fd));
+				} else {
+					mono_g_hash_table_replace (threadpool_io->states, GINT_TO_POINTER (fd), list);
+					threadpool_io->backend.event_reset_fd_at (i, get_operations (list));
+				}
 			}
-
-			list = mono_g_hash_table_lookup (threadpool_io->states, GINT_TO_POINTER (fd));
-
-			valid_fd = threadpool_io->backend.event_create_ioares_at (i, fd, &list);
-			if (!valid_fd)
-				continue;
-
-			if (list)
-				mono_g_hash_table_replace (threadpool_io->states, GINT_TO_POINTER (fd), list);
-			else
-				mono_g_hash_table_remove (threadpool_io->states, GINT_TO_POINTER (fd));
 
 			ready -= 1;
 		}
@@ -245,61 +345,26 @@ selector_thread (gpointer data)
 	io_thread_status = STATUS_CLEANED_UP;
 }
 
-static void
-wakeup_pipes_init (void)
+static gboolean
+backend_init (gint wakeup_rdhandle)
 {
-#if !defined(HOST_WIN32)
-	if (pipe (threadpool_io->wakeup_pipes) == -1)
-		g_error ("wakeup_pipes_init: pipe () failed, error (%d) %s\n", errno, g_strerror (errno));
-	if (fcntl (threadpool_io->wakeup_pipes [0], F_SETFL, O_NONBLOCK) == -1)
-		g_error ("wakeup_pipes_init: fcntl () failed, error (%d) %s\n", errno, g_strerror (errno));
+#if defined(HAVE_EPOLL)
+	threadpool_io->backend = backend_epoll;
+#elif defined(HAVE_KQUEUE)
+	threadpool_io->backend = backend_kqueue;
 #else
-	struct sockaddr_in client;
-	struct sockaddr_in server;
-	SOCKET server_sock;
-	gulong arg;
-	gint size;
-
-	server_sock = socket (AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	g_assert (server_sock != INVALID_SOCKET);
-	threadpool_io->wakeup_pipes [1] = socket (AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	g_assert (threadpool_io->wakeup_pipes [1] != INVALID_SOCKET);
-
-	server.sin_family = AF_INET;
-	server.sin_addr.s_addr = inet_addr ("127.0.0.1");
-	server.sin_port = 0;
-	if (bind (server_sock, (SOCKADDR*) &server, sizeof (server)) == SOCKET_ERROR) {
-		closesocket (server_sock);
-		g_error ("wakeup_pipes_init: bind () failed, error (%d)\n", WSAGetLastError ());
-	}
-
-	size = sizeof (server);
-	if (getsockname (server_sock, (SOCKADDR*) &server, &size) == SOCKET_ERROR) {
-		closesocket (server_sock);
-		g_error ("wakeup_pipes_init: getsockname () failed, error (%d)\n", WSAGetLastError ());
-	}
-	if (listen (server_sock, 1024) == SOCKET_ERROR) {
-		closesocket (server_sock);
-		g_error ("wakeup_pipes_init: listen () failed, error (%d)\n", WSAGetLastError ());
-	}
-	if (connect ((SOCKET) threadpool_io->wakeup_pipes [1], (SOCKADDR*) &server, sizeof (server)) == SOCKET_ERROR) {
-		closesocket (server_sock);
-		g_error ("wakeup_pipes_init: connect () failed, error (%d)\n", WSAGetLastError ());
-	}
-
-	size = sizeof (client);
-	threadpool_io->wakeup_pipes [0] = accept (server_sock, (SOCKADDR *) &client, &size);
-	g_assert (threadpool_io->wakeup_pipes [0] != INVALID_SOCKET);
-
-	arg = 1;
-	if (ioctlsocket (threadpool_io->wakeup_pipes [0], FIONBIO, &arg) == SOCKET_ERROR) {
-		closesocket (threadpool_io->wakeup_pipes [0]);
-		closesocket (server_sock);
-		g_error ("wakeup_pipes_init: ioctlsocket () failed, error (%d)\n", WSAGetLastError ());
-	}
-
-	closesocket (server_sock);
+	threadpool_io->backend = backend_poll;
 #endif
+	if (g_getenv ("MONO_DISABLE_AIO") != NULL)
+		threadpool_io->backend = backend_poll;
+
+	return threadpool_io->backend.init (wakeup_rdhandle);
+}
+
+static void
+backend_cleanup (void)
+{
+	threadpool_io->backend.cleanup ();
 }
 
 static void
@@ -326,23 +391,17 @@ ensure_initialized (void)
 	threadpool_io->updates_size = 0;
 	mono_mutex_init (&threadpool_io->updates_lock);
 
-#if defined(HAVE_EPOLL)
-	threadpool_io->backend = backend_epoll;
-#elif defined(HAVE_KQUEUE)
-	threadpool_io->backend = backend_kqueue;
-#else
-	threadpool_io->backend = backend_poll;
-#endif
-	if (g_getenv ("MONO_DISABLE_AIO") != NULL)
-		threadpool_io->backend = backend_poll;
+	selector_thread_wakeup_create_pipes (&threadpool_io->wakeup_pipes [0], &threadpool_io->wakeup_pipes [1]);
 
-	wakeup_pipes_init ();
+	if (!backend_init (threadpool_io->wakeup_pipes [0])) {
+		g_error ("ensure_initialized: backend_init () failed");
+		return;
+	}
 
-	if (!threadpool_io->backend.init (threadpool_io->wakeup_pipes [0]))
-		g_error ("ensure_initialized: backend->init () failed");
-
-	if (!mono_thread_create_internal (mono_get_root_domain (), selector_thread, NULL, TRUE, SMALL_STACK))
+	if (!mono_thread_create_internal (mono_get_root_domain (), selector_thread, NULL, TRUE, SMALL_STACK)) {
 		g_error ("ensure_initialized: mono_thread_create_internal () failed");
+		return;
+	}
 
 	io_thread_status = STATUS_INITIALIZING;
 	mono_memory_write_barrier ();
@@ -372,7 +431,7 @@ ensure_cleanedup (void)
 	 * cleaning up only if the runtime is shutting down */
 	g_assert (mono_runtime_is_shutting_down ());
 
-	selector_thread_wakeup ();
+	selector_thread_wakeup (threadpool_io->wakeup_pipes [1]);
 	while (io_thread_status != STATUS_CLEANED_UP)
 		usleep (1000);
 
@@ -383,15 +442,9 @@ ensure_cleanedup (void)
 	g_free (threadpool_io->updates);
 	mono_mutex_destroy (&threadpool_io->updates_lock);
 
-	threadpool_io->backend.cleanup ();
+	backend_cleanup ();
 
-#if !defined(HOST_WIN32)
-	close (threadpool_io->wakeup_pipes [0]);
-	close (threadpool_io->wakeup_pipes [1]);
-#else
-	closesocket (threadpool_io->wakeup_pipes [0]);
-	closesocket (threadpool_io->wakeup_pipes [1]);
-#endif
+	selector_thread_cleanup (threadpool_io->wakeup_pipes [0], threadpool_io->wakeup_pipes [1]);
 
 	g_assert (threadpool_io);
 	g_free (threadpool_io);
@@ -450,13 +503,13 @@ mono_threadpool_ms_io_add (MonoAsyncResult *ares, MonoIOAsyncResult *ioares)
 
 	update = &threadpool_io->updates [threadpool_io->updates_size - 1];
 	update->fd = GPOINTER_TO_INT (ioares->handle);
-	update->operations = get_operations (list);;
+	update->operations = ioares->operation;
 	update->is_new = is_new;
 	mono_mutex_unlock (&threadpool_io->updates_lock);
 
 	mono_mutex_unlock (&threadpool_io->states_lock);
 
-	selector_thread_wakeup ();
+	selector_thread_wakeup (threadpool_io->wakeup_pipes [1]);
 
 	return ares;
 }
