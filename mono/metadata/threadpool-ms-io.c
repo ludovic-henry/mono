@@ -28,15 +28,15 @@
 #include <mono/utils/mono-threads.h>
 
 /* Keep in sync with System.Threading.IOOperation */
-typedef enum {
+enum {
 	IO_OP_UNDEFINED = 0,
 	IO_OP_IN        = 1,
 	IO_OP_OUT       = 2,
-} MonoIOOperation;
+};
 
 typedef struct {
 	gint fd;
-	MonoIOOperation operations;
+	gint32 operations;
 	gboolean is_new;
 } ThreadPoolIOUpdate;
 
@@ -46,8 +46,8 @@ typedef struct {
 	void     (*update_add) (ThreadPoolIOUpdate *update);
 	gint     (*event_wait) (void);
 	gint     (*event_get_fd_max) (void);
-	gint     (*event_get_fd_at) (gint i, MonoIOOperation *operations);
-	void     (*event_reset_fd_at) (gint i, MonoIOOperation operations);
+	gint     (*event_get_fd_at) (gint i, gint32 *operations);
+	void     (*event_reset_fd_at) (gint i, gint32 operations);
 } ThreadPoolIOBackend;
 
 #include "threadpool-ms-io-epoll.c"
@@ -65,7 +65,7 @@ struct _MonoIOAsyncResult {
 	gpointer handle;
 	MonoAsyncResult *async_result;
 	MonoObject *async_callback;
-	MonoIOOperation operation;
+	gint32 operation;
 };
 
 typedef struct {
@@ -87,7 +87,7 @@ static gint32 io_thread_status = STATUS_NOT_INITIALIZED;
 static ThreadPoolIO* threadpool_io;
 
 static MonoIOAsyncResult*
-get_ioares_for_operation (MonoMList **list, MonoIOOperation operation)
+get_ioares_for_operation (MonoMList **list, gint32 operation)
 {
 	MonoIOAsyncResult *ioares = NULL;
 	MonoMList *current;
@@ -107,11 +107,11 @@ get_ioares_for_operation (MonoMList **list, MonoIOOperation operation)
 	return ioares;
 }
 
-static MonoIOOperation
+static gint32
 get_operations (MonoMList *list)
 {
 	MonoIOAsyncResult *ioares;
-	MonoIOOperation operations = 0;
+	gint32 operations = 0;
 
 	for (; list; list = mono_mlist_next (list))
 		if ((ioares = (MonoIOAsyncResult*) mono_mlist_get_data (list)))
@@ -307,7 +307,7 @@ selector_thread (gpointer data)
 
 		mono_mutex_lock (&threadpool_io->states_lock);
 		for (i = 0; ready > 0 && i < max; ++i) {
-			MonoIOOperation operations;
+			gint32 operations;
 			gint fd = threadpool_io->backend.event_get_fd_at (i, &operations);
 
 			if (fd == -1)

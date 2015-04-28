@@ -97,7 +97,7 @@ epoll_event_get_fd_max (void)
 }
 
 static gint
-epoll_event_get_fd_at (gint i, MonoIOOperation *operations)
+epoll_event_get_fd_at (gint i, gint32 *operations)
 {
 	struct epoll_event *epoll_event;
 
@@ -112,7 +112,7 @@ epoll_event_get_fd_at (gint i, MonoIOOperation *operations)
 }
 
 static void
-epoll_event_reset_fd_at (gint i, MonoIOOperation operations)
+epoll_event_reset_fd_at (gint i, gint32 operations)
 {
 	struct epoll_event *epoll_event;
 

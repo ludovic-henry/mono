@@ -95,7 +95,7 @@ kqueue_event_get_fd_max (void)
 }
 
 static gint
-kqueue_event_get_fd_at (gint i, MonoIOOperation *operations)
+kqueue_event_get_fd_at (gint i, gint32 *operations)
 {
 	struct kevent *kqueue_event;
 
@@ -110,7 +110,7 @@ kqueue_event_get_fd_at (gint i, MonoIOOperation *operations)
 }
 
 static void
-kqueue_event_reset_fd_at (gint i, MonoIOOperation operations)
+kqueue_event_reset_fd_at (gint i, gint32 operations)
 {
 	struct kevent *kqueue_event;
 
