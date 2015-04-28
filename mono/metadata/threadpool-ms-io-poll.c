@@ -17,8 +17,8 @@ POLL_INIT_FD (mono_pollfd *poll_fd, gint fd, gint events)
 	poll_fd->revents = 0;
 }
 
-static gboolean
-poll_init (gpointer *backend_data, gint wakeup_pipe_fd)
+static gint
+poll_init (gpointer *backend_data, gint wakeup_pipe_fd, gchar *error, gint error_size)
 {
 	ThreadPoolIOBackendPoll *poll_backend_data;
 	guint i;
@@ -27,23 +27,23 @@ poll_init (gpointer *backend_data, gint wakeup_pipe_fd)
 
 	*backend_data = poll_backend_data = g_new0 (ThreadPoolIOBackendPoll, 1);
 	if (poll_backend_data == NULL) {
-		g_warning ("poll_init: g_new0 (ThreadPoolIOBackendPoll, 1) failed, error (%d) %s", errno, g_strerror (errno));
-		return FALSE;
+		g_snprintf (error, error_size, "poll_init: g_new0 (ThreadPoolIOBackendPoll, 1) failed, error (%d) %s", errno, g_strerror (errno));
+		return -1;
 	}
 
 	poll_backend_data->poll_fds_size = 1;
 	poll_backend_data->poll_fds_capacity = POLL_NEVENTS;
 	poll_backend_data->poll_fds = g_new0 (mono_pollfd, poll_backend_data->poll_fds_capacity);
 	if (poll_backend_data->poll_fds == NULL) {
-		g_warning ("poll_init: g_new0 (mono_pollfd, POLL_NEVENTS) failed, error (%d) %s", errno, g_strerror (errno));
-		return FALSE;
+		g_snprintf (error, error_size, "poll_init: g_new0 (mono_pollfd, POLL_NEVENTS) failed, error (%d) %s", errno, g_strerror (errno));
+		return -1;
 	}
 
 	POLL_INIT_FD (&poll_backend_data->poll_fds [0], wakeup_pipe_fd, MONO_POLLIN);
 	for (i = 1; i < poll_backend_data->poll_fds_capacity; ++i)
 		POLL_INIT_FD (&poll_backend_data->poll_fds [i], -1, 0);
 
-	return TRUE;
+	return 0;
 }
 
 static void
@@ -90,8 +90,8 @@ poll_mark_bad_fds (mono_pollfd *poll_fds, gint poll_fds_size)
 	return ready;
 }
 
-static void
-poll_update_add (gpointer backend_data, ThreadPoolIOUpdate *update)
+static gint
+poll_update_add (gpointer backend_data, ThreadPoolIOUpdate *update, gchar *error, gint error_size)
 {
 	ThreadPoolIOBackendPoll *poll_backend_data;
 	gboolean found = FALSE;
@@ -131,10 +131,12 @@ poll_update_add (gpointer backend_data, ThreadPoolIOUpdate *update)
 
 	if (j >= poll_backend_data->poll_fds_size)
 		poll_backend_data->poll_fds_size = j + 1;
+
+	return 0;
 }
 
 static gint
-poll_event_wait (gpointer backend_data)
+poll_event_wait (gpointer backend_data, gchar *error, gint error_size)
 {
 	ThreadPoolIOBackendPoll *poll_backend_data;
 	gint ready;
@@ -180,9 +182,9 @@ poll_event_wait (gpointer backend_data)
 			break;
 		default:
 #if !defined(HOST_WIN32)
-			g_warning ("poll_event_wait: mono_poll () failed, error (%d) %s", errno, g_strerror (errno));
+			g_snprintf (error, error_size, "poll_event_wait: mono_poll () failed, error (%d) %s", errno, g_strerror (errno));
 #else
-			g_warning ("poll_event_wait: mono_poll () failed, error (%d)\n", WSAGetLastError ());
+			g_snprintf (error, error_size, "poll_event_wait: mono_poll () failed, error (%d)\n", WSAGetLastError ());
 #endif
 			break;
 		}
@@ -222,8 +224,8 @@ poll_event_get_fd_at (gpointer backend_data, gint i, gint32 *operations)
 	return poll_fd->revents == 0 ? -1 : poll_fd->fd;
 }
 
-static void
-poll_event_reset_fd_at (gpointer backend_data, gint i, gint32 operations)
+static gint
+poll_event_reset_fd_at (gpointer backend_data, gint i, gint32 operations, gchar *error, gint error_size)
 {
 	ThreadPoolIOBackendPoll *poll_backend_data;
 	mono_pollfd *poll_fd;
@@ -236,6 +238,8 @@ poll_event_reset_fd_at (gpointer backend_data, gint i, gint32 operations)
 	g_assert (poll_fd->revents != 0);
 
 	POLL_INIT_FD (poll_fd, operations == 0 ? -1 : poll_fd->fd, operations);
+
+	return 0;
 }
 
 static ThreadPoolIOBackend backend_poll = {

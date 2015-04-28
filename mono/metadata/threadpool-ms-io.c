@@ -41,13 +41,13 @@ typedef struct {
 } ThreadPoolIOUpdate;
 
 typedef struct {
-	gboolean (*init) (gpointer *backend_data, gint wakeup_pipe_fd);
-	void     (*cleanup) (gpointer backend_data);
-	void     (*update_add) (gpointer backend_data, ThreadPoolIOUpdate *update);
-	gint     (*event_wait) (gpointer backend_data);
-	gint     (*event_get_fd_max) (gpointer backend_data);
-	gint     (*event_get_fd_at) (gpointer backend_data, gint i, gint32 *operations);
-	void     (*event_reset_fd_at) (gpointer backend_data, gint i, gint32 operations);
+	gint (*init) (gpointer *backend_data, gint wakeup_pipe_fd, gchar *error, gint error_size);
+	void (*cleanup) (gpointer backend_data);
+	gint (*update_add) (gpointer backend_data, ThreadPoolIOUpdate *update, gchar *error, gint error_size);
+	gint (*event_wait) (gpointer backend_data, gchar *error, gint error_size);
+	gint (*event_get_fd_max) (gpointer backend_data);
+	gint (*event_get_fd_at) (gpointer backend_data, gint i, gint32 *operations);
+	gint (*event_reset_fd_at) (gpointer backend_data, gint i, gint32 operations, gchar *error, gint error_size);
 } ThreadPoolIOBackend;
 
 #include "threadpool-ms-io-epoll.c"
@@ -124,6 +124,7 @@ get_operations (MonoMList *list)
 static void
 selector_thread_wakeup (gint wrhandle)
 {
+	gchar msg [256];
 	gchar c = 'c';
 	gint written;
 
@@ -133,7 +134,8 @@ selector_thread_wakeup (gint wrhandle)
 		if (written == sizeof (c))
 			break;
 		if (written == -1) {
-			g_warning ("selector_thread_wakeup: write () failed, error (%d) %s\n", errno, g_strerror (errno));
+			g_snprintf (msg, sizeof (msg), "selector_thread_wakeup: write () failed, error (%d) %s\n", errno, g_strerror (errno));
+			g_message (msg);
 			break;
 		}
 #else
@@ -141,7 +143,8 @@ selector_thread_wakeup (gint wrhandle)
 		if (written == sizeof (c))
 			break;
 		if (written == SOCKET_ERROR) {
-			g_warning ("selector_thread_wakeup: send () failed, error (%d)\n", WSAGetLastError ());
+			g_snprintf (msg, sizeof (msg), "selector_thread_wakeup: send () failed, error (%d)\n", WSAGetLastError ());
+			g_message (msg);
 			break;
 		}
 #endif
@@ -151,6 +154,7 @@ selector_thread_wakeup (gint wrhandle)
 static void
 selector_thread_wakeup_drain_pipes (gint rdhandle)
 {
+	gchar msg [256];
 	gchar buffer [128];
 	gint received;
 
@@ -161,7 +165,9 @@ selector_thread_wakeup_drain_pipes (gint rdhandle)
 			break;
 		if (received == -1) {
 			if (errno != EINTR && errno != EAGAIN) {
-				g_warning ("selector_thread_wakeup_drain_pipes: read () failed, error (%d) %s\n", errno, g_strerror (errno));
+				g_snprintf (msg, sizeof (msg), "selector_thread_wakeup_drain_pipes: read () failed, error (%d) %s\n", errno, g_strerror (errno));
+				g_message (msg);
+				break;
 			}
 			break;
 		}
@@ -171,7 +177,9 @@ selector_thread_wakeup_drain_pipes (gint rdhandle)
 			break;
 		if (received == SOCKET_ERROR) {
 			if (WSAGetLastError () != WSAEINTR && WSAGetLastError () != WSAEWOULDBLOCK) {
-				g_warning ("selector_thread_wakeup_drain_pipes: recv () failed, error (%d)\n", WSAGetLastError ());
+				g_snprintf (msg, sizeof (msg), "selector_thread_wakeup_drain_pipes: recv () failed, error (%d)\n", WSAGetLastError ());
+				g_message (msg);
+				break;
 			}
 			break;
 		}
@@ -182,6 +190,7 @@ selector_thread_wakeup_drain_pipes (gint rdhandle)
 static void
 selector_thread_wakeup_create_pipes (gint *rdhandle, gint *wrhandle)
 {
+	gchar msg [256];
 	gint wakeup_pipes [2];
 
 	g_assert (rdhandle);
@@ -192,11 +201,13 @@ selector_thread_wakeup_create_pipes (gint *rdhandle, gint *wrhandle)
 
 #if !defined(HOST_WIN32)
 	if (pipe (wakeup_pipes) == -1) {
-		g_error ("selector_thread_wakeup_create_pipes: pipe () failed, error (%d) %s\n", errno, g_strerror (errno));
+		g_snprintf (msg, sizeof (msg), "selector_thread_wakeup_create_pipes: pipe () failed, error (%d) %s\n", errno, g_strerror (errno));
+		g_error (msg);
 		return;
 	}
 	if (fcntl (wakeup_pipes [0], F_SETFL, O_NONBLOCK) == -1) {
-		g_error ("selector_thread_wakeup_create_pipes: fcntl () failed, error (%d) %s\n", errno, g_strerror (errno));
+		g_snprintf (msg, sizeof (msg), "selector_thread_wakeup_create_pipes: fcntl () failed, error (%d) %s\n", errno, g_strerror (errno));
+		g_error (msg);
 		return;
 	}
 #else
@@ -206,12 +217,6 @@ selector_thread_wakeup_create_pipes (gint *rdhandle, gint *wrhandle)
 	SOCKET server_sock;
 	gulong arg;
 	gint size;
-
-	g_assert (rdhandle);
-	g_assert (wrhandle);
-
-	*rdhandle = 0;
-	*wrhandle = 0;
 
 	server_sock = socket (AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	g_assert (server_sock != INVALID_SOCKET);
@@ -223,24 +228,28 @@ selector_thread_wakeup_create_pipes (gint *rdhandle, gint *wrhandle)
 	server.sin_port = 0;
 	if (bind (server_sock, (SOCKADDR*) &server, sizeof (server)) == SOCKET_ERROR) {
 		closesocket (server_sock);
-		g_error ("selector_thread_wakeup_create_pipes: bind () failed, error (%d)\n", WSAGetLastError ());
+		g_snprintf (msg, sizeof (msg), "selector_thread_wakeup_create_pipes: bind () failed, error (%d)\n", WSAGetLastError ());
+		g_error (msg);
 		return;
 	}
 
 	size = sizeof (server);
 	if (getsockname (server_sock, (SOCKADDR*) &server, &size) == SOCKET_ERROR) {
 		closesocket (server_sock);
-		g_error ("selector_thread_wakeup_create_pipes: getsockname () failed, error (%d)\n", WSAGetLastError ());
+		g_snprintf (msg, sizeof (msg), "selector_thread_wakeup_create_pipes: getsockname () failed, error (%d)\n", WSAGetLastError ());
+		g_error (msg);
 		return;
 	}
 	if (listen (server_sock, 1024) == SOCKET_ERROR) {
 		closesocket (server_sock);
-		g_error ("selector_thread_wakeup_create_pipes: listen () failed, error (%d)\n", WSAGetLastError ());
+		g_snprintf (msg, sizeof (msg), "selector_thread_wakeup_create_pipes: listen () failed, error (%d)\n", WSAGetLastError ());
+		g_error (msg);
 		return;
 	}
 	if (connect ((SOCKET) wakeup_pipes [1], (SOCKADDR*) &server, sizeof (server)) == SOCKET_ERROR) {
 		closesocket (server_sock);
-		g_error ("selector_thread_wakeup_create_pipes: connect () failed, error (%d)\n", WSAGetLastError ());
+		g_snprintf (msg, sizeof (msg), "selector_thread_wakeup_create_pipes: connect () failed, error (%d)\n", WSAGetLastError ());
+		g_error (msg);
 		return;
 	}
 
@@ -252,7 +261,8 @@ selector_thread_wakeup_create_pipes (gint *rdhandle, gint *wrhandle)
 	if (ioctlsocket (wakeup_pipes [0], FIONBIO, &arg) == SOCKET_ERROR) {
 		closesocket (wakeup_pipes [0]);
 		closesocket (server_sock);
-		g_error ("selector_thread_wakeup_create_pipes: ioctlsocket () failed, error (%d)\n", WSAGetLastError ());
+		g_snprintf (msg, sizeof (msg), "selector_thread_wakeup_create_pipes: ioctlsocket () failed, error (%d)\n", WSAGetLastError ());
+		g_error (msg);
 		return;
 	}
 
@@ -278,6 +288,8 @@ selector_thread_cleanup (gint rdhandle, gint wrhandle)
 static void
 selector_thread (gpointer data)
 {
+	gchar error [256];
+
 	io_thread_status = STATUS_INITIALIZED;
 
 	for (;;) {
@@ -289,7 +301,11 @@ selector_thread (gpointer data)
 
 		mono_mutex_lock (&threadpool_io->updates_lock);
 		for (i = 0; i < threadpool_io->updates_size; ++i) {
-			threadpool_io->backend->update_add (threadpool_io->backend_data, &threadpool_io->updates [i]);
+			if (threadpool_io->backend->update_add (threadpool_io->backend_data, &threadpool_io->updates [i], error, sizeof (error)) == -1) {
+				gchar msg [sizeof (error) + 64];
+				g_snprintf (msg, sizeof (msg), "selector_thread: backend->update_add () failed, error : '%s'", error);
+				g_message (msg);
+			}
 		}
 		if (threadpool_io->updates_size > 0) {
 			threadpool_io->updates_size = 0;
@@ -297,12 +313,19 @@ selector_thread (gpointer data)
 		}
 		mono_mutex_unlock (&threadpool_io->updates_lock);
 
-		ready = threadpool_io->backend->event_wait (threadpool_io->backend_data);
+		ready = threadpool_io->backend->event_wait (threadpool_io->backend_data, error, sizeof (error));
 
 		mono_gc_set_skip_thread (FALSE);
 
-		if (ready == -1 || mono_runtime_is_shutting_down ())
+		if (mono_runtime_is_shutting_down ())
 			break;
+
+		if (ready == -1) {
+			gchar msg [sizeof (error) + 64];
+			g_snprintf (msg, sizeof (msg), "selector_thread: backend->event_wait () failed, error : '%s'", error);
+			g_error (msg);
+			break;
+		}
 
 		max = threadpool_io->backend->event_get_fd_max (threadpool_io->backend_data);
 
@@ -334,7 +357,11 @@ selector_thread (gpointer data)
 					mono_g_hash_table_remove (threadpool_io->states, GINT_TO_POINTER (fd));
 				} else {
 					mono_g_hash_table_replace (threadpool_io->states, GINT_TO_POINTER (fd), list);
-					threadpool_io->backend->event_reset_fd_at (threadpool_io->backend_data, i, get_operations (list));
+					if (threadpool_io->backend->event_reset_fd_at (threadpool_io->backend_data, i, get_operations (list), error, sizeof (error)) == -1) {
+						gchar msg [sizeof (error) + 64];
+						g_snprintf (msg, sizeof (msg), "selector_thread: backend->event_reset_fd_at () failed, error : '%s'", error);
+						g_message (msg);
+					}
 				}
 			}
 
@@ -346,9 +373,11 @@ selector_thread (gpointer data)
 	io_thread_status = STATUS_CLEANED_UP;
 }
 
-static gboolean
+static void
 backend_init (gint wakeup_rdhandle)
 {
+	gchar error [256];
+
 #if defined(HAVE_EPOLL)
 	threadpool_io->backend = &backend_epoll;
 #elif defined(HAVE_KQUEUE)
@@ -359,7 +388,12 @@ backend_init (gint wakeup_rdhandle)
 	if (g_getenv ("MONO_DISABLE_AIO") != NULL)
 		threadpool_io->backend = &backend_poll;
 
-	return threadpool_io->backend->init (&threadpool_io->backend_data, wakeup_rdhandle);
+	if (threadpool_io->backend->init (&threadpool_io->backend_data, wakeup_rdhandle, error, sizeof (error)) == -1) {
+		gchar msg [sizeof (error) + 64];
+		g_snprintf (msg, sizeof (msg), "backend_init () failed, error : '%s'", error);
+		g_error (msg);
+		return;
+	}
 }
 
 static void
@@ -394,10 +428,7 @@ ensure_initialized (void)
 
 	selector_thread_wakeup_create_pipes (&threadpool_io->wakeup_pipes [0], &threadpool_io->wakeup_pipes [1]);
 
-	if (!backend_init (threadpool_io->wakeup_pipes [0])) {
-		g_error ("ensure_initialized: backend_init () failed");
-		return;
-	}
+	backend_init (threadpool_io->wakeup_pipes [0]);
 
 	if (!mono_thread_create_internal (mono_get_root_domain (), selector_thread, NULL, TRUE, SMALL_STACK)) {
 		g_error ("ensure_initialized: mono_thread_create_internal () failed");

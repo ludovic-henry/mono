@@ -17,8 +17,8 @@ typedef struct {
 	struct kevent *kqueue_events;
 } ThreadPoolIOBackendKqueue;
 
-static gboolean
-kqueue_init (gpointer *backend_data, gint wakeup_pipe_fd)
+static gint
+kqueue_init (gpointer *backend_data, gint wakeup_pipe_fd, gchar *error, gint error_size)
 {
 	ThreadPoolIOBackendKqueue *kqueue_backend_data;
 	struct kevent event;
@@ -27,30 +27,30 @@ kqueue_init (gpointer *backend_data, gint wakeup_pipe_fd)
 
 	*backend_data = kqueue_backend_data = g_new0 (ThreadPoolIOBackendKqueue, 1);
 	if (kqueue_backend_data == NULL) {
-		g_warning ("kqueue_init: g_new0 (ThreadPoolIOBackendKqueue, 1) failed, error (%d) %s", errno, g_strerror (errno));
-		return FALSE;
+		g_snprintf (error, error_size, "kqueue_init: g_new0 (ThreadPoolIOBackendKqueue, 1) failed, error (%d) %s", errno, g_strerror (errno));
+		return -1;
 	}
 
 	kqueue_backend_data->kqueue_fd = kqueue ();
 	if (kqueue_backend_data->kqueue_fd == -1) {
-		g_warning ("kqueue_init: kqueue () failed, error (%d) %s", errno, g_strerror (errno));
-		return FALSE;
+		g_snprintf (error, error_size, "kqueue_init: kqueue () failed, error (%d) %s", errno, g_strerror (errno));
+		return -1;
 	}
 
 	EV_SET (&event, wakeup_pipe_fd, EVFILT_READ, EV_ADD | EV_ENABLE, 0, 0, 0);
 	if (kevent (kqueue_backend_data->kqueue_fd, &event, 1, NULL, 0, NULL) == -1) {
-		g_warning ("kqueue_init: kevent () failed, error (%d) %s", errno, g_strerror (errno));
+		g_snprintf (error, error_size, "kqueue_init: kevent () failed, error (%d) %s", errno, g_strerror (errno));
 		close (kqueue_backend_data->kqueue_fd);
-		return FALSE;
+		return -1;
 	}
 
 	kqueue_backend_data->kqueue_events = g_new0 (struct kevent, KQUEUE_NEVENTS);
 	if (kqueue_backend_data->kqueue_events == NULL) {
-		g_warning ("kqueue_init: g_new0 (struct kevent, KQUEUE_NEVENTS) failed, error (%d) %s", errno, g_strerror (errno));
-		return FALSE;
+		g_snprintf (error, error_size, "kqueue_init: g_new0 (struct kevent, KQUEUE_NEVENTS) failed, error (%d) %s", errno, g_strerror (errno));
+		return -1;
 	}
 
-	return TRUE;
+	return 0;
 }
 
 static void
@@ -66,8 +66,8 @@ kqueue_cleanup (gpointer backend_data)
 	g_free (kqueue_backend_data);
 }
 
-static void
-kqueue_update_add (gpointer backend_data, ThreadPoolIOUpdate *update)
+static gint
+kqueue_update_add (gpointer backend_data, ThreadPoolIOUpdate *update, gchar *error, gint error_size)
 {
 	ThreadPoolIOBackendKqueue *kqueue_backend_data;
 	struct kevent event;
@@ -83,17 +83,20 @@ kqueue_update_add (gpointer backend_data, ThreadPoolIOUpdate *update)
 	if (kevent (kqueue_backend_data->kqueue_fd, &event, 1, NULL, 0, NULL) == -1) {
 		switch (errno) {
 		case EBADF:
-			g_warning ("kqueue_update_add: kevent(update) failed, error (%d) %s, fd = %d", errno, g_strerror (errno), GPOINTER_TO_INT (update->handle));
+			g_snprintf (error, error_size, "kqueue_update_add: kevent(update) failed, error (%d) %s, fd = %d", errno, g_strerror (errno), GPOINTER_TO_INT (update->handle));
 			break;
 		default:
-			g_warning ("kqueue_update_add: kevent(update) failed, error (%d) %s", errno, g_strerror (errno));
+			g_snprintf (error, error_size, "kqueue_update_add: kevent(update) failed, error (%d) %s", errno, g_strerror (errno));
 			break;
 		}
+		return -1;
 	}
+
+	return 0;
 }
 
 static gint
-kqueue_event_wait (gpointer backend_data)
+kqueue_event_wait (gpointer backend_data, gchar *error, gint error_size)
 {
 	ThreadPoolIOBackendKqueue *kqueue_backend_data;
 	gint ready;
@@ -109,7 +112,7 @@ kqueue_event_wait (gpointer backend_data)
 			ready = 0;
 			break;
 		default:
-			g_warning ("kqueue_event_wait: kevent () failed, error (%d) %s", errno, g_strerror (errno));
+			g_snprintf (error, error_size, "kqueue_event_wait: kevent () failed, error (%d) %s", errno, g_strerror (errno));
 			break;
 		}
 	}
@@ -141,8 +144,8 @@ kqueue_event_get_fd_at (gpointer backend_data, gint i, gint32 *operations)
 	return kqueue_event->ident;
 }
 
-static void
-kqueue_event_reset_fd_at (gpointer backend_data, gint i, gint32 operations)
+static gint
+kqueue_event_reset_fd_at (gpointer backend_data, gint i, gint32 operations, gchar *error, gint error_size)
 {
 	ThreadPoolIOBackendKqueue *kqueue_backend_data;
 	struct kevent *kqueue_event;
@@ -155,15 +158,19 @@ kqueue_event_reset_fd_at (gpointer backend_data, gint i, gint32 operations)
 	if (kqueue_event->filter == EVFILT_READ && (operations & IO_OP_IN) != 0) {
 		EV_SET (kqueue_event, kqueue_event->ident, EVFILT_READ, EV_ADD | EV_ENABLE | EV_ONESHOT, 0, 0, 0);
 		if (kevent (kqueue_backend_data->kqueue_fd, kqueue_event, 1, NULL, 0, NULL) == -1) {
-			g_warning ("kqueue_event_reset_fd_at: kevent (read) failed, error (%d) %s", errno, g_strerror (errno));
+			g_snprintf (error, error_size, "kqueue_event_reset_fd_at: kevent (read) failed, error (%d) %s", errno, g_strerror (errno));
+			return -1;
 		}
 	}
 	if (kqueue_event->filter == EVFILT_WRITE && (operations & IO_OP_OUT) != 0) {
 		EV_SET (kqueue_event, kqueue_event->ident, EVFILT_WRITE, EV_ADD | EV_ENABLE | EV_ONESHOT, 0, 0, 0);
 		if (kevent (kqueue_backend_data->kqueue_fd, kqueue_event, 1, NULL, 0, NULL) == -1) {
-			g_warning ("kqueue_event_reset_fd_at: kevent (write) failed, error (%d) %s", errno, g_strerror (errno));
+			g_snprintf (error, error_size, "kqueue_event_reset_fd_at: kevent (write) failed, error (%d) %s", errno, g_strerror (errno));
+			return -1;
 		}
 	}
+
+	return 0;
 }
 
 static ThreadPoolIOBackend backend_kqueue = {
