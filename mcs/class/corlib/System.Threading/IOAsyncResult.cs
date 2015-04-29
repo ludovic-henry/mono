@@ -108,7 +108,7 @@ namespace System.Threading
 		{
 		}
 
-		protected abstract void Invoke ();
+		internal abstract void Invoke ();
 
 		internal abstract void Cancel ();
 	}

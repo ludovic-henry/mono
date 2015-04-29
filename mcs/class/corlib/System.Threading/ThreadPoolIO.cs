@@ -1,5 +1,6 @@
 
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Remoting.Messaging;
@@ -53,23 +54,14 @@ namespace System.Threading
 			Init_internal (wakeup_handles [0]);
 
 			selector_thread = new Thread (SelectorThread);
+			selector_thread.IsBackground = true;
 			selector_thread.Start ();
-		}
-
-		~NativeThreadPoolIOBackend ()
-		{
-			foreach (var items in states.Values) {
-				for (int i = 0; i < items.Count; ++i)
-					items [i].Cancel ();
-			}
-
-			SelectorThreadWakeup_internal (wakeup_handles [1]);
-			while (selector_thread.IsAlive)
-				Thread.Yield ();
 		}
 
 		public void Add (IntPtr handle, IOAsyncCallback iocallback, IOAsyncResult ioares)
 		{
+			Console.WriteLine ("NativeThreadPoolIOBackend.Add: handle = {0}, ioares = {1}", handle, ioares.GetType ());
+
 			if (Environment.HasShutdownStarted) {
 				// FIXME : throw exception ?
 				return;
@@ -102,6 +94,8 @@ namespace System.Threading
 		public void Remove (IntPtr handle)
 		{
 			List<IOAsyncResult> items = null;
+
+			Console.WriteLine ("NativeThreadPoolIOBackend.Remove: handle = {0}", handle);
 
 			lock (states) {
 				if (states.ContainsKey (handle)) {
@@ -140,19 +134,19 @@ namespace System.Threading
 
 		void SelectorThread ()
 		{
-			do {
-				try {}
-				finally  {
+			try {}
+			finally {
+				do {
 					try {
 						lock (updates) {
 							if (updates.Count > 0) {
-								int i = 0;
+								int i = 0, count = updates.Count;
 								try {
-									for (; i < updates.Count; ++i) {
+									for (; i < count; ++i) {
 										UpdateAdd_internal (updates [i]);
 									}
 								} finally {
-									updates.RemoveRange (0, Math.Min (i + 1, updates.Count));
+									updates.RemoveRange (0, i == count ? count : i + 1);
 								}
 							}
 						}
@@ -176,16 +170,20 @@ namespace System.Threading
 										if (items.Count != 0 && (operations & IOOperation.In) != 0) {
 											IOAsyncResult ioares = GetIOAsyncResultForOperation (items, IOOperation.In);
 											if (ioares != null)
-												ThreadPool.UnsafeQueueCustomWorkItem (ioares, false);
+												ioares.Invoke ();
+												// ThreadPool.UnsafeQueueCustomWorkItem (ioares, false);
 										}
 										if (items.Count != 0 && (operations & IOOperation.Out) != 0) {
 											IOAsyncResult ioares = GetIOAsyncResultForOperation (items, IOOperation.Out);
 											if (ioares != null)
-												ThreadPool.UnsafeQueueCustomWorkItem (ioares, false);
+												ioares.Invoke ();
+												// ThreadPool.UnsafeQueueCustomWorkItem (ioares, false);
 										}
 
-										if (items.Count == 0)
+										if (items.Count == 0) {
+											Console.WriteLine ("NativeThreadPoolIOBackend.SelectorThread: remove handle = {0}", handle);
 											states.Remove (handle);
+										}
 									}
 
 									EventResetHandleAt_internal (i, states.ContainsKey (handle) ? GetOperations (states [handle]) : 0);
@@ -202,8 +200,19 @@ namespace System.Threading
 						 */
 						 Console.WriteLine (e);
 					}
+				} while (!Environment.HasShutdownStarted);
+
+				Console.WriteLine ("NativeThreadPoolIOBackend.SelectorThread: End");
+				lock (states) {
+					Console.WriteLine ("NativeThreadPoolIOBackend.SelectorThread: states.Count = {0}", states.Count);
+					foreach (var items in states.Values) {
+						foreach (var item in items) {
+							Console.WriteLine ("NativeThreadPoolIOBackend.SelectorThread: item = {0}", item.GetType ());
+							item.Cancel ();
+						}
+					}
 				}
-			} while (!Environment.HasShutdownStarted);
+			}
 		}
 
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]

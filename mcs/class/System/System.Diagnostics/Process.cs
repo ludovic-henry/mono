@@ -1452,6 +1452,8 @@ namespace System.Diagnostics {
 
 			internal override void Cancel ()
 			{
+				Console.WriteLine ("ProcessAsyncReader.Cancel");
+
 				lock (this) {
 					FlushLast ();
 					completed = true;
