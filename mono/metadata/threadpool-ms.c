@@ -131,6 +131,8 @@ typedef struct {
 	GPtrArray *parked_threads; // mono_cond_t* []
 	mono_mutex_t parked_threads_lock;
 
+	gint32 monitor_status;
+
 	gint32 heuristic_completions;
 	guint32 heuristic_sample_start;
 	guint32 heuristic_last_dequeue; // ms
@@ -169,9 +171,7 @@ enum {
 	MONITOR_STATUS_NOT_RUNNING,
 };
 
-static gint32 status = STATUS_NOT_INITIALIZED;
-static gint32 monitor_status = MONITOR_STATUS_NOT_RUNNING;
-
+static gint32 threadpool_status = STATUS_NOT_INITIALIZED;
 static ThreadPool* threadpool;
 
 #define COUNTER_CHECK(counter) \
@@ -180,29 +180,29 @@ static ThreadPool* threadpool;
 		g_assert (counter._.active >= 0); \
 	} while (0)
 
-#define COUNTER_READ() ((ThreadPoolCounter) InterlockedRead64 (&threadpool->counters.as_gint64))
+#define COUNTER_READ(tp) ((ThreadPoolCounter) InterlockedRead64 (&(tp)->counters.as_gint64))
 
-#define COUNTER_ATOMIC(var,block) \
+#define COUNTER_ATOMIC(tp,var,block) \
 	do { \
 		ThreadPoolCounter __old; \
 		do { \
-			g_assert (threadpool); \
-			(var) = __old = COUNTER_READ (); \
+			g_assert (tp); \
+			(var) = __old = COUNTER_READ (tp); \
 			{ block; } \
 			COUNTER_CHECK (var); \
-		} while (InterlockedCompareExchange64 (&threadpool->counters.as_gint64, (var).as_gint64, __old.as_gint64) != __old.as_gint64); \
+		} while (InterlockedCompareExchange64 (&(tp)->counters.as_gint64, (var).as_gint64, __old.as_gint64) != __old.as_gint64); \
 	} while (0)
 
-#define COUNTER_TRY_ATOMIC(res,var,block) \
+#define COUNTER_TRY_ATOMIC(tp,res,var,block) \
 	do { \
 		ThreadPoolCounter __old; \
 		do { \
-			g_assert (threadpool); \
-			(var) = __old = COUNTER_READ (); \
+			g_assert (tp); \
+			(var) = __old = COUNTER_READ (tp); \
 			(res) = FALSE; \
 			{ block; } \
 			COUNTER_CHECK (var); \
-			(res) = InterlockedCompareExchange64 (&threadpool->counters.as_gint64, (var).as_gint64, __old.as_gint64) == __old.as_gint64; \
+			(res) = InterlockedCompareExchange64 (&(tp)->counters.as_gint64, (var).as_gint64, __old.as_gint64) == __old.as_gint64; \
 		} while (0); \
 	} while (0)
 
@@ -230,27 +230,35 @@ rand_free (gpointer handle)
 	mono_rand_close (handle);
 }
 
+static void hill_climbing_init (ThreadPoolHillClimbing *hc);
+static void hill_climbing_cleanup (ThreadPoolHillClimbing *hc);
+
 static void
-ensure_initialized (MonoBoolean *enable_worker_tracking)
+ensure_initialized (ThreadPool **tp, gint32 *tp_status, MonoBoolean *enable_worker_tracking)
 {
-	ThreadPoolHillClimbing *hc;
+	ThreadPool *threadpool;
 	const char *threads_per_cpu_env;
 	gint threads_per_cpu;
 	gint threads_count;
+
+	g_assert (tp);
+	g_assert (tp_status);
 
 	if (enable_worker_tracking) {
 		// TODO implement some kind of switch to have the possibily to use it
 		*enable_worker_tracking = FALSE;
 	}
 
-	if (status >= STATUS_INITIALIZED)
+	if (*tp_status >= STATUS_INITIALIZED)
 		return;
-	if (status == STATUS_INITIALIZING || InterlockedCompareExchange (&status, STATUS_INITIALIZING, STATUS_NOT_INITIALIZED) != STATUS_NOT_INITIALIZED) {
-		while (status == STATUS_INITIALIZING)
+	if (*tp_status == STATUS_INITIALIZING || InterlockedCompareExchange (tp_status, STATUS_INITIALIZING, STATUS_NOT_INITIALIZED) != STATUS_NOT_INITIALIZED) {
+		while (*tp_status == STATUS_INITIALIZING)
 			mono_thread_info_yield ();
-		g_assert (status >= STATUS_INITIALIZED);
+		g_assert (*tp_status >= STATUS_INITIALIZED);
 		return;
 	}
+
+	threadpool = *tp;
 
 	g_assert (!threadpool);
 	threadpool = g_new0 (ThreadPool, 1);
@@ -265,37 +273,12 @@ ensure_initialized (MonoBoolean *enable_worker_tracking)
 	threadpool->working_threads = g_ptr_array_new ();
 	mono_mutex_init (&threadpool->working_threads_lock);
 
+	threadpool->monitor_status = MONITOR_STATUS_NOT_RUNNING;
+
 	threadpool->heuristic_adjustment_interval = 10;
 	mono_mutex_init (&threadpool->heuristic_lock);
 
-	mono_rand_open ();
-
-	hc = &threadpool->heuristic_hill_climbing;
-
-	hc->wave_period = HILL_CLIMBING_WAVE_PERIOD;
-	hc->max_thread_wave_magnitude = HILL_CLIMBING_MAX_WAVE_MAGNITUDE;
-	hc->thread_magnitude_multiplier = (gdouble) HILL_CLIMBING_WAVE_MAGNITUDE_MULTIPLIER;
-	hc->samples_to_measure = hc->wave_period * HILL_CLIMBING_WAVE_HISTORY_SIZE;
-	hc->target_throughput_ratio = (gdouble) HILL_CLIMBING_BIAS;
-	hc->target_signal_to_noise_ratio = (gdouble) HILL_CLIMBING_TARGET_SIGNAL_TO_NOISE_RATIO;
-	hc->max_change_per_second = (gdouble) HILL_CLIMBING_MAX_CHANGE_PER_SECOND;
-	hc->max_change_per_sample = (gdouble) HILL_CLIMBING_MAX_CHANGE_PER_SAMPLE;
-	hc->sample_interval_low = HILL_CLIMBING_SAMPLE_INTERVAL_LOW;
-	hc->sample_interval_high = HILL_CLIMBING_SAMPLE_INTERVAL_HIGH;
-	hc->throughput_error_smoothing_factor = (gdouble) HILL_CLIMBING_ERROR_SMOOTHING_FACTOR;
-	hc->gain_exponent = (gdouble) HILL_CLIMBING_GAIN_EXPONENT;
-	hc->max_sample_error = (gdouble) HILL_CLIMBING_MAX_SAMPLE_ERROR_PERCENT;
-	hc->current_control_setting = 0;
-	hc->total_samples = 0;
-	hc->last_thread_count = 0;
-	hc->average_throughput_noise = 0;
-	hc->elapsed_since_last_change = 0;
-	hc->accumulated_completion_count = 0;
-	hc->accumulated_sample_duration = 0;
-	hc->samples = g_new0 (gdouble, hc->samples_to_measure);
-	hc->thread_counts = g_new0 (gdouble, hc->samples_to_measure);
-	hc->random_interval_generator = rand_create ();
-	hc->current_sample_interval = rand_next (&hc->random_interval_generator, hc->sample_interval_low, hc->sample_interval_high);
+	hill_climbing_init (&threadpool->heuristic_hill_climbing);
 
 	if (!(threads_per_cpu_env = g_getenv ("MONO_THREADS_PER_CPU")))
 		threads_per_cpu = 1;
@@ -313,26 +296,34 @@ ensure_initialized (MonoBoolean *enable_worker_tracking)
 
 	threadpool->suspended = FALSE;
 
-	status = STATUS_INITIALIZED;
+	*tp = threadpool;
+	*tp_status = STATUS_INITIALIZED;
 }
 
 static void
-ensure_cleanedup (void)
+ensure_cleanedup (ThreadPool **tp, gint32 *tp_status)
 {
-	if (status == STATUS_NOT_INITIALIZED && InterlockedCompareExchange (&status, STATUS_CLEANED_UP, STATUS_NOT_INITIALIZED) == STATUS_NOT_INITIALIZED)
+	ThreadPool *threadpool;
+
+	g_assert (tp);
+	g_assert (tp_status);
+
+	if (*tp_status == STATUS_NOT_INITIALIZED && InterlockedCompareExchange (tp_status, STATUS_CLEANED_UP, STATUS_NOT_INITIALIZED) == STATUS_NOT_INITIALIZED)
 		return;
-	if (status == STATUS_INITIALIZING) {
-		while (status == STATUS_INITIALIZING)
+	if (*tp_status == STATUS_INITIALIZING) {
+		while (*tp_status == STATUS_INITIALIZING)
 			mono_thread_info_yield ();
 	}
-	if (status == STATUS_CLEANED_UP)
+	if (*tp_status == STATUS_CLEANED_UP)
 		return;
-	if (status == STATUS_CLEANING_UP || InterlockedCompareExchange (&status, STATUS_CLEANING_UP, STATUS_INITIALIZED) != STATUS_INITIALIZED) {
-		while (status == STATUS_CLEANING_UP)
+	if (*tp_status == STATUS_CLEANING_UP || InterlockedCompareExchange (tp_status, STATUS_CLEANING_UP, STATUS_INITIALIZED) != STATUS_INITIALIZED) {
+		while (*tp_status == STATUS_CLEANING_UP)
 			mono_thread_info_yield ();
-		g_assert (status == STATUS_CLEANED_UP);
+		g_assert (*tp_status == STATUS_CLEANED_UP);
 		return;
 	}
+
+	threadpool = *tp;
 
 	/* we make the assumption along the code that we are
 	 * cleaning up only if the runtime is shutting down */
@@ -342,7 +333,7 @@ ensure_cleanedup (void)
 	mono_mutex_lock (&threadpool->parked_threads_lock);
 	for (;;) {
 		guint i;
-		ThreadPoolCounter counter = COUNTER_READ ();
+		ThreadPoolCounter counter = COUNTER_READ (threadpool);
 		if (counter._.active == 0 && counter._.parked == 0)
 			break;
 		if (counter._.active == 1) {
@@ -363,7 +354,7 @@ ensure_cleanedup (void)
 	}
 	mono_mutex_unlock (&threadpool->parked_threads_lock);
 
-	while (monitor_status != MONITOR_STATUS_NOT_RUNNING)
+	while (threadpool->monitor_status != MONITOR_STATUS_NOT_RUNNING)
 		usleep (1000);
 
 	g_ptr_array_free (threadpool->domains, TRUE);
@@ -376,9 +367,7 @@ ensure_cleanedup (void)
 	mono_mutex_destroy (&threadpool->working_threads_lock);
 
 	mono_mutex_destroy (&threadpool->heuristic_lock);
-	g_free (threadpool->heuristic_hill_climbing.samples);
-	g_free (threadpool->heuristic_hill_climbing.thread_counts);
-	rand_free (threadpool->heuristic_hill_climbing.random_interval_generator);
+	hill_climbing_cleanup (&threadpool->heuristic_hill_climbing);
 
 	g_free (threadpool->cpu_usage_state);
 
@@ -387,7 +376,8 @@ ensure_cleanedup (void)
 	threadpool = NULL;
 	g_assert (!threadpool);
 
-	status = STATUS_CLEANED_UP;
+	*tp = threadpool;
+	*tp_status = STATUS_CLEANED_UP;
 }
 
 void
@@ -428,48 +418,48 @@ mono_threadpool_ms_enqueue_work_item (MonoDomain *domain, MonoObject *work_item)
 }
 
 static void
-domain_add (ThreadPoolDomain *tpdomain)
+domain_add (ThreadPool *tp, ThreadPoolDomain *tpdomain)
 {
 	guint i, len;
 
 	g_assert (tpdomain);
 
-	mono_mutex_lock (&threadpool->domains_lock);
-	len = threadpool->domains->len;
+	mono_mutex_lock (&tp->domains_lock);
+	len = tp->domains->len;
 	for (i = 0; i < len; ++i) {
-		if (g_ptr_array_index (threadpool->domains, i) == tpdomain)
+		if (g_ptr_array_index (tp->domains, i) == tpdomain)
 			break;
 	}
 	if (i == len)
-		g_ptr_array_add (threadpool->domains, tpdomain);
-	mono_mutex_unlock (&threadpool->domains_lock);
+		g_ptr_array_add (tp->domains, tpdomain);
+	mono_mutex_unlock (&tp->domains_lock);
 }
 
 static gboolean
-domain_remove (ThreadPoolDomain *tpdomain)
+domain_remove (ThreadPool *tp, ThreadPoolDomain *tpdomain)
 {
 	gboolean res;
 
 	g_assert (tpdomain);
 
-	mono_mutex_lock (&threadpool->domains_lock);
-	res = g_ptr_array_remove (threadpool->domains, tpdomain);
-	mono_mutex_unlock (&threadpool->domains_lock);
+	mono_mutex_lock (&tp->domains_lock);
+	res = g_ptr_array_remove (tp->domains, tpdomain);
+	mono_mutex_unlock (&tp->domains_lock);
 
 	return res;
 }
 
 static ThreadPoolDomain *
-domain_get_or_create (MonoDomain *domain)
+domain_get_or_create (ThreadPool *tp, MonoDomain *domain)
 {
 	ThreadPoolDomain *tpdomain = NULL;
 	guint i;
 
 	g_assert (domain);
 
-	mono_mutex_lock (&threadpool->domains_lock);
-	for (i = 0; i < threadpool->domains->len; ++i) {
-		ThreadPoolDomain *tmp = g_ptr_array_index (threadpool->domains, i);
+	mono_mutex_lock (&tp->domains_lock);
+	for (i = 0; i < tp->domains->len; ++i) {
+		ThreadPoolDomain *tmp = g_ptr_array_index (tp->domains, i);
 		if (tmp->domain == domain) {
 			tpdomain = tmp;
 			break;
@@ -478,43 +468,43 @@ domain_get_or_create (MonoDomain *domain)
 	if (!tpdomain) {
 		tpdomain = g_new0 (ThreadPoolDomain, 1);
 		tpdomain->domain = domain;
-		domain_add (tpdomain);
+		domain_add (tp, tpdomain);
 	}
-	mono_mutex_unlock (&threadpool->domains_lock);
+	mono_mutex_unlock (&tp->domains_lock);
 	return tpdomain;
 }
 
 static gboolean
-domain_any_has_request (void)
+domain_any_has_request (ThreadPool *tp)
 {
 	gboolean res = FALSE;
 	guint i;
 
-	mono_mutex_lock (&threadpool->domains_lock);
-	for (i = 0; i < threadpool->domains->len; ++i) {
-		ThreadPoolDomain *tmp = g_ptr_array_index (threadpool->domains, i);
+	mono_mutex_lock (&tp->domains_lock);
+	for (i = 0; i < tp->domains->len; ++i) {
+		ThreadPoolDomain *tmp = g_ptr_array_index (tp->domains, i);
 		if (tmp->outstanding_request > 0) {
 			res = TRUE;
 			break;
 		}
 	}
-	mono_mutex_unlock (&threadpool->domains_lock);
+	mono_mutex_unlock (&tp->domains_lock);
 	return res;
 }
 
 static ThreadPoolDomain *
-domain_get_next (ThreadPoolDomain *current)
+domain_get_next (ThreadPool *tp, ThreadPoolDomain *current)
 {
 	ThreadPoolDomain *tpdomain = NULL;
 	guint len;
 
-	mono_mutex_lock (&threadpool->domains_lock);
-	len = threadpool->domains->len;
+	mono_mutex_lock (&tp->domains_lock);
+	len = tp->domains->len;
 	if (len > 0) {
 		guint i, current_idx = -1;
 		if (current) {
 			for (i = 0; i < len; ++i) {
-				if (current == g_ptr_array_index (threadpool->domains, i)) {
+				if (current == g_ptr_array_index (tp->domains, i)) {
 					current_idx = i;
 					break;
 				}
@@ -522,7 +512,7 @@ domain_get_next (ThreadPoolDomain *current)
 			g_assert (current_idx >= 0);
 		}
 		for (i = current_idx + 1; i < len + current_idx + 1; ++i) {
-			ThreadPoolDomain *tmp = g_ptr_array_index (threadpool->domains, i % len);
+			ThreadPoolDomain *tmp = g_ptr_array_index (tp->domains, i % len);
 			if (tmp->outstanding_request > 0) {
 				tpdomain = tmp;
 				tpdomain->outstanding_request --;
@@ -531,41 +521,46 @@ domain_get_next (ThreadPoolDomain *current)
 			}
 		}
 	}
-	mono_mutex_unlock (&threadpool->domains_lock);
+	mono_mutex_unlock (&tp->domains_lock);
 	return tpdomain;
 }
 
 static void
-worker_park (void)
+worker_park (ThreadPool *tp)
 {
 	mono_cond_t cond;
 	mono_cond_init (&cond, NULL);
 
-	mono_mutex_lock (&threadpool->parked_threads_lock);
-	g_ptr_array_add (threadpool->parked_threads, &cond);
-	mono_cond_wait (&cond, &threadpool->parked_threads_lock);
-	g_ptr_array_remove (threadpool->parked_threads, &cond);
-	mono_mutex_unlock (&threadpool->parked_threads_lock);
+	mono_mutex_lock (&tp->parked_threads_lock);
+	g_ptr_array_add (tp->parked_threads, &cond);
+	mono_cond_wait (&cond, &tp->parked_threads_lock);
+	g_ptr_array_remove (tp->parked_threads, &cond);
+	mono_mutex_unlock (&tp->parked_threads_lock);
 
 	mono_cond_destroy (&cond);
 }
 
 static gboolean
-worker_try_unpark (void)
+worker_try_unpark (ThreadPool *tp)
 {
 	gboolean res = FALSE;
 	guint len;
 
-	mono_mutex_lock (&threadpool->parked_threads_lock);
-	len = threadpool->parked_threads->len;
+	mono_mutex_lock (&tp->parked_threads_lock);
+	len = tp->parked_threads->len;
 	if (len > 0) {
-		mono_cond_t *cond = (mono_cond_t*) g_ptr_array_index (threadpool->parked_threads, len - 1);
+		mono_cond_t *cond = (mono_cond_t*) g_ptr_array_index (tp->parked_threads, len - 1);
 		mono_cond_signal (cond);
 		res = TRUE;
 	}
-	mono_mutex_unlock (&threadpool->parked_threads_lock);
+	mono_mutex_unlock (&tp->parked_threads_lock);
 	return res;
 }
+
+typedef struct {
+	ThreadPool *tp;
+	ThreadPoolDomain *tpdomain;
+} WorkerThreadData;
 
 static void
 worker_thread (gpointer data)
@@ -573,18 +568,29 @@ worker_thread (gpointer data)
 	static MonoClass *threadpool_wait_callback_class = NULL;
 	static MonoMethod *perform_wait_callback_method = NULL;
 	MonoInternalThread *thread;
+	WorkerThreadData *worker_thread_data;
+	ThreadPool *tp;
 	ThreadPoolDomain *tpdomain;
 	ThreadPoolCounter counter;
 	gboolean retire = FALSE;
 
-	g_assert (status >= STATUS_INITIALIZED);
+	g_assert (threadpool_status >= STATUS_INITIALIZED);
 
-	tpdomain = data;
+	worker_thread_data = data;
+	g_assert (worker_thread_data);
+
+	tp = worker_thread_data->tp;
+	g_assert (tp);
+
+	tpdomain = worker_thread_data->tpdomain;
 	g_assert (tpdomain);
 	g_assert (tpdomain->domain);
 
+	g_free (worker_thread_data);
+	worker_thread_data = NULL;
+
 	if (mono_runtime_is_shutting_down () || mono_domain_is_unloading (tpdomain->domain)) {
-		COUNTER_ATOMIC (counter, { counter._.active --; });
+		COUNTER_ATOMIC (tp, counter, { counter._.active --; });
 		return;
 	}
 
@@ -596,12 +602,10 @@ worker_thread (gpointer data)
 		perform_wait_callback_method = mono_class_get_method_from_name (threadpool_wait_callback_class, "PerformWaitCallback", 0);
 	g_assert (perform_wait_callback_method);
 
-	g_assert (threadpool);
-
 	thread = mono_thread_internal_current ();
 	g_assert (thread);
 
-	mono_mutex_lock (&threadpool->domains_lock);
+	mono_mutex_lock (&tp->domains_lock);
 
 	do {
 		guint i, c;
@@ -611,13 +615,13 @@ worker_thread (gpointer data)
 
 		tpdomain->domain->threadpool_jobs ++;
 
-		mono_mutex_unlock (&threadpool->domains_lock);
+		mono_mutex_unlock (&tp->domains_lock);
 
-		mono_mutex_lock (&threadpool->working_threads_lock);
-		g_ptr_array_add (threadpool->working_threads, thread);
-		mono_mutex_unlock (&threadpool->working_threads_lock);
+		mono_mutex_lock (&tp->working_threads_lock);
+		g_ptr_array_add (tp->working_threads, thread);
+		mono_mutex_unlock (&tp->working_threads_lock);
 
-		COUNTER_ATOMIC (counter, { counter._.working ++; });
+		COUNTER_ATOMIC (tp, counter, { counter._.working ++; });
 
 		mono_thread_push_appdomain_ref (tpdomain->domain);
 		if (mono_domain_set (tpdomain->domain, FALSE)) {
@@ -634,19 +638,19 @@ worker_thread (gpointer data)
 		}
 		mono_thread_pop_appdomain_ref ();
 
-		COUNTER_ATOMIC (counter, { counter._.working --; });
+		COUNTER_ATOMIC (tp, counter, { counter._.working --; });
 
-		mono_mutex_lock (&threadpool->working_threads_lock);
-		g_ptr_array_remove_fast (threadpool->working_threads, thread);
-		mono_mutex_unlock (&threadpool->working_threads_lock);
+		mono_mutex_lock (&tp->working_threads_lock);
+		g_ptr_array_remove_fast (tp->working_threads, thread);
+		mono_mutex_unlock (&tp->working_threads_lock);
 
-		mono_mutex_lock (&threadpool->domains_lock);
+		mono_mutex_lock (&tp->domains_lock);
 
 		tpdomain->domain->threadpool_jobs --;
 		g_assert (tpdomain->domain->threadpool_jobs >= 0);
 
 		if (tpdomain->domain->threadpool_jobs == 0 && mono_domain_is_unloading (tpdomain->domain)) {
-			gboolean removed = domain_remove (tpdomain);
+			gboolean removed = domain_remove (tp, tpdomain);
 			g_assert (removed);
 			if (tpdomain->domain->cleanup_semaphore)
 				ReleaseSemaphore (tpdomain->domain->cleanup_semaphore, 1, NULL);
@@ -659,7 +663,7 @@ worker_thread (gpointer data)
 				break;
 
 			if (!retire) {
-				tpdomain = domain_get_next (tpdomain);
+				tpdomain = domain_get_next (tp, tpdomain);
 				if (tpdomain)
 					break;
 			}
@@ -667,7 +671,7 @@ worker_thread (gpointer data)
 			if (i < c - 1) {
 				gboolean park = TRUE;
 
-				COUNTER_ATOMIC (counter, {
+				COUNTER_ATOMIC (tp, counter, {
 					if (counter._.active <= counter._.max_working) {
 						park = FALSE;
 						break;
@@ -677,13 +681,13 @@ worker_thread (gpointer data)
 				});
 
 				if (park) {
-					mono_mutex_unlock (&threadpool->domains_lock);
+					mono_mutex_unlock (&tp->domains_lock);
 					mono_gc_set_skip_thread (TRUE);
-					worker_park ();
+					worker_park (tp);
 					mono_gc_set_skip_thread (FALSE);
-					mono_mutex_lock (&threadpool->domains_lock);
+					mono_mutex_lock (&tp->domains_lock);
 
-					COUNTER_ATOMIC (counter, {
+					COUNTER_ATOMIC (tp, counter, {
 						counter._.active ++;
 						counter._.parked --;
 					});
@@ -694,104 +698,125 @@ worker_thread (gpointer data)
 		}
 	} while (tpdomain && !mono_runtime_is_shutting_down ());
 
-	mono_mutex_unlock (&threadpool->domains_lock);
+	mono_mutex_unlock (&tp->domains_lock);
 
-	COUNTER_ATOMIC (counter, { counter._.active --; });
+	COUNTER_ATOMIC (tp, counter, { counter._.active --; });
 }
 
 static gboolean
-worker_try_create (ThreadPoolDomain *tpdomain)
+worker_try_create (ThreadPool *tp, ThreadPoolDomain *tpdomain)
 {
+	WorkerThreadData *worker_thread_data;
+
 	g_assert (tpdomain);
 	g_assert (tpdomain->domain);
 
-	return mono_thread_create_internal (tpdomain->domain, worker_thread, tpdomain, TRUE, 0) != NULL;
+	worker_thread_data = g_new0 (WorkerThreadData, 1);
+	worker_thread_data->tp = tp;
+	worker_thread_data->tpdomain = tpdomain;
+
+	return mono_thread_create_internal (tpdomain->domain, worker_thread, worker_thread_data, TRUE, 0) != NULL;
 }
 
-static void monitor_ensure_running (void);
+static void monitor_ensure_running (ThreadPool *tp);
 
 static gboolean
-worker_request (MonoDomain *domain)
+worker_request (ThreadPool *tp, MonoDomain *domain)
 {
 	ThreadPoolDomain *tpdomain;
 	ThreadPoolCounter counter;
 
+	g_assert (tp);
 	g_assert (domain);
-	g_assert (threadpool);
 
 	if (mono_runtime_is_shutting_down () || mono_domain_is_unloading (domain))
 		return FALSE;
 
-	mono_mutex_lock (&threadpool->domains_lock);
-	tpdomain = domain_get_or_create (domain);
+	mono_mutex_lock (&tp->domains_lock);
+	tpdomain = domain_get_or_create (tp, domain);
 	g_assert (tpdomain);
 	tpdomain->outstanding_request ++;
-	mono_mutex_unlock (&threadpool->domains_lock);
+	mono_mutex_unlock (&tp->domains_lock);
 
-	if (threadpool->suspended)
+	if (tp->suspended)
 		return FALSE;
 
-	monitor_ensure_running ();
+	monitor_ensure_running (tp);
 
-	if (worker_try_unpark ())
+	if (worker_try_unpark (tp))
 		return TRUE;
 
-	COUNTER_ATOMIC (counter, {
+	COUNTER_ATOMIC (tp, counter, {
 		if (counter._.active >= counter._.max_working)
 			return FALSE;
 		counter._.active ++;
 	});
 
-	if (worker_try_create (tpdomain))
+	if (worker_try_create (tp, tpdomain))
 		return TRUE;
 
-	COUNTER_ATOMIC (counter, { counter._.active --; });
+	COUNTER_ATOMIC (tp, counter, { counter._.active --; });
 	return FALSE;
 }
 
 static gboolean
-monitor_should_keep_running (void)
+monitor_should_keep_running (ThreadPool *tp)
 {
-	g_assert (monitor_status == MONITOR_STATUS_WAITING_FOR_REQUEST || monitor_status == MONITOR_STATUS_REQUESTED);
+	g_assert (tp->monitor_status == MONITOR_STATUS_WAITING_FOR_REQUEST || tp->monitor_status == MONITOR_STATUS_REQUESTED);
 
-	if (InterlockedExchange (&monitor_status, MONITOR_STATUS_WAITING_FOR_REQUEST) == MONITOR_STATUS_WAITING_FOR_REQUEST) {
-		if (mono_runtime_is_shutting_down () || !domain_any_has_request ()) {
-			if (InterlockedCompareExchange (&monitor_status, MONITOR_STATUS_NOT_RUNNING, MONITOR_STATUS_WAITING_FOR_REQUEST) == MONITOR_STATUS_WAITING_FOR_REQUEST)
+	if (InterlockedExchange (&tp->monitor_status, MONITOR_STATUS_WAITING_FOR_REQUEST) == MONITOR_STATUS_WAITING_FOR_REQUEST) {
+		if (mono_runtime_is_shutting_down () || !domain_any_has_request (tp)) {
+			if (InterlockedCompareExchange (&tp->monitor_status, MONITOR_STATUS_NOT_RUNNING, MONITOR_STATUS_WAITING_FOR_REQUEST) == MONITOR_STATUS_WAITING_FOR_REQUEST)
 				return FALSE;
 		}
 	}
 
-	g_assert (monitor_status == MONITOR_STATUS_WAITING_FOR_REQUEST || monitor_status == MONITOR_STATUS_REQUESTED);
+	g_assert (tp->monitor_status == MONITOR_STATUS_WAITING_FOR_REQUEST || tp->monitor_status == MONITOR_STATUS_REQUESTED);
 
 	return TRUE;
 }
 
 static gboolean
-monitor_sufficient_delay_since_last_dequeue (void)
+monitor_sufficient_delay_since_last_dequeue (ThreadPool *tp)
 {
 	guint32 threshold;
 
-	g_assert (threadpool);
+	g_assert (tp);
 
-	if (threadpool->cpu_usage < CPU_USAGE_LOW) {
+	if (tp->cpu_usage < CPU_USAGE_LOW) {
 		threshold = MONITOR_INTERVAL;
 	} else {
-		ThreadPoolCounter counter = COUNTER_READ ();
+		ThreadPoolCounter counter = COUNTER_READ (tp);
 		threshold = counter._.max_working * MONITOR_INTERVAL * 2;
 	}
 
-	return mono_msec_ticks () >= threadpool->heuristic_last_dequeue + threshold;
+	return mono_msec_ticks () >= tp->heuristic_last_dequeue + threshold;
 }
 
-static void hill_climbing_force_change (gint16 new_thread_count, ThreadPoolHeuristicStateTransition transition);
+static void hill_climbing_force_change (ThreadPoolHillClimbing *hc, gint16 new_thread_count, ThreadPoolHeuristicStateTransition transition);
+
+typedef struct {
+	ThreadPool *tp;
+} MonitorThreadData;
 
 static void
-monitor_thread (void)
+monitor_thread (gpointer data)
 {
 	MonoInternalThread *current_thread = mono_thread_internal_current ();
+	MonitorThreadData *monitor_thread_data;
+	ThreadPool *tp;
 	guint i;
 
-	mono_cpu_usage (threadpool->cpu_usage_state);
+	monitor_thread_data = data;
+	g_assert (monitor_thread_data);
+
+	tp = monitor_thread_data->tp;
+	g_assert (tp);
+
+	g_free (monitor_thread_data);
+	monitor_thread_data = NULL;
+
+	mono_cpu_usage (tp->cpu_usage_state);
 
 	do {
 		MonoInternalThread *thread;
@@ -799,7 +824,7 @@ monitor_thread (void)
 		gint32 interval_left = MONITOR_INTERVAL;
 		gint32 awake = 0; /* number of spurious awakes we tolerate before doing a round of rebalancing */
 
-		g_assert (monitor_status != MONITOR_STATUS_NOT_RUNNING);
+		g_assert (tp->monitor_status != MONITOR_STATUS_NOT_RUNNING);
 
 		mono_gc_set_skip_thread (TRUE);
 
@@ -820,31 +845,31 @@ monitor_thread (void)
 
 		mono_gc_set_skip_thread (FALSE);
 
-		if (threadpool->suspended)
+		if (tp->suspended)
 			continue;
 
-		if (mono_runtime_is_shutting_down () || !domain_any_has_request ())
+		if (mono_runtime_is_shutting_down () || !domain_any_has_request (tp))
 			continue;
 
-		mono_mutex_lock (&threadpool->working_threads_lock);
-		for (i = 0; i < threadpool->working_threads->len; ++i) {
-			thread = g_ptr_array_index (threadpool->working_threads, i);
+		mono_mutex_lock (&tp->working_threads_lock);
+		for (i = 0; i < tp->working_threads->len; ++i) {
+			thread = g_ptr_array_index (tp->working_threads, i);
 			if ((thread->state & ThreadState_WaitSleepJoin) == 0) {
 				all_waitsleepjoin = FALSE;
 				break;
 			}
 		}
-		mono_mutex_unlock (&threadpool->working_threads_lock);
+		mono_mutex_unlock (&tp->working_threads_lock);
 
 		if (all_waitsleepjoin) {
 			ThreadPoolCounter counter;
-			COUNTER_ATOMIC (counter, { counter._.max_working ++; });
-			hill_climbing_force_change (counter._.max_working, TRANSITION_STARVATION);
+			COUNTER_ATOMIC (tp, counter, { counter._.max_working ++; });
+			hill_climbing_force_change (&tp->heuristic_hill_climbing, counter._.max_working, TRANSITION_STARVATION);
 		}
 
-		threadpool->cpu_usage = mono_cpu_usage (threadpool->cpu_usage_state);
+		tp->cpu_usage = mono_cpu_usage (tp->cpu_usage_state);
 
-		if (monitor_sufficient_delay_since_last_dequeue ()) {
+		if (monitor_sufficient_delay_since_last_dequeue (tp)) {
 			for (i = 0; i < 5; ++i) {
 				ThreadPoolDomain *tpdomain;
 				ThreadPoolCounter counter;
@@ -853,10 +878,10 @@ monitor_thread (void)
 				if (mono_runtime_is_shutting_down ())
 					break;
 
-				if (worker_try_unpark ())
+				if (worker_try_unpark (tp))
 					break;
 
-				COUNTER_TRY_ATOMIC (success, counter, {
+				COUNTER_TRY_ATOMIC (tp, success, counter, {
 					if (counter._.active >= counter._.max_working)
 						break;
 					counter._.active ++;
@@ -865,30 +890,37 @@ monitor_thread (void)
 				if (!success)
 					continue;
 
-				tpdomain = domain_get_next (NULL);
-				if (tpdomain && worker_try_create (tpdomain))
+				tpdomain = domain_get_next (tp, NULL);
+				if (tpdomain && worker_try_create (tp, tpdomain))
 					break;
 
-				COUNTER_ATOMIC (counter, { counter._.active --; });
+				COUNTER_ATOMIC (tp, counter, { counter._.active --; });
 			}
 		}
-	} while (monitor_should_keep_running ());
+	} while (monitor_should_keep_running (tp));
 }
 
 static void
-monitor_ensure_running (void)
+monitor_ensure_running (ThreadPool *tp)
 {
 	for (;;) {
-		switch (monitor_status) {
+		switch (tp->monitor_status) {
 		case MONITOR_STATUS_REQUESTED:
 			return;
 		case MONITOR_STATUS_WAITING_FOR_REQUEST:
-			InterlockedCompareExchange (&monitor_status, MONITOR_STATUS_REQUESTED, MONITOR_STATUS_WAITING_FOR_REQUEST);
+			InterlockedCompareExchange (&tp->monitor_status, MONITOR_STATUS_REQUESTED, MONITOR_STATUS_WAITING_FOR_REQUEST);
 			break;
 		case MONITOR_STATUS_NOT_RUNNING:
-			if (InterlockedCompareExchange (&monitor_status, MONITOR_STATUS_REQUESTED, MONITOR_STATUS_NOT_RUNNING) == MONITOR_STATUS_NOT_RUNNING) {
-				if (!mono_thread_create_internal (mono_get_root_domain (), monitor_thread, NULL, TRUE, SMALL_STACK))
-					monitor_status = MONITOR_STATUS_NOT_RUNNING;
+			if (InterlockedCompareExchange (&tp->monitor_status, MONITOR_STATUS_REQUESTED, MONITOR_STATUS_NOT_RUNNING) == MONITOR_STATUS_NOT_RUNNING) {
+				MonitorThreadData *monitor_thread_data;
+
+				monitor_thread_data = g_new0 (MonitorThreadData, 1);
+				monitor_thread_data->tp = tp;
+
+				if (!mono_thread_create_internal (mono_get_root_domain (), monitor_thread, monitor_thread_data, TRUE, SMALL_STACK)) {
+					tp->monitor_status = MONITOR_STATUS_NOT_RUNNING;
+					g_free (monitor_thread_data);
+				}
 				return;
 			}
 			break;
@@ -898,13 +930,50 @@ monitor_ensure_running (void)
 }
 
 static void
-hill_climbing_change_thread_count (gint16 new_thread_count, ThreadPoolHeuristicStateTransition transition)
+hill_climbing_init (ThreadPoolHillClimbing *hc)
 {
-	ThreadPoolHillClimbing *hc;
+	memset (hc, 0, sizeof (ThreadPoolHillClimbing));
 
-	g_assert (threadpool);
+	hc->wave_period = HILL_CLIMBING_WAVE_PERIOD;
+	hc->max_thread_wave_magnitude = HILL_CLIMBING_MAX_WAVE_MAGNITUDE;
+	hc->thread_magnitude_multiplier = (gdouble) HILL_CLIMBING_WAVE_MAGNITUDE_MULTIPLIER;
+	hc->samples_to_measure = hc->wave_period * HILL_CLIMBING_WAVE_HISTORY_SIZE;
+	hc->target_throughput_ratio = (gdouble) HILL_CLIMBING_BIAS;
+	hc->target_signal_to_noise_ratio = (gdouble) HILL_CLIMBING_TARGET_SIGNAL_TO_NOISE_RATIO;
+	hc->max_change_per_second = (gdouble) HILL_CLIMBING_MAX_CHANGE_PER_SECOND;
+	hc->max_change_per_sample = (gdouble) HILL_CLIMBING_MAX_CHANGE_PER_SAMPLE;
+	hc->sample_interval_low = HILL_CLIMBING_SAMPLE_INTERVAL_LOW;
+	hc->sample_interval_high = HILL_CLIMBING_SAMPLE_INTERVAL_HIGH;
+	hc->throughput_error_smoothing_factor = (gdouble) HILL_CLIMBING_ERROR_SMOOTHING_FACTOR;
+	hc->gain_exponent = (gdouble) HILL_CLIMBING_GAIN_EXPONENT;
+	hc->max_sample_error = (gdouble) HILL_CLIMBING_MAX_SAMPLE_ERROR_PERCENT;
+	hc->current_control_setting = 0;
+	hc->total_samples = 0;
+	hc->last_thread_count = 0;
+	hc->average_throughput_noise = 0;
+	hc->elapsed_since_last_change = 0;
+	hc->accumulated_completion_count = 0;
+	hc->accumulated_sample_duration = 0;
+	hc->samples = g_new0 (gdouble, hc->samples_to_measure);
+	hc->thread_counts = g_new0 (gdouble, hc->samples_to_measure);
+	hc->random_interval_generator = rand_create ();
+	hc->current_sample_interval = rand_next (&hc->random_interval_generator, hc->sample_interval_low, hc->sample_interval_high);
+}
 
-	hc = &threadpool->heuristic_hill_climbing;
+static void
+hill_climbing_cleanup (ThreadPoolHillClimbing *hc)
+{
+	g_assert (hc);
+
+	g_free (hc->samples);
+	g_free (hc->thread_counts);
+	rand_free (hc->random_interval_generator);
+}
+
+static void
+hill_climbing_change_thread_count (ThreadPoolHillClimbing *hc, gint16 new_thread_count, ThreadPoolHeuristicStateTransition transition)
+{
+	g_assert (hc);
 
 	hc->last_thread_count = new_thread_count;
 	hc->current_sample_interval = rand_next (&hc->random_interval_generator, hc->sample_interval_low, hc->sample_interval_high);
@@ -913,32 +982,25 @@ hill_climbing_change_thread_count (gint16 new_thread_count, ThreadPoolHeuristicS
 }
 
 static void
-hill_climbing_force_change (gint16 new_thread_count, ThreadPoolHeuristicStateTransition transition)
+hill_climbing_force_change (ThreadPoolHillClimbing *hc, gint16 new_thread_count, ThreadPoolHeuristicStateTransition transition)
 {
-	ThreadPoolHillClimbing *hc;
-
-	g_assert (threadpool);
-
-	hc = &threadpool->heuristic_hill_climbing;
+	g_assert (hc);
 
 	if (new_thread_count != hc->last_thread_count) {
 		hc->current_control_setting += new_thread_count - hc->last_thread_count;
-		hill_climbing_change_thread_count (new_thread_count, transition);
+		hill_climbing_change_thread_count (hc, new_thread_count, transition);
 	}
 }
 
 static double complex
-hill_climbing_get_wave_component (gdouble *samples, guint sample_count, gdouble period)
+hill_climbing_get_wave_component (ThreadPoolHillClimbing *hc, gdouble *samples, guint sample_count, gdouble period)
 {
-	ThreadPoolHillClimbing *hc;
 	gdouble w, cosine, sine, coeff, q0, q1, q2;
 	guint i;
 
-	g_assert (threadpool);
+	g_assert (hc);
 	g_assert (sample_count >= period);
 	g_assert (period >= 2);
-
-	hc = &threadpool->heuristic_hill_climbing;
 
 	w = 2.0 * M_PI / period;
 	cosine = cos (w);
@@ -956,9 +1018,9 @@ hill_climbing_get_wave_component (gdouble *samples, guint sample_count, gdouble 
 }
 
 static gint16
-hill_climbing_update (gint16 current_thread_count, guint32 sample_duration, gint32 completions, guint32 *adjustment_interval)
+hill_climbing_update (ThreadPoolHillClimbing *hc, gint16 current_thread_count, guint32 sample_duration, gint32 completions,
+		gint32 cpu_usage, gint32 worker_min, gint32 worker_max, guint32 *adjustment_interval)
 {
-	ThreadPoolHillClimbing *hc;
 	ThreadPoolHeuristicStateTransition transition;
 	gdouble throughput;
 	gdouble throughput_error_estimate;
@@ -973,14 +1035,12 @@ hill_climbing_update (gint16 current_thread_count, guint32 sample_duration, gint
 	double complex throughput_wave_component;
 	double complex ratio;
 
-	g_assert (threadpool);
+	g_assert (hc);
 	g_assert (adjustment_interval);
-
-	hc = &threadpool->heuristic_hill_climbing;
 
 	/* If someone changed the thread count without telling us, update our records accordingly. */
 	if (current_thread_count != hc->last_thread_count)
-		hill_climbing_force_change (current_thread_count, TRANSITION_INITIALIZING);
+		hill_climbing_force_change (hc, current_thread_count, TRANSITION_INITIALIZING);
 
 	/* Update the cumulative stats for this thread count */
 	hc->elapsed_since_last_change += sample_duration;
@@ -1072,17 +1132,17 @@ hill_climbing_update (gint16 current_thread_count, guint32 sample_duration, gint
 			/* Get the the three different frequency components of the throughput (scaled by average
 			 * throughput). Our "error" estimate (the amount of noise that might be present in the
 			 * frequency band we're really interested in) is the average of the adjacent bands. */
-			throughput_wave_component = hill_climbing_get_wave_component (hc->samples, sample_count, hc->wave_period) / average_throughput;
-			throughput_error_estimate = cabs (hill_climbing_get_wave_component (hc->samples, sample_count, adjacent_period_1) / average_throughput);
+			throughput_wave_component = hill_climbing_get_wave_component (hc, hc->samples, sample_count, hc->wave_period) / average_throughput;
+			throughput_error_estimate = cabs (hill_climbing_get_wave_component (hc, hc->samples, sample_count, adjacent_period_1) / average_throughput);
 
 			if (adjacent_period_2 <= sample_count) {
 				throughput_error_estimate = MAX (throughput_error_estimate, cabs (hill_climbing_get_wave_component (
-					hc->samples, sample_count, adjacent_period_2) / average_throughput));
+					hc, hc->samples, sample_count, adjacent_period_2) / average_throughput));
 			}
 
 			/* Do the same for the thread counts, so we have something to compare to. We don't
 			 * measure thread count noise, because there is none; these are exact measurements. */
-			thread_wave_component = hill_climbing_get_wave_component (hc->thread_counts, sample_count, hc->wave_period) / average_thread_count;
+			thread_wave_component = hill_climbing_get_wave_component (hc, hc->thread_counts, sample_count, hc->wave_period) / average_thread_count;
 
 			/* Update our moving average of the throughput noise. We'll use this
 			 * later as feedback to determine the new size of the thread wave. */
@@ -1133,7 +1193,7 @@ hill_climbing_update (gint16 current_thread_count, guint32 sample_duration, gint
 	move = MIN (move, hc->max_change_per_sample);
 
 	/* If the result was positive, and CPU is > 95%, refuse the move. */
-	if (move > 0.0 && threadpool->cpu_usage > CPU_USAGE_HIGH)
+	if (move > 0.0 && cpu_usage > CPU_USAGE_HIGH)
 		move = 0.0;
 
 	/* Apply the move to our control setting. */
@@ -1146,18 +1206,18 @@ hill_climbing_update (gint16 current_thread_count, guint32 sample_duration, gint
 	new_thread_wave_magnitude = CLAMP (new_thread_wave_magnitude, 1, hc->max_thread_wave_magnitude);
 
 	/* Make sure our control setting is within the ThreadPool's limits. */
-	hc->current_control_setting = CLAMP (hc->current_control_setting, threadpool->limit_worker_min, threadpool->limit_worker_max - new_thread_wave_magnitude);
+	hc->current_control_setting = CLAMP (hc->current_control_setting, worker_min, worker_max - new_thread_wave_magnitude);
 
 	/* Calculate the new thread count (control setting + square wave). */
 	new_thread_count = (gint)(hc->current_control_setting + new_thread_wave_magnitude * ((hc->total_samples / (hc->wave_period / 2)) % 2));
 
 	/* Make sure the new thread count doesn't exceed the ThreadPool's limits. */
-	new_thread_count = CLAMP (new_thread_count, threadpool->limit_worker_min, threadpool->limit_worker_max);
+	new_thread_count = CLAMP (new_thread_count, worker_min, worker_max);
 
 	if (new_thread_count != current_thread_count)
-		hill_climbing_change_thread_count (new_thread_count, transition);
+		hill_climbing_change_thread_count (hc, new_thread_count, transition);
 
-	if (creal (ratio) < 0.0 && new_thread_count == threadpool->limit_worker_min)
+	if (creal (ratio) < 0.0 && new_thread_count == worker_min)
 		*adjustment_interval = (gint)(0.5 + hc->current_sample_interval * (10.0 * MAX (-1.0 * creal (ratio), 1.0)));
 	else
 		*adjustment_interval = hc->current_sample_interval;
@@ -1166,21 +1226,21 @@ hill_climbing_update (gint16 current_thread_count, guint32 sample_duration, gint
 }
 
 static void
-heuristic_notify_work_completed (void)
+heuristic_notify_work_completed (ThreadPool *tp)
 {
-	g_assert (threadpool);
+	g_assert (tp);
 
-	InterlockedIncrement (&threadpool->heuristic_completions);
-	threadpool->heuristic_last_dequeue = mono_msec_ticks ();
+	InterlockedIncrement (&tp->heuristic_completions);
+	tp->heuristic_last_dequeue = mono_msec_ticks ();
 }
 
 static gboolean
-heuristic_should_adjust (void)
+heuristic_should_adjust (ThreadPool *tp)
 {
-	g_assert (threadpool);
+	g_assert (tp);
 
-	if (threadpool->heuristic_last_dequeue > threadpool->heuristic_last_adjustment + threadpool->heuristic_adjustment_interval) {
-		ThreadPoolCounter counter = COUNTER_READ ();
+	if (tp->heuristic_last_dequeue > tp->heuristic_last_adjustment + tp->heuristic_adjustment_interval) {
+		ThreadPoolCounter counter = COUNTER_READ (tp);
 		if (counter._.active <= counter._.max_working)
 			return TRUE;
 	}
@@ -1189,32 +1249,33 @@ heuristic_should_adjust (void)
 }
 
 static void
-heuristic_adjust (void)
+heuristic_adjust (ThreadPool *tp)
 {
-	g_assert (threadpool);
+	g_assert (tp);
 
-	if (mono_mutex_trylock (&threadpool->heuristic_lock) == 0) {
-		gint32 completions = InterlockedExchange (&threadpool->heuristic_completions, 0);
+	if (mono_mutex_trylock (&tp->heuristic_lock) == 0) {
+		gint32 completions = InterlockedExchange (&tp->heuristic_completions, 0);
 		guint32 sample_end = mono_msec_ticks ();
-		guint32 sample_duration = sample_end - threadpool->heuristic_sample_start;
+		guint32 sample_duration = sample_end - tp->heuristic_sample_start;
 
-		if (sample_duration >= threadpool->heuristic_adjustment_interval / 2) {
+		if (sample_duration >= tp->heuristic_adjustment_interval / 2) {
 			ThreadPoolCounter counter;
 			gint16 new_thread_count;
 
-			counter = COUNTER_READ ();
-			new_thread_count = hill_climbing_update (counter._.max_working, sample_duration, completions, &threadpool->heuristic_adjustment_interval);
+			counter = COUNTER_READ (tp);
+			new_thread_count = hill_climbing_update (&tp->heuristic_hill_climbing, counter._.max_working, sample_duration, completions,
+				tp->cpu_usage, tp->limit_worker_min, tp->limit_worker_max, &tp->heuristic_adjustment_interval);
 
-			COUNTER_ATOMIC (counter, { counter._.max_working = new_thread_count; });
+			COUNTER_ATOMIC (tp, counter, { counter._.max_working = new_thread_count; });
 
 			if (new_thread_count > counter._.max_working)
-				worker_request (mono_domain_get ());
+				worker_request (tp, mono_domain_get ());
 
-			threadpool->heuristic_sample_start = sample_end;
-			threadpool->heuristic_last_adjustment = mono_msec_ticks ();
+			tp->heuristic_sample_start = sample_end;
+			tp->heuristic_last_adjustment = mono_msec_ticks ();
 		}
 
-		mono_mutex_unlock (&threadpool->heuristic_lock);
+		mono_mutex_unlock (&tp->heuristic_lock);
 	}
 }
 
@@ -1224,7 +1285,7 @@ mono_threadpool_ms_cleanup (void)
 #ifndef DISABLE_SOCKETS
 	mono_threadpool_ms_io_cleanup ();
 #endif
-	ensure_cleanedup ();
+	ensure_cleanedup (&threadpool, &threadpool_status);
 }
 
 MonoAsyncResult *
@@ -1241,7 +1302,7 @@ mono_threadpool_ms_begin_invoke (MonoDomain *domain, MonoObject *target, MonoMet
 		async_call_klass = mono_class_from_name (mono_defaults.corlib, "System", "MonoAsyncCall");
 	g_assert (async_call_klass);
 
-	ensure_initialized (NULL);
+	ensure_initialized (&threadpool, &threadpool_status, NULL);
 
 	message = mono_method_call_message_new (method, params, mono_get_delegate_invoke (method->klass), (params != NULL) ? (&async_callback) : NULL, (params != NULL) ? (&state) : NULL);
 
@@ -1386,7 +1447,7 @@ ves_icall_System_Threading_ThreadPool_GetAvailableThreadsNative (gint *worker_th
 	if (!worker_threads || !completion_port_threads)
 		return;
 
-	ensure_initialized (NULL);
+	ensure_initialized (&threadpool, &threadpool_status, NULL);
 
 	*worker_threads = threadpool->limit_worker_max;
 	*completion_port_threads = threadpool->limit_io_max;
@@ -1398,7 +1459,7 @@ ves_icall_System_Threading_ThreadPool_GetMinThreadsNative (gint *worker_threads,
 	if (!worker_threads || !completion_port_threads)
 		return;
 
-	ensure_initialized (NULL);
+	ensure_initialized (&threadpool, &threadpool_status, NULL);
 
 	*worker_threads = threadpool->limit_worker_min;
 	*completion_port_threads = threadpool->limit_io_min;
@@ -1410,7 +1471,7 @@ ves_icall_System_Threading_ThreadPool_GetMaxThreadsNative (gint *worker_threads,
 	if (!worker_threads || !completion_port_threads)
 		return;
 
-	ensure_initialized (NULL);
+	ensure_initialized (&threadpool, &threadpool_status, NULL);
 
 	*worker_threads = threadpool->limit_worker_max;
 	*completion_port_threads = threadpool->limit_io_max;
@@ -1419,7 +1480,7 @@ ves_icall_System_Threading_ThreadPool_GetMaxThreadsNative (gint *worker_threads,
 MonoBoolean
 ves_icall_System_Threading_ThreadPool_SetMinThreadsNative (gint worker_threads, gint completion_port_threads)
 {
-	ensure_initialized (NULL);
+	ensure_initialized (&threadpool, &threadpool_status, NULL);
 
 	if (worker_threads <= 0 || worker_threads > threadpool->limit_worker_max)
 		return FALSE;
@@ -1437,7 +1498,7 @@ ves_icall_System_Threading_ThreadPool_SetMaxThreadsNative (gint worker_threads, 
 {
 	gint cpu_count = mono_cpu_count ();
 
-	ensure_initialized (NULL);
+	ensure_initialized (&threadpool, &threadpool_status, NULL);
 
 	if (worker_threads < threadpool->limit_worker_min || worker_threads < cpu_count)
 		return FALSE;
@@ -1453,7 +1514,7 @@ ves_icall_System_Threading_ThreadPool_SetMaxThreadsNative (gint worker_threads, 
 void
 ves_icall_System_Threading_ThreadPool_InitializeVMTp (MonoBoolean *enable_worker_tracking)
 {
-	ensure_initialized (enable_worker_tracking);
+	ensure_initialized (&threadpool, &threadpool_status, enable_worker_tracking);
 }
 
 MonoBoolean
@@ -1464,22 +1525,22 @@ ves_icall_System_Threading_ThreadPool_NotifyWorkItemComplete (void)
 	if (mono_domain_is_unloading (mono_domain_get ()) || mono_runtime_is_shutting_down ())
 		return FALSE;
 
-	heuristic_notify_work_completed ();
+	heuristic_notify_work_completed (threadpool);
 
-	if (heuristic_should_adjust ())
-		heuristic_adjust ();
+	if (heuristic_should_adjust (threadpool))
+		heuristic_adjust (threadpool);
 
-	counter = COUNTER_READ ();
+	counter = COUNTER_READ (threadpool);
 	return counter._.active <= counter._.max_working;
 }
 
 void
 ves_icall_System_Threading_ThreadPool_NotifyWorkItemProgressNative (void)
 {
-	heuristic_notify_work_completed ();
+	heuristic_notify_work_completed (threadpool);
 
-	if (heuristic_should_adjust ())
-		heuristic_adjust ();
+	if (heuristic_should_adjust (threadpool))
+		heuristic_adjust (threadpool);
 }
 
 void
@@ -1492,7 +1553,7 @@ ves_icall_System_Threading_ThreadPool_ReportThreadStatus (MonoBoolean is_working
 MonoBoolean
 ves_icall_System_Threading_ThreadPool_RequestWorkerThread (void)
 {
-	return worker_request (mono_domain_get ());
+	return worker_request (threadpool, mono_domain_get ());
 }
 
 MonoBoolean G_GNUC_UNUSED
