@@ -8,10 +8,9 @@
  */
 
 #include <config.h>
+#include <glib.h>
 
 #ifndef DISABLE_SOCKETS
-
-#include <glib.h>
 
 #if defined(HOST_WIN32)
 #include <windows.h>
@@ -35,6 +34,26 @@ enum {
 	IO_OP_OUT       = 2,
 };
 
+typedef struct {
+	gint fd;
+	gint operations;
+	gboolean is_new;
+} ThreadPoolIOUpdate;
+
+typedef struct {
+	gboolean (*init) (gint wakeup_pipe_fd);
+	void     (*cleanup) (void);
+	void     (*update_add) (ThreadPoolIOUpdate *update);
+	gint     (*event_wait) (void);
+	gint     (*event_get_fd_max) (void);
+	gint     (*event_get_fd_at) (gint i, gint *operations);
+	void     (*event_reset_fd_at) (gint i, gint operations);
+} ThreadPoolIOBackend;
+
+#include "threadpool-ms-io-epoll.c"
+#include "threadpool-ms-io-kqueue.c"
+#include "threadpool-ms-io-poll.c"
+
 /* Keep in sync with System.Threading.IOAsyncResult */
 struct _MonoIOAsyncResult {
 	MonoObject obj;
@@ -50,20 +69,26 @@ struct _MonoIOAsyncResult {
 };
 
 typedef struct {
-	gint fd;
-	gint operations;
-	gboolean is_new;
-} ThreadPoolIOUpdate;
+	MonoGHashTable *states;
+	mono_mutex_t states_lock;
 
-typedef struct {
-	gboolean (*init) (gint wakeup_pipe_fd);
-	void     (*cleanup) (void);
-	void     (*update_add) (ThreadPoolIOUpdate *update);
-	gint     (*event_wait) (void);
-	gint     (*event_max) (void);
-	gint     (*event_fd_at) (guint i);
-	gboolean (*event_create_ioares_at) (guint i, gint fd, MonoMList **list);
-} ThreadPoolIOBackend;
+	ThreadPoolIOBackend backend;
+
+	ThreadPoolIOUpdate *updates;
+	guint updates_size;
+	mono_mutex_t updates_lock;
+
+#if !defined(HOST_WIN32)
+	gint wakeup_pipes [2];
+#else
+	SOCKET wakeup_pipes [2];
+#endif
+} ThreadPoolIO;
+
+static gint32 io_status = STATUS_NOT_INITIALIZED;
+static gint32 io_thread_status = STATUS_NOT_INITIALIZED;
+
+static ThreadPoolIO* threadpool_io;
 
 static MonoIOAsyncResult*
 get_ioares_for_operation (MonoMList **list, gint operation)
@@ -99,42 +124,16 @@ get_operations (MonoMList *list)
 	return operations;
 }
 
-#include "threadpool-ms-io-epoll.c"
-#include "threadpool-ms-io-kqueue.c"
-#include "threadpool-ms-io-poll.c"
-
-typedef struct {
-	MonoGHashTable *states;
-	mono_mutex_t states_lock;
-
-	ThreadPoolIOBackend backend;
-
-	ThreadPoolIOUpdate *updates;
-	guint updates_size;
-	mono_mutex_t updates_lock;
-
-#if !defined(HOST_WIN32)
-	gint wakeup_pipes [2];
-#else
-	SOCKET wakeup_pipes [2];
-#endif
-} ThreadPoolIO;
-
-static gint32 io_status = STATUS_NOT_INITIALIZED;
-static gint32 io_thread_status = STATUS_NOT_INITIALIZED;
-
-static ThreadPoolIO* threadpool_io;
-
 static void
 selector_thread_wakeup (void)
 {
-	gchar msg = 'c';
+	gchar c = 'c';
 	gint written;
 
 	for (;;) {
 #if !defined(HOST_WIN32)
-		written = write (threadpool_io->wakeup_pipes [1], &msg, 1);
-		if (written == 1)
+		written = write (threadpool_io->wakeup_pipes [1], &c, sizeof (c));
+		if (written == sizeof (c))
 			break;
 		if (written == -1) {
 			g_warning ("selector_thread_wakeup: write () failed, error (%d) %s\n", errno, g_strerror (errno));
@@ -142,10 +141,10 @@ selector_thread_wakeup (void)
 		}
 #else
 		written = send (threadpool_io->wakeup_pipes [1], &msg, 1, 0);
-		if (written == 1)
+		if (written == sizeof (c))
 			break;
 		if (written == SOCKET_ERROR) {
-			g_warning ("selector_thread_wakeup: write () failed, error (%d)\n", WSAGetLastError ());
+			g_warning ("selector_thread_wakeup: send () failed, error (%d)\n", WSAGetLastError ());
 			break;
 		}
 #endif
@@ -174,7 +173,7 @@ selector_thread_wakeup_drain_pipes (void)
 			break;
 		if (received == SOCKET_ERROR) {
 			if (WSAGetLastError () != WSAEINTR && WSAGetLastError () != WSAEWOULDBLOCK)
-				g_warning ("selector_thread_wakeup_drain_pipes: recv () failed, error (%d) %s\n", WSAGetLastError ());
+				g_warning ("selector_thread_wakeup_drain_pipes: recv () failed, error (%d)\n", WSAGetLastError ());
 			break;
 		}
 #endif
@@ -210,32 +209,39 @@ selector_thread (gpointer data)
 		if (ready == -1 || mono_runtime_is_shutting_down ())
 			break;
 
-		max = threadpool_io->backend.event_max ();
+		max = threadpool_io->backend.event_get_fd_max ();
 
 		mono_mutex_lock (&threadpool_io->states_lock);
-		for (i = 0; i < max && ready > 0; ++i) {
-			MonoMList *list;
-			gboolean valid_fd;
-			gint fd;
+		for (i = 0; ready > 0 && i < max; ++i) {
+			gint operations;
+			gint fd = threadpool_io->backend.event_get_fd_at (i, &operations);
 
-			fd = threadpool_io->backend.event_fd_at (i);
+			if (fd == -1)
+				continue;
 
 			if (fd == threadpool_io->wakeup_pipes [0]) {
 				selector_thread_wakeup_drain_pipes ();
-				ready -= 1;
-				continue;
+			} else {
+				MonoMList *list = mono_g_hash_table_lookup (threadpool_io->states, GINT_TO_POINTER (fd));
+
+				if (list && (operations & IO_OP_IN) != 0) {
+					MonoIOAsyncResult *ioares = get_ioares_for_operation (&list, IO_OP_IN);
+					if (ioares)
+						mono_threadpool_ms_enqueue_work_item (((MonoObject*) ioares)->vtable->domain, (MonoObject*) ioares);
+				}
+				if (list && (operations & IO_OP_OUT) != 0) {
+					MonoIOAsyncResult *ioares = get_ioares_for_operation (&list, IO_OP_OUT);
+					if (ioares)
+						mono_threadpool_ms_enqueue_work_item (((MonoObject*) ioares)->vtable->domain, (MonoObject*) ioares);
+				}
+
+				if (!list) {
+					mono_g_hash_table_remove (threadpool_io->states, GINT_TO_POINTER (fd));
+				} else {
+					mono_g_hash_table_replace (threadpool_io->states, GINT_TO_POINTER (fd), list);
+					threadpool_io->backend.event_reset_fd_at (i, get_operations (list));
+				}
 			}
-
-			list = mono_g_hash_table_lookup (threadpool_io->states, GINT_TO_POINTER (fd));
-
-			valid_fd = threadpool_io->backend.event_create_ioares_at (i, fd, &list);
-			if (!valid_fd)
-				continue;
-
-			if (list)
-				mono_g_hash_table_replace (threadpool_io->states, GINT_TO_POINTER (fd), list);
-			else
-				mono_g_hash_table_remove (threadpool_io->states, GINT_TO_POINTER (fd));
 
 			ready -= 1;
 		}
@@ -326,6 +332,8 @@ ensure_initialized (void)
 	threadpool_io->updates_size = 0;
 	mono_mutex_init (&threadpool_io->updates_lock);
 
+	wakeup_pipes_init ();
+
 #if defined(HAVE_EPOLL)
 	threadpool_io->backend = backend_epoll;
 #elif defined(HAVE_KQUEUE)
@@ -336,10 +344,8 @@ ensure_initialized (void)
 	if (g_getenv ("MONO_DISABLE_AIO") != NULL)
 		threadpool_io->backend = backend_poll;
 
-	wakeup_pipes_init ();
-
 	if (!threadpool_io->backend.init (threadpool_io->wakeup_pipes [0]))
-		g_error ("ensure_initialized: backend->init () failed");
+		g_error ("ensure_initialized: backend.init () failed");
 
 	if (!mono_thread_create_internal (mono_get_root_domain (), selector_thread, NULL, TRUE, SMALL_STACK))
 		g_error ("ensure_initialized: mono_thread_create_internal () failed");
@@ -450,7 +456,7 @@ mono_threadpool_ms_io_add (MonoAsyncResult *ares, MonoIOAsyncResult *ioares)
 
 	update = &threadpool_io->updates [threadpool_io->updates_size - 1];
 	update->fd = GPOINTER_TO_INT (ioares->handle);
-	update->operations = get_operations (list);;
+	update->operations = ioares->operation;
 	update->is_new = is_new;
 	mono_mutex_unlock (&threadpool_io->updates_lock);
 

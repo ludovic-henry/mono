@@ -91,53 +91,44 @@ epoll_event_wait (void)
 }
 
 static gint
-epoll_event_max (void)
+epoll_event_get_fd_max (void)
 {
 	return EPOLL_NEVENTS;
 }
 
 static gint
-epoll_event_fd_at (guint i)
-{
-	return epoll_events [i].data.fd;
-}
-
-static gboolean
-epoll_event_create_ioares_at (guint i, gint fd, MonoMList **list)
+epoll_event_get_fd_at (gint i, gint *operations)
 {
 	struct epoll_event *epoll_event;
 
-	g_assert (list);
+	g_assert (operations);
 
 	epoll_event = &epoll_events [i];
-	g_assert (epoll_event);
 
-	g_assert (fd == epoll_event->data.fd);
+	*operations = ((epoll_event->events & (EPOLLIN | EPOLLERR | EPOLLHUP)) ? IO_OP_IN : 0)
+	                | ((epoll_event->events & (EPOLLOUT | EPOLLERR | EPOLLHUP)) ? IO_OP_OUT : 0);
 
-	if (*list && (epoll_event->events & (EPOLLIN | EPOLLERR | EPOLLHUP)) != 0) {
-		MonoIOAsyncResult *io_event = get_ioares_for_operation (list, IO_OP_IN);
-		if (io_event)
-			mono_threadpool_ms_enqueue_work_item (((MonoObject*) io_event)->vtable->domain, (MonoObject*) io_event);
-	}
-	if (*list && (epoll_event->events & (EPOLLOUT | EPOLLERR | EPOLLHUP)) != 0) {
-		MonoIOAsyncResult *io_event = get_ioares_for_operation (list, IO_OP_OUT);
-		if (io_event)
-			mono_threadpool_ms_enqueue_work_item (((MonoObject*) io_event)->vtable->domain, (MonoObject*) io_event);
-	}
+	return epoll_event->data.fd;
+}
 
-	if (*list) {
-		gint operations = get_operations (*list);
+static void
+epoll_event_reset_fd_at (gint i, gint operations)
+{
+	struct epoll_event *epoll_event;
 
-		epoll_event->events = ((operations & IO_OP_OUT) ? EPOLLOUT : 0) | ((operations & IO_OP_IN) ? EPOLLIN : 0);
-		if (epoll_ctl (epoll_fd, EPOLL_CTL_MOD, fd, epoll_event) == -1) {
-			if (epoll_ctl (epoll_fd, EPOLL_CTL_ADD, fd, epoll_event) == -1)
-				g_warning ("epoll_event_create_ioares_at: epoll_ctl () failed, error (%d) %s", errno, g_strerror (errno));
+	epoll_event = &epoll_events [i];
+
+	if (operations == 0) {
+		if (epoll_ctl (epoll_fd, EPOLL_CTL_DEL, epoll_event->data.fd, epoll_event) == -1) {
+			g_warning ("epoll_event_reset_fd_at: epoll_ctl (EPOLL_CTL_DEL) failed, error (%d) %s", errno, g_strerror (errno));
 		}
 	} else {
-		epoll_ctl (epoll_fd, EPOLL_CTL_DEL, fd, epoll_event);
-	}
+		epoll_event->events = ((operations & IO_OP_OUT) ? EPOLLOUT : 0) | ((operations & IO_OP_IN) ? EPOLLIN : 0);
 
-	return TRUE;
+		if (epoll_ctl (epoll_fd, EPOLL_CTL_MOD, epoll_event->data.fd, epoll_event) == -1) {
+			g_warning ("epoll_event_get_ioares_at: epoll_ctl (EPOLL_CTL_MOD) failed, error (%d) %s", errno, g_strerror (errno));
+		}
+	}
 }
 
 static ThreadPoolIOBackend backend_epoll = {
@@ -145,9 +136,9 @@ static ThreadPoolIOBackend backend_epoll = {
 	.cleanup = epoll_cleanup,
 	.update_add = epoll_update_add,
 	.event_wait = epoll_event_wait,
-	.event_max = epoll_event_max,
-	.event_fd_at = epoll_event_fd_at,
-	.event_create_ioares_at = epoll_event_create_ioares_at,
+	.event_get_fd_max = epoll_event_get_fd_max,
+	.event_get_fd_at = epoll_event_get_fd_at,
+	.event_reset_fd_at = epoll_event_reset_fd_at,
 };
 
 #endif

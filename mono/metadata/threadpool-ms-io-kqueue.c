@@ -88,56 +88,46 @@ kqueue_event_wait (void)
 	return ready;
 }
 
-static inline gint
-kqueue_event_fd_at (guint i)
-{
-	return kqueue_events [i].ident;
-}
-
 static gint
-kqueue_event_max (void)
+kqueue_event_get_fd_max (void)
 {
 	return KQUEUE_NEVENTS;
 }
 
-static gboolean
-kqueue_event_create_ioares_at (guint i, gint fd, MonoMList **list)
+static gint
+kqueue_event_get_fd_at (gint i, gint *operations)
 {
 	struct kevent *kqueue_event;
 
-	g_assert (list);
+	g_assert (operations);
 
 	kqueue_event = &kqueue_events [i];
-	g_assert (kqueue_event);
 
-	g_assert (fd == kqueue_event->ident);
+	*operations = ((kqueue_event->filter == EVFILT_READ || (kqueue_event->flags & EV_ERROR) != 0) ? IO_OP_IN : 0)
+	                | ((kqueue_event->filter == EVFILT_WRITE || (kqueue_event->flags & EV_ERROR) != 0) ? IO_OP_OUT : 0);
 
-	if (*list && (kqueue_event->filter == EVFILT_READ || (kqueue_event->flags & EV_ERROR) != 0)) {
-		MonoIOAsyncResult *io_event = get_ioares_for_operation (list, IO_OP_IN);
-		if (io_event)
-			mono_threadpool_ms_enqueue_work_item (((MonoObject*) io_event)->vtable->domain, (MonoObject*) io_event);
-	}
-	if (*list && (kqueue_event->filter == EVFILT_WRITE || (kqueue_event->flags & EV_ERROR) != 0)) {
-		MonoIOAsyncResult *io_event = get_ioares_for_operation (list, IO_OP_OUT);
-		if (io_event)
-			mono_threadpool_ms_enqueue_work_item (((MonoObject*) io_event)->vtable->domain, (MonoObject*) io_event);
-	}
+	return kqueue_event->ident;
+}
 
-	if (*list) {
-		gint operations = get_operations (*list);
-		if (kqueue_event->filter == EVFILT_READ && (operations & IO_OP_IN) != 0) {
-			EV_SET (kqueue_event, fd, EVFILT_READ, EV_ADD | EV_ENABLE | EV_ONESHOT, 0, 0, 0);
-			if (kevent (kqueue_fd, kqueue_event, 1, NULL, 0, NULL) == -1)
-				g_warning ("kqueue_event_create_ioares_at: kevent (read) failed, error (%d) %s", errno, g_strerror (errno));
-		}
-		if (kqueue_event->filter == EVFILT_WRITE && (operations & IO_OP_OUT) != 0) {
-			EV_SET (kqueue_event, fd, EVFILT_WRITE, EV_ADD | EV_ENABLE | EV_ONESHOT, 0, 0, 0);
-			if (kevent (kqueue_fd, kqueue_event, 1, NULL, 0, NULL) == -1)
-				g_warning ("kqueue_event_create_ioares_at: kevent (write) failed, error (%d) %s", errno, g_strerror (errno));
+static void
+kqueue_event_reset_fd_at (gint i, gint operations)
+{
+	struct kevent *kqueue_event;
+
+	kqueue_event = &kqueue_events [i];
+
+	if (kqueue_event->filter == EVFILT_READ && (operations & IO_OP_IN) != 0) {
+		EV_SET (kqueue_event, kqueue_event->ident, EVFILT_READ, EV_ADD | EV_ENABLE | EV_ONESHOT, 0, 0, 0);
+		if (kevent (kqueue_fd, kqueue_event, 1, NULL, 0, NULL) == -1) {
+			g_warning ("kqueue_event_reset_fd_at: kevent (read) failed, error (%d) %s", errno, g_strerror (errno));
 		}
 	}
-
-	return TRUE;
+	if (kqueue_event->filter == EVFILT_WRITE && (operations & IO_OP_OUT) != 0) {
+		EV_SET (kqueue_event, kqueue_event->ident, EVFILT_WRITE, EV_ADD | EV_ENABLE | EV_ONESHOT, 0, 0, 0);
+		if (kevent (kqueue_fd, kqueue_event, 1, NULL, 0, NULL) == -1) {
+			g_warning ("kqueue_event_reset_fd_at: kevent (write) failed, error (%d) %s", errno, g_strerror (errno));
+		}
+	}
 }
 
 static ThreadPoolIOBackend backend_kqueue = {
@@ -145,9 +135,9 @@ static ThreadPoolIOBackend backend_kqueue = {
 	.cleanup = kqueue_cleanup,
 	.update_add = kqueue_update_add,
 	.event_wait = kqueue_event_wait,
-	.event_max = kqueue_event_max,
-	.event_fd_at = kqueue_event_fd_at,
-	.event_create_ioares_at = kqueue_event_create_ioares_at,
+	.event_get_fd_max = kqueue_event_get_fd_max,
+	.event_get_fd_at = kqueue_event_get_fd_at,
+	.event_reset_fd_at = kqueue_event_reset_fd_at,
 };
 
 #endif
