@@ -170,6 +170,15 @@ typedef enum {
 	MONO_SERVICE_REQUEST_SAMPLE = 1,
 } MonoAsyncJob;
 
+#define INTERRUPT_TOKEN ((gpointer) (size_t) -1)
+
+typedef void (*MonoThreadInfoInterruptCallback) (gpointer user_data);
+
+typedef struct {
+	MonoThreadInfoInterruptCallback callback;
+	gpointer data;
+} MonoThreadInfoInterruptToken;
+
 typedef struct {
 	MonoLinkedListSetNode node;
 	guint32 small_id; /*Used by hazard pointers */
@@ -243,6 +252,8 @@ typedef struct {
 	volatile gint32 service_requests;
 
 	void *jit_data;
+
+	MonoThreadInfoInterruptToken *interrupt_token;
 } MonoThreadInfo;
 
 typedef struct {
@@ -401,20 +412,26 @@ mono_thread_info_exit (void);
 HANDLE
 mono_thread_info_open_handle (void);
 
-gpointer
-mono_thread_info_prepare_interrupt (HANDLE thread_handle);
+gboolean
+mono_thread_info_install_interrupt_token (THREAD_INFO_TYPE *info, MonoThreadInfoInterruptToken *token);
 
 void
-mono_thread_info_finish_interrupt (gpointer wait_handle);
+mono_thread_info_uninstall_interrupt_token (THREAD_INFO_TYPE *info);
+
+MonoThreadInfoInterruptToken*
+mono_thread_info_prepare_interrupt (THREAD_INFO_TYPE *info);
 
 void
-mono_thread_info_interrupt (HANDLE thread_handle);
+mono_thread_info_finish_interrupt (MonoThreadInfoInterruptToken *token);
+
+void
+mono_thread_info_interrupt (THREAD_INFO_TYPE *info);
 
 void
 mono_thread_info_self_interrupt (void);
 
 void
-mono_thread_info_clear_interruption (void);
+mono_thread_info_clear_interrupt (THREAD_INFO_TYPE *info);
 
 gboolean
 mono_thread_info_is_live (THREAD_INFO_TYPE *info);
@@ -523,10 +540,6 @@ void mono_threads_core_unregister (THREAD_INFO_TYPE *info);
 HANDLE mono_threads_core_open_handle (void);
 HANDLE mono_threads_core_open_thread_handle (HANDLE handle, MonoNativeThreadId tid);
 void mono_threads_core_set_name (MonoNativeThreadId tid, const char *name);
-gpointer mono_threads_core_prepare_interrupt (HANDLE thread_handle);
-void mono_threads_core_finish_interrupt (gpointer wait_handle);
-void mono_threads_core_self_interrupt (void);
-void mono_threads_core_clear_interruption (void);
 
 MonoNativeThreadId mono_native_thread_id_get (void);
 

@@ -45,6 +45,8 @@
 
 #include <mono/utils/mono-mutex.h>
 #include <mono/utils/mono-proclib.h>
+#include <mono/utils/mono-threads.h>
+
 #undef DEBUG_REFS
 
 #if 0
@@ -1554,6 +1556,34 @@ int _wapi_handle_wait_signal_handle (gpointer handle, gboolean alertable)
 	return _wapi_handle_timedwait_signal_handle (handle, NULL, alertable, FALSE);
 }
 
+
+static void
+signal_handle_and_unref (gpointer handle)
+{
+	pthread_cond_t *cond;
+	mono_mutex_t *mutex;
+	guint32 idx;
+
+	g_assert (handle);
+
+	/* If we reach here, then handle is set to the flag value,
+	 * which means that the target thread is either
+	 * - before the first CAS in timedwait, which means it won't enter the
+	 *    wait.
+	 * - it is after the first CAS, so it is already waiting, or it will
+	 *    enter the wait, and it will be interrupted by the broadcast. */
+	idx = GPOINTER_TO_UINT (handle);
+	cond = &_WAPI_PRIVATE_HANDLES (idx).signal_cond;
+	mutex = &_WAPI_PRIVATE_HANDLES (idx).signal_mutex;
+
+	mono_mutex_lock (mutex);
+	mono_cond_broadcast (cond);
+	mono_mutex_unlock (mutex);
+
+	/* ref added by set_wait_handle */
+	_wapi_handle_unref (handle);
+}
+
 int _wapi_handle_timedwait_signal_handle (gpointer handle,
 										  struct timespec *timeout, gboolean alertable, gboolean poll)
 {
@@ -1593,8 +1623,12 @@ int _wapi_handle_timedwait_signal_handle (gpointer handle,
 		pthread_cond_t *cond;
 		mono_mutex_t *mutex;
 
-		if (alertable && !wapi_thread_set_wait_handle (handle))
-			return 0;
+		if (alertable) {
+			MonoThreadInfoInterruptToken token = { .data = handle, .callback = signal_handle_and_unref };
+			if (!mono_thread_info_install_interrupt_token (mono_thread_info_current (), &token))
+				return 0;
+			_wapi_handle_ref (handle);
+		}
 
 		cond = &_WAPI_PRIVATE_HANDLES (idx).signal_cond;
 		mutex = &_WAPI_PRIVATE_HANDLES (idx).signal_mutex;
@@ -1610,7 +1644,7 @@ int _wapi_handle_timedwait_signal_handle (gpointer handle,
 		}
 
 		if (alertable)
-			wapi_thread_clear_wait_handle (handle);
+			mono_thread_info_uninstall_interrupt_token (mono_thread_info_current ());
 
 		return res;
 	}

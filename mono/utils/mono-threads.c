@@ -19,6 +19,7 @@
 #include <mono/utils/mono-mmap.h>
 #include <mono/utils/atomic.h>
 #include <mono/utils/mono-time.h>
+#include <mono/utils/mono-mutex.h>
 
 
 #include <errno.h>
@@ -56,6 +57,8 @@ static gboolean mono_threads_inited = FALSE;
 static MonoSemType suspend_semaphore;
 static size_t pending_suspends;
 static gboolean unified_suspend_enabled;
+
+static mono_mutex_t interrupt_token_lock;
 
 #define mono_thread_info_run_state(info) (((MonoThreadInfo*)info)->thread_state & THREAD_STATE_MASK)
 
@@ -597,6 +600,8 @@ mono_threads_init (MonoThreadInfoCallbacks *callbacks, size_t info_size)
 #if defined(__MACH__)
 	mono_mach_init (thread_info_key);
 #endif
+
+	mono_mutex_init (&interrupt_token_lock);
 
 	mono_threads_inited = TRUE;
 
@@ -1158,41 +1163,102 @@ mono_thread_info_set_name (MonoNativeThreadId tid, const char *name)
 }
 
 /*
+ * Install an interruption token for the current thread.
+ *
+ * Returns TRUE if installed, FALSE if thread is in interrupt state.
+ *
+ * The callback in token must be able to be called from another thread and always cancel the thread.
+ * It will be called while holding the interrution token lock.
+ */
+gboolean
+mono_thread_info_install_interrupt_token (MonoThreadInfo *info, MonoThreadInfoInterruptToken *token)
+{
+	MonoThreadInfoInterruptToken *previous_token;
+
+	g_assert (token->callback);
+
+	previous_token = InterlockedCompareExchangePointer ((gpointer*) &info->interrupt_token, token, NULL);
+
+	if (previous_token != NULL)
+		g_assert (previous_token == INTERRUPT_TOKEN);
+
+	return previous_token == NULL;
+}
+
+void
+mono_thread_info_uninstall_interrupt_token (MonoThreadInfo *info)
+{
+	MonoThreadInfoInterruptToken *token, *previous_token;
+
+	token = info->interrupt_token;
+
+	/* only the installer can uninstall the token */
+	g_assert (token);
+
+	previous_token = InterlockedCompareExchangePointer ((gpointer*) &info->interrupt_token, NULL, token);
+
+	if (previous_token != token)
+		g_assert (previous_token == INTERRUPT_TOKEN || previous_token == NULL);
+
+	if (previous_token == INTERRUPT_TOKEN) {
+		mono_mutex_lock (&interrupt_token_lock);
+		mono_mutex_unlock (&interrupt_token_lock);
+	}
+}
+
+/*
  * mono_thread_info_prepare_interrupt:
  *
- *   See wapi_prepare_interrupt ().
  */
-gpointer
-mono_thread_info_prepare_interrupt (HANDLE thread_handle)
+MonoThreadInfoInterruptToken*
+mono_thread_info_prepare_interrupt (MonoThreadInfo *info)
 {
-	return mono_threads_core_prepare_interrupt (thread_handle);
+	MonoThreadInfoInterruptToken *token;
+
+	/* Atomically obtain the token the thread is
+	 * waiting on, and change it to a flag value. */
+
+	do {
+		token = info->interrupt_token;
+
+		/* Already interrupted */
+		if (token == INTERRUPT_TOKEN)
+			return NULL;
+	} while (InterlockedCompareExchangePointer ((gpointer*) &info->interrupt_token, INTERRUPT_TOKEN, token) != token);
+
+	return token;
 }
 
 void
-mono_thread_info_finish_interrupt (gpointer wait_handle)
+mono_thread_info_finish_interrupt (MonoThreadInfoInterruptToken *token)
 {
-	mono_threads_core_finish_interrupt (wait_handle);
+	if (token == NULL)
+		return;
+
+	mono_mutex_lock (&interrupt_token_lock);
+	token->callback (token->data);
+	mono_mutex_unlock (&interrupt_token_lock);
 }
 
 void
-mono_thread_info_interrupt (HANDLE thread_handle)
+mono_thread_info_interrupt (MonoThreadInfo *info)
 {
-	gpointer wait_handle;
+	MonoThreadInfoInterruptToken *token;
 
-	wait_handle = mono_thread_info_prepare_interrupt (thread_handle);
-	mono_thread_info_finish_interrupt (wait_handle);
+	token = mono_thread_info_prepare_interrupt (info);
+	mono_thread_info_finish_interrupt (token);
 }
-	
+
 void
 mono_thread_info_self_interrupt (void)
 {
-	mono_threads_core_self_interrupt ();
+	mono_thread_info_interrupt (mono_thread_info_current ());
 }
 
 void
-mono_thread_info_clear_interruption (void)
+mono_thread_info_clear_interrupt (MonoThreadInfo *info)
 {
-	mono_threads_core_clear_interruption ();
+	InterlockedCompareExchangePointer ((gpointer*) &info->interrupt_token, NULL, INTERRUPT_TOKEN);
 }
 
 /* info must be self or be held in a hazard pointer. */

@@ -4011,7 +4011,7 @@ mono_thread_execute_interruption (MonoInternalThread *thread)
 #endif
 		InterlockedDecrement (&thread_interruption_requested);
 		/* Clear the interrupted flag of the thread so it can wait again */
-		mono_thread_info_clear_interruption ();
+		mono_thread_info_clear_interrupt (mono_thread_info_current ());
 	}
 
 	if ((thread->state & ThreadState_AbortRequested) != 0) {
@@ -4381,7 +4381,7 @@ mono_thread_info_get_last_managed (MonoThreadInfo *info)
 typedef struct {
 	MonoInternalThread *thread;
 	gboolean install_async_abort;
-	gpointer interrupt_handle;
+	MonoThreadInfoInterruptToken *interrupt_token;
 } AbortThreadData;
 
 static SuspendThreadResult
@@ -4424,7 +4424,7 @@ abort_thread_critical (MonoThreadInfo *info, gpointer ud)
 		 * functions in the io-layer until the signal handler calls QueueUserAPC which will
 		 * make it return.
 		 */
-		data->interrupt_handle = mono_thread_info_prepare_interrupt (thread->handle);
+		data->interrupt_token = mono_thread_info_prepare_interrupt (mono_thread_info_lookup ((MonoNativeThreadId) (gsize) thread->tid));
 		return MonoResumeThread;
 	}
 }
@@ -4445,20 +4445,20 @@ abort_thread_internal (MonoInternalThread *thread, gboolean can_raise_exception,
 		MonoException *exc = mono_thread_request_interruption (can_raise_exception); 
 		if (exc)
 			mono_raise_exception (exc);
-		mono_thread_info_interrupt (thread->handle);
+		mono_thread_info_interrupt (mono_thread_info_lookup ((MonoNativeThreadId) (gsize) thread->tid));
 		return;
 	}
 
 	mono_thread_info_safe_suspend_and_run ((MonoNativeThreadId)(gsize)thread->tid, TRUE, abort_thread_critical, &data);
-	if (data.interrupt_handle)
-		mono_thread_info_finish_interrupt (data.interrupt_handle);
+	if (data.interrupt_token)
+		mono_thread_info_finish_interrupt (data.interrupt_token);
 	/*FIXME we need to wait for interruption to complete -- figure out how much into interruption we should wait for here*/
 }
 
 typedef struct{
 	MonoInternalThread *thread;
 	gboolean interrupt;
-	gpointer interrupt_handle;
+	MonoThreadInfoInterruptToken *interrupt_token;
 } SuspendThreadData;
 
 static SuspendThreadResult
@@ -4482,7 +4482,7 @@ suspend_thread_critical (MonoThreadInfo *info, gpointer ud)
 		if (InterlockedCompareExchange (&thread->interruption_requested, 1, 0) == 0)
 			InterlockedIncrement (&thread_interruption_requested);
 		if (data->interrupt)
-			data->interrupt_handle = mono_thread_info_prepare_interrupt (thread->handle);
+			data->interrupt_token = mono_thread_info_prepare_interrupt (mono_thread_info_lookup ((MonoNativeThreadId) (gsize) thread->tid));
 		
 		if (mono_thread_notify_pending_exc_fn && !running_managed)
 			/* The JIT will notify the thread about the interruption */
@@ -4508,8 +4508,8 @@ suspend_thread_internal (MonoInternalThread *thread, gboolean interrupt)
 		data.interrupt = interrupt;
 
 		mono_thread_info_safe_suspend_and_run ((MonoNativeThreadId)(gsize)thread->tid, interrupt, suspend_thread_critical, &data);
-		if (data.interrupt_handle)
-			mono_thread_info_finish_interrupt (data.interrupt_handle);
+		if (data.interrupt_token)
+			mono_thread_info_finish_interrupt (data.interrupt_token);
 		UNLOCK_THREAD (thread);
 	}
 }
