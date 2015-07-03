@@ -266,13 +266,15 @@ typedef struct {
 	MonoString *param_name;
 } MonoArgumentException;
 
+typedef struct _MonoAsyncCall MonoAsyncCall;
+
 typedef struct {
 	MonoObject   object;
 	MonoObject  *async_state;
 	MonoObject  *handle;
 	MonoObject  *async_delegate;
 	gpointer    *data;
-	MonoObject  *object_data;
+	MonoAsyncCall  *async_call;
 	MonoBoolean  sync_completed;
 	MonoBoolean  completed;
 	MonoBoolean  endinvoke_called;
@@ -353,15 +355,14 @@ typedef struct {
 } MonoMethodMessage;
 
 /* Keep in sync with the System.MonoAsyncCall */
-typedef struct {
+struct _MonoAsyncCall {
 	MonoObject object;
 	MonoMethodMessage *msg;
-	MonoMethod *cb_method;
-	MonoDelegate *cb_target;
+	MonoDelegate *callback;
 	MonoObject *state;
 	MonoObject *res;
 	MonoArray *out_args;
-} MonoAsyncCall;
+};
 
 typedef struct {
 	MonoObject obj;
@@ -630,14 +631,11 @@ MONO_COLD void mono_set_pending_exception (MonoException *exc);
 /* remoting and async support */
 
 MonoAsyncResult *
-mono_async_result_new	    (MonoDomain *domain, HANDLE handle, 
-			     MonoObject *state, gpointer data, MonoObject *object_data);
+mono_async_result_new (MonoDomain *domain, HANDLE handle, MonoObject *state, gpointer data);
 
 MonoObject *
-mono_async_result_invoke    (MonoAsyncResult *ares, MonoObject **exc);
-
-MonoObject *
-ves_icall_System_Runtime_Remoting_Messaging_AsyncResult_Invoke (MonoAsyncResult *this_obj);
+ves_icall_System_Runtime_Remoting_Messaging_MonoMethodMessage_Invoke (MonoMethodMessage *this,
+		MonoObject *target, MonoArray **outargs);
 
 MonoWaitHandle *
 mono_wait_handle_new	    (MonoDomain *domain, HANDLE handle);
@@ -648,10 +646,6 @@ mono_wait_handle_get_handle (MonoWaitHandle *handle);
 void
 mono_message_init	    (MonoDomain *domain, MonoMethodMessage *this_obj, 
 			     MonoReflectionMethod *method, MonoArray *out_args);
-
-MonoObject *
-mono_message_invoke	    (MonoObject *target, MonoMethodMessage *msg, 
-			     MonoObject **exc, MonoArray **out_args);
 
 MonoMethodMessage *
 mono_method_call_message_new (MonoMethod *method, gpointer *params, MonoMethod *invoke, 

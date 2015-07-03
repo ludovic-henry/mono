@@ -36,6 +36,7 @@ using System.Collections;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Threading;
 
 namespace System.Runtime.Remoting.Messaging {
 	
@@ -371,7 +372,9 @@ namespace System.Runtime.Remoting.Messaging {
 			}
 			return outCount > 0 || res;
 		}
-		
+
+		[MethodImplAttribute(MethodImplOptions.InternalCall)]
+		internal extern object Invoke (object target, out object[] out_args);
 	}
 
 	internal enum CallType: int
