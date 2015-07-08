@@ -16,6 +16,7 @@
 #include <string.h>
 #include <errno.h>
 #include <time.h>
+#include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #ifdef HAVE_SYS_TIME_H
@@ -63,6 +64,7 @@
 #include <mono/utils/atomic.h>
 #include <mono/utils/mono-memory-model.h>
 #include <mono/utils/mono-threads.h>
+#include <mono/utils/file.h>
 #ifdef HOST_WIN32
 #include <direct.h>
 #endif
@@ -1503,11 +1505,11 @@ shadow_copy_create_ini (const char *shadow, const char *filename)
 {
 	char *dir_name;
 	char *ini_file;
-	guint16 *u16_ini;
 	gboolean result;
-	guint32 n;
-	HANDLE *handle;
+	gint fd;
 	gchar *full_path;
+	gint32 full_path_len;
+	gint32 written;
 
 	dir_name = g_path_get_dirname (shadow);
 	ini_file = g_build_filename (dir_name, "__AssemblyInfo__.ini", NULL);
@@ -1517,22 +1519,33 @@ shadow_copy_create_ini (const char *shadow, const char *filename)
 		return TRUE;
 	}
 
-	u16_ini = g_utf8_to_utf16 (ini_file, strlen (ini_file), NULL, NULL, NULL);
+	fd = mono_file_open (ini_file, MONO_O_WRONLY | MONO_O_CREAT | MONO_O_EXCL, NULL);
 	g_free (ini_file);
-	if (!u16_ini) {
+	if (fd == -1)
 		return FALSE;
-	}
-	handle = CreateFile (u16_ini, GENERIC_WRITE, FILE_SHARE_READ|FILE_SHARE_WRITE,
-				NULL, CREATE_NEW, FileAttributes_Normal, NULL);
-	g_free (u16_ini);
-	if (handle == INVALID_HANDLE_VALUE) {
-		return FALSE;
-	}
 
 	full_path = mono_path_resolve_symlinks (filename);
-	result = WriteFile (handle, full_path, strlen (full_path), &n, NULL);
+	full_path_len = strlen (full_path);
+
+	written = 0;
+	while (1) {
+		int w = mono_file_write (fd, full_path + written, full_path_len - written, NULL);
+		if (w == -1) {
+			result = FALSE;
+			break;
+		}
+		written += w;
+		if (full_path_len - written == 0) {
+			result = TRUE;
+			break;
+		}
+	}
+
 	g_free (full_path);
-	CloseHandle (handle);
+
+	mono_file_flush (fd, NULL);
+	mono_file_close (fd, NULL);
+
 	return result;
 }
 
