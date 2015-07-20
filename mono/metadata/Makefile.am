@@ -1,6 +1,7 @@
 if HOST_WIN32
 win32_sources = \
-	console-win32.c
+	console-win32.c \
+	file-io-win32.c
 
 platform_sources = $(win32_sources)
 
@@ -23,7 +24,8 @@ else
 assembliesdir = $(exec_prefix)/lib
 confdir = $(sysconfdir)
 unix_sources = \
-	console-unix.c
+	console-unix.c \
+	file-io-unix.c
 
 platform_sources = $(unix_sources)
 endif
@@ -126,7 +128,6 @@ common_sources = \
 	environment.h		\
 	exception.c		\
 	exception.h		\
-	file-io.c		\
 	file-io.h		\
 	filewatcher.c		\
 	filewatcher.h		\
