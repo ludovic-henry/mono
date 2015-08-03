@@ -224,8 +224,13 @@ public class AsyncResult : IAsyncResult, IMessageSink, IThreadPoolWorkItem {
 					((ManualResetEvent) handle).Set ();
 			}
 
-			if (async_call.callback != null)
-				async_call.callback (this);
+			if (async_call.callback != null) {
+				try {
+					async_call.callback (this);
+				} catch (Exception) {
+					/* We swallow the exception as it is the behavior on .NET */
+				}
+			}
 		}
 	}
 
