@@ -696,6 +696,21 @@ interrupt_syscall (gpointer data)
 	mono_thread_info_suspend_unlock ();
 }
 
+static void
+interruptable_syscall (void (*syscall) (gpointer user_data), gpointer user_data, gboolean *interrupted)
+{
+	g_assert (interrupted);
+	*interrupted = FALSE;
+
+	mono_thread_info_install_interrupt (interrupt_syscall, mono_thread_info_current (), interrupted);
+	if (*interrupted)
+		return;
+
+	syscall (user_data);
+
+	mono_thread_info_uninstall_interrupt (interrupted);
+}
+
 gpointer ves_icall_System_Net_Sockets_Socket_Socket_internal(MonoObject *this_obj, gint32 family, gint32 type, gint32 proto, gint32 *error)
 {
 	SOCKET sock;
@@ -795,19 +810,20 @@ void ves_icall_System_Net_Sockets_Socket_Blocking_internal(SOCKET sock,
 	}
 }
 
-gpointer
-ves_icall_System_Net_Sockets_Socket_Accept_internal (SOCKET sock, gint32 *error, gboolean blocking)
-{
-	gboolean interrupted;
+typedef struct {
+	/* IN */
+	SOCKET sock;
+	/* OUT */
 	SOCKET newsock;
+} InterruptableAcceptData;
 
-	*error = 0;
+static void
+interruptable_accept (gpointer user_data)
+{
+	InterruptableAcceptData *data;
 
-	mono_thread_info_install_interrupt (interrupt_syscall, mono_thread_info_current (), &interrupted);
-	if (interrupted) {
-		*error = WSAEINTR;
-		return NULL;
-	}
+	g_assert (user_data);
+	data = user_data;
 
 	MONO_PREPARE_BLOCKING;
 
@@ -815,27 +831,38 @@ ves_icall_System_Net_Sockets_Socket_Accept_internal (SOCKET sock, gint32 *error,
 	{
 		MonoInternalThread *thread = mono_thread_internal_current ();
 		thread->interrupt_on_stop = (gpointer)TRUE;
-		newsock = _wapi_accept (sock, NULL, 0);
+		data->newsock = _wapi_accept (data->sock, NULL, 0);
 		thread->interrupt_on_stop = (gpointer)FALSE;
 	}
 #else
-	newsock = _wapi_accept (sock, NULL, 0);
+	data->newsock = _wapi_accept (data->sock, NULL, 0);
 #endif
 
 	MONO_FINISH_BLOCKING;
+}
 
-	mono_thread_info_uninstall_interrupt (&interrupted);
+gpointer
+ves_icall_System_Net_Sockets_Socket_Accept_internal (SOCKET sock, gint32 *error, gboolean blocking)
+{
+	SOCKET newsock;
+	InterruptableAcceptData data;
+	gboolean interrupted;
+
+	data.sock = sock;
+	interruptable_syscall (interruptable_accept, &data, &interrupted);
+	newsock = data.newsock;
+
 	if (interrupted) {
 		*error = WSAEINTR;
 		return NULL;
 	}
 
-	if(newsock==INVALID_SOCKET) {
+	if (newsock == INVALID_SOCKET) {
 		*error = WSAGetLastError ();
-		return(NULL);
+		return NULL;
 	}
 
-	return(GUINT_TO_POINTER (newsock));
+	return GUINT_TO_POINTER (newsock);
 }
 
 void
@@ -1230,17 +1257,43 @@ enum {
 	SelectModeError
 };
 
+typedef struct {
+	/* IN */
+	mono_pollfd *pfds;
+	gint timeout;
+	/* OUT */
+	gint ret;
+} InterruptablePollData;
+
+static void
+interruptable_poll (gpointer user_data)
+{
+	InterruptablePollData *data;
+
+	g_assert (user_data);
+	data = user_data;
+
+	MONO_PREPARE_BLOCKING;
+
+	data->ret = mono_poll (data->pfds, 1, data->timeout);
+
+	MONO_FINISH_BLOCKING;
+}
+
 MonoBoolean
 ves_icall_System_Net_Sockets_Socket_Poll_internal (SOCKET sock, gint mode,
 						   gint timeout, gint32 *error)
 {
-	MonoInternalThread *thread = mono_thread_internal_current ();
+	MonoInternalThread *thread;
 	mono_pollfd *pfds;
 	gint ret;
-	gboolean interrupted;
 	time_t start;
+	InterruptablePollData data;
+	gboolean interrupted;
 
 	*error = 0;
+
+	thread = mono_thread_internal_current ();
 
 	pfds = g_new0 (mono_pollfd, 1);
 	pfds->fd = GPOINTER_TO_INT (sock);
@@ -1255,20 +1308,11 @@ ves_icall_System_Net_Sockets_Socket_Poll_internal (SOCKET sock, gint mode,
 	start = time (NULL);
 
 	do {
-		mono_thread_info_install_interrupt (interrupt_syscall, mono_thread_info_current (), &interrupted);
-		if (interrupted) {
-			g_free (pfds);
-			*error = WSAEINTR;
-			return FALSE;
-		}
+		data.pfds = pfds;
+		data.timeout = timeout;
+		interruptable_syscall (interruptable_poll, &data, &interrupted);
+		ret = data.ret;
 
-		MONO_PREPARE_BLOCKING;
-
-		ret = mono_poll (pfds, 1, timeout);
-
-		MONO_FINISH_BLOCKING;
-
-		mono_thread_info_uninstall_interrupt (&interrupted);
 		if (interrupted) {
 			g_free (pfds);
 			*error = WSAEINTR;
@@ -1314,15 +1358,41 @@ ves_icall_System_Net_Sockets_Socket_Poll_internal (SOCKET sock, gint mode,
 	return ret > 0;
 }
 
+typedef struct {
+	/* IN */
+	SOCKET sock;
+	struct sockaddr *sa;
+	socklen_t sa_size;
+	/* OUT */
+	gint ret;
+} InterruptableConnectData;
+
+static void
+interruptable_connect (gpointer user_data)
+{
+	InterruptableConnectData *data;
+
+	g_assert (user_data);
+	data = user_data;
+
+	MONO_PREPARE_BLOCKING
+
+	data->ret = _wapi_connect (data->sock, data->sa, data->sa_size);
+
+	MONO_FINISH_BLOCKING
+}
+
 void
 ves_icall_System_Net_Sockets_Socket_Connect_internal (SOCKET sock, MonoObject *sockaddr, gint32 *error)
 {
 	struct sockaddr *sa;
 	socklen_t sa_size;
 	gint ret;
+	InterruptableConnectData data;
 	gboolean interrupted;
 
 	*error = 0;
+
 
 	sa = create_sockaddr_from_object(sockaddr, &sa_size, error);
 	if (*error != 0)
@@ -1330,28 +1400,18 @@ ves_icall_System_Net_Sockets_Socket_Connect_internal (SOCKET sock, MonoObject *s
 
 	LOGDEBUG (g_message("%s: connecting to %s port %d", __func__, inet_ntoa(((struct sockaddr_in *)sa)->sin_addr), ntohs (((struct sockaddr_in *)sa)->sin_port)));
 
-	mono_thread_info_install_interrupt (interrupt_syscall, mono_thread_info_current (), &interrupted);
-	if (interrupted) {
+	data.sock = sock;
+	data.sa = sa;
+	data.sa_size = sa_size;
+	interruptable_syscall (interruptable_connect, &data, &interrupted);
+	ret = data.ret;
+
+	if (interrupted)
 		*error = WSAEINTR;
-		return;
-	}
-
-	MONO_PREPARE_BLOCKING;
-
-	ret = _wapi_connect (sock, sa, sa_size);
-
-	MONO_FINISH_BLOCKING;
-
-	mono_thread_info_uninstall_interrupt (&interrupted);
-	if (interrupted) {
-		*error = WSAEINTR;
-		return;
-	}
-
-	if (ret == SOCKET_ERROR)
+	else if (ret == SOCKET_ERROR)
 		*error = WSAGetLastError ();
 
-	g_free(sa);
+	g_free (sa);
 }
 
 /* These #defines from mswsock.h from wine.  Defining them here allows
@@ -1368,6 +1428,36 @@ typedef BOOL (WINAPI *LPFN_DISCONNECTEX)(SOCKET, LPOVERLAPPED, DWORD, DWORD);
 typedef BOOL (WINAPI *LPFN_TRANSMITFILE)(SOCKET, HANDLE, DWORD, DWORD, LPOVERLAPPED, LPTRANSMIT_FILE_BUFFERS, DWORD);
 #endif
 
+typedef struct {
+	/* IN */
+	SOCKET sock;
+	LPFN_DISCONNECTEX _wapi_disconnectex;
+	LPFN_TRANSMITFILE _wapi_transmitfile;
+	/* OUT */
+	gint ret;
+} InterruptableDisconnectData;
+
+static void
+interruptable_disconnect (gpointer user_data)
+{
+	InterruptableDisconnectData *data;
+
+	g_assert (user_data);
+	data = user_data;
+
+	MONO_PREPARE_BLOCKING
+
+	if (data->_wapi_disconnectex != NULL) {
+		data->ret = data->_wapi_disconnectex (data->sock, NULL, TF_REUSE_SOCKET, 0);
+	} else if (data->_wapi_transmitfile != NULL) {
+		data->ret = data->_wapi_transmitfile (data->sock, NULL, 0, 0, NULL, NULL, TF_DISCONNECT | TF_REUSE_SOCKET);
+	} else {
+		g_assert_not_reached ();
+	}
+
+	MONO_FINISH_BLOCKING
+}
+
 void
 ves_icall_System_Net_Sockets_Socket_Disconnect_internal (SOCKET sock, MonoBoolean reuse, gint32 *error)
 {
@@ -1377,6 +1467,7 @@ ves_icall_System_Net_Sockets_Socket_Disconnect_internal (SOCKET sock, MonoBoolea
 	GUID trans_guid = WSAID_TRANSMITFILE;
 	LPFN_DISCONNECTEX _wapi_disconnectex = NULL;
 	LPFN_TRANSMITFILE _wapi_transmitfile = NULL;
+	InterruptableDisconnectData data;
 	gboolean interrupted;
 
 	*error = 0;
@@ -1420,29 +1511,55 @@ ves_icall_System_Net_Sockets_Socket_Disconnect_internal (SOCKET sock, MonoBoolea
 			_wapi_transmitfile = NULL;
 	}
 
-	mono_thread_info_install_interrupt (interrupt_syscall, mono_thread_info_current (), &interrupted);
-	if (interrupted) {
-		*error = WSAEINTR;
+	if (!_wapi_transmitfile && !_wapi_disconnectex) {
+		*error = ERROR_NOT_SUPPORTED;
 		return;
 	}
 
-	MONO_PREPARE_BLOCKING;
+	data.sock = sock;
+	data._wapi_disconnectex = _wapi_disconnectex;
+	data._wapi_transmitfile = _wapi_transmitfile;
+	interruptable_syscall (interruptable_disconnect, &data, &interrupted);
+	ret = data.ret;
 
-	if (_wapi_disconnectex != NULL) {
-		if (!_wapi_disconnectex (sock, NULL, TF_REUSE_SOCKET, 0))
-			*error = WSAGetLastError ();
-	} else if (_wapi_transmitfile != NULL) {
-		if (!_wapi_transmitfile (sock, NULL, 0, 0, NULL, NULL, TF_DISCONNECT | TF_REUSE_SOCKET))
-			*error = WSAGetLastError ();
-	} else {
-		*error = ERROR_NOT_SUPPORTED;
-	}
-
-	MONO_FINISH_BLOCKING;
-
-	mono_thread_info_uninstall_interrupt (&interrupted);
 	if (interrupted)
 		*error = WSAEINTR;
+	else if (ret != 0)
+		*error = WSAGetLastError ();
+}
+
+typedef struct {
+	/* IN */
+	SOCKET sock;
+	guchar *buf;
+	gint32 count;
+	gint recvflags;
+	/* OUT */
+	gint ret;
+} InterruptableReceiveData;
+
+static void
+interruptable_receive (gpointer user_data)
+{
+	InterruptableReceiveData *data;
+
+	g_assert (user_data);
+	data = user_data;
+
+	MONO_PREPARE_BLOCKING;
+
+#ifdef HOST_WIN32
+	{
+		MonoInternalThread *thread = mono_thread_internal_current ();
+		thread->interrupt_on_stop = (gpointer) TRUE;
+		data->ret = _wapi_recv (data->sock, data->buf, data->count, data->recvflags);
+		thread->interrupt_on_stop = (gpointer) FALSE;
+	}
+#else
+	data->ret = _wapi_recv (data->sock, data->buf, data->count, data->recvflags);
+#endif
+
+	MONO_FINISH_BLOCKING;
 }
 
 gint32
@@ -1452,8 +1569,8 @@ ves_icall_System_Net_Sockets_Socket_Receive_internal (SOCKET sock, MonoArray *bu
 	guchar *buf;
 	gint32 alen;
 	gint recvflags=0;
+	InterruptableReceiveData data;
 	gboolean interrupted;
-	MonoInternalThread* curthread G_GNUC_UNUSED = mono_thread_internal_current ();
 	
 	*error = 0;
 	
@@ -1470,25 +1587,13 @@ ves_icall_System_Net_Sockets_Socket_Receive_internal (SOCKET sock, MonoArray *bu
 		return (0);
 	}
 
-	mono_thread_info_install_interrupt (interrupt_syscall, mono_thread_info_current (), &interrupted);
-	if (interrupted)
-		return 0;
+	data.sock = sock;
+	data.buf = buf;
+	data.count = count;
+	data.recvflags = recvflags;
+	interruptable_syscall (interruptable_receive, &data, &interrupted);
+	ret = data.ret;
 
-	MONO_PREPARE_BLOCKING;
-
-#ifdef HOST_WIN32
-	{
-		curthread->interrupt_on_stop = (gpointer)TRUE;
-		ret = _wapi_recv (sock, buf, count, recvflags);
-		curthread->interrupt_on_stop = (gpointer)FALSE;
-	}
-#else
-	ret = _wapi_recv (sock, buf, count, recvflags);
-#endif
-
-	MONO_FINISH_BLOCKING;
-
-	mono_thread_info_uninstall_interrupt (&interrupted);
 	if (interrupted) {
 		*error = WSAEINTR;
 		return 0;
@@ -1502,14 +1607,41 @@ ves_icall_System_Net_Sockets_Socket_Receive_internal (SOCKET sock, MonoArray *bu
 	return(ret);
 }
 
+typedef struct {
+	/* IN */
+	SOCKET sock;
+	WSABUF *wsabufs;
+	gint count;
+	DWORD *recv;
+	DWORD *recvflags;
+	/* OUT */
+	gint ret;
+} InterruptableReceiveArrayData;
+
+static void
+interruptable_receive_array (gpointer user_data)
+{
+	InterruptableReceiveArrayData *data;
+
+	g_assert (user_data);
+	data = user_data;
+
+	MONO_PREPARE_BLOCKING;
+
+	data->ret = WSARecv (data->sock, data->wsabufs, data->count, data->recv, data->recvflags, NULL, NULL);
+
+	MONO_FINISH_BLOCKING;
+}
+
 gint32
 ves_icall_System_Net_Sockets_Socket_Receive_array_internal (SOCKET sock, MonoArray *buffers, gint32 flags, gint32 *error)
 {
 	gint ret, count;
-	gboolean interrupted;
 	DWORD recv;
 	WSABUF *wsabufs;
 	DWORD recvflags = 0;
+	InterruptableReceiveArrayData data;
+	gboolean interrupted;
 
 	*error = 0;
 
@@ -1522,19 +1654,14 @@ ves_icall_System_Net_Sockets_Socket_Receive_array_internal (SOCKET sock, MonoArr
 		return(0);
 	}
 
-	mono_thread_info_install_interrupt (interrupt_syscall, mono_thread_info_current (), &interrupted);
-	if (interrupted) {
-		*error = WSAEINTR;
-		return 0;
-	}
+	data.sock = sock;
+	data.wsabufs = wsabufs;
+	data.count = count;
+	data.recv = &recv;
+	data.recvflags = &recvflags;
+	interruptable_syscall (interruptable_receive_array, &data, &interrupted);
+	ret = data.ret;
 
-	MONO_PREPARE_BLOCKING;
-
-	ret = WSARecv (sock, wsabufs, count, &recv, &recvflags, NULL, NULL);
-
-	MONO_FINISH_BLOCKING;
-
-	mono_thread_info_uninstall_interrupt (&interrupted);
 	if (interrupted) {
 		*error = WSAEINTR;
 		return 0;
@@ -1548,6 +1675,33 @@ ves_icall_System_Net_Sockets_Socket_Receive_array_internal (SOCKET sock, MonoArr
 	return recv;
 }
 
+typedef struct {
+	/* IN */
+	SOCKET sock;
+	guchar *buf;
+	gint32 count;
+	gint recvflags;
+	struct sockaddr *sa;
+	socklen_t *sa_size;
+	/* OUT */
+	gint ret;
+} InterruptableReceiveFromData;
+
+static void
+interruptable_receive_from (gpointer user_data)
+{
+	InterruptableReceiveFromData *data;
+
+	g_assert (user_data);
+	data = user_data;
+
+	MONO_PREPARE_BLOCKING;
+
+	data->ret = _wapi_recvfrom (data->sock, data->buf, data->count, data->recvflags, data->sa, data->sa_size);
+
+	MONO_FINISH_BLOCKING;
+}
+
 gint32
 ves_icall_System_Net_Sockets_Socket_ReceiveFrom_internal (SOCKET sock, MonoArray *buffer, gint32 offset, gint32 count, gint32 flags, MonoObject **sockaddr, gint32 *error)
 {
@@ -1557,6 +1711,7 @@ ves_icall_System_Net_Sockets_Socket_ReceiveFrom_internal (SOCKET sock, MonoArray
 	int recvflags=0;
 	struct sockaddr *sa;
 	socklen_t sa_size;
+	InterruptableReceiveFromData data;
 	gboolean interrupted;
 	
 	*error = 0;
@@ -1579,20 +1734,15 @@ ves_icall_System_Net_Sockets_Socket_ReceiveFrom_internal (SOCKET sock, MonoArray
 		return (0);
 	}
 
-	mono_thread_info_install_interrupt (interrupt_syscall, mono_thread_info_current (), &interrupted);
-	if (interrupted) {
-		g_free(sa);
-		*error = WSAEINTR;
-		return 0;
-	}
+	data.sock = sock;
+	data.buf = buf;
+	data.count = count;
+	data.recvflags = recvflags;
+	data.sa = sa;
+	data.sa_size = &sa_size;
+	interruptable_syscall (interruptable_receive_from, &data, &interrupted);
+	ret = data.ret;
 
-	MONO_PREPARE_BLOCKING;
-
-	ret = _wapi_recvfrom (sock, buf, count, recvflags, sa, &sa_size);
-
-	MONO_FINISH_BLOCKING;
-
-	mono_thread_info_uninstall_interrupt (&interrupted);
 	if (interrupted) {
 		g_free(sa);
 		*error = WSAEINTR;
@@ -1619,6 +1769,31 @@ ves_icall_System_Net_Sockets_Socket_ReceiveFrom_internal (SOCKET sock, MonoArray
 	return(ret);
 }
 
+typedef struct {
+	/* IN */
+	SOCKET sock;
+	guchar *buf;
+	gint32 count;
+	gint sendflags;
+	/* OUT */
+	gint ret;
+} InterruptableSendData;
+
+static void
+interruptable_send (gpointer user_data)
+{
+	InterruptableSendData *data;
+
+	g_assert (user_data);
+	data = user_data;
+
+	MONO_PREPARE_BLOCKING;
+
+	data->ret = _wapi_send (data->sock, data->buf, data->count, data->sendflags);
+
+	MONO_FINISH_BLOCKING;
+}
+
 gint32
 ves_icall_System_Net_Sockets_Socket_Send_internal (SOCKET sock, MonoArray *buffer, gint32 offset, gint32 count, gint32 flags, gint32 *error)
 {
@@ -1626,6 +1801,7 @@ ves_icall_System_Net_Sockets_Socket_Send_internal (SOCKET sock, MonoArray *buffe
 	guchar *buf;
 	gint32 alen;
 	int sendflags=0;
+	InterruptableSendData data;
 	gboolean interrupted;
 	
 	*error = 0;
@@ -1647,19 +1823,13 @@ ves_icall_System_Net_Sockets_Socket_Send_internal (SOCKET sock, MonoArray *buffe
 		return (0);
 	}
 
-	mono_thread_info_install_interrupt (interrupt_syscall, mono_thread_info_current (), &interrupted);
-	if (interrupted) {
-		*error = WSAEINTR;
-		return 0;
-	}
+	data.sock = sock;
+	data.buf = buf;
+	data.count = count;
+	data.sendflags = sendflags;
+	interruptable_syscall (interruptable_send, &data, &interrupted);
+	ret = data.ret;
 
-	MONO_PREPARE_BLOCKING;
-
-	ret = _wapi_send (sock, buf, count, sendflags);
-
-	MONO_FINISH_BLOCKING;
-
-	mono_thread_info_uninstall_interrupt (&interrupted);
 	if (interrupted) {
 		*error = WSAEINTR;
 		return 0;
@@ -1673,6 +1843,32 @@ ves_icall_System_Net_Sockets_Socket_Send_internal (SOCKET sock, MonoArray *buffe
 	return(ret);
 }
 
+typedef struct {
+	/* IN */
+	SOCKET sock;
+	WSABUF *wsabufs;
+	gint count;
+	DWORD *sent;
+	DWORD sendflags;
+	/* OUT */
+	gint ret;
+} InterruptableSendArrayData;
+
+static void
+interruptable_send_array (gpointer user_data)
+{
+	InterruptableSendArrayData *data;
+
+	g_assert (user_data);
+	data = user_data;
+
+	MONO_PREPARE_BLOCKING;
+
+	data->ret = WSASend (data->sock, data->wsabufs, data->count, data->sent, data->sendflags, NULL, NULL);
+
+	MONO_FINISH_BLOCKING;
+}
+
 gint32
 ves_icall_System_Net_Sockets_Socket_Send_array_internal(SOCKET sock, MonoArray *buffers, gint32 flags, gint32 *error)
 {
@@ -1680,6 +1876,7 @@ ves_icall_System_Net_Sockets_Socket_Send_array_internal(SOCKET sock, MonoArray *
 	DWORD sent;
 	WSABUF *wsabufs;
 	DWORD sendflags = 0;
+	InterruptableSendArrayData data;
 	gboolean interrupted;
 	
 	*error = 0;
@@ -1693,19 +1890,14 @@ ves_icall_System_Net_Sockets_Socket_Send_array_internal(SOCKET sock, MonoArray *
 		return(0);
 	}
 
-	mono_thread_info_install_interrupt (interrupt_syscall, mono_thread_info_current (), &interrupted);
-	if (interrupted) {
-		*error = WSAEINTR;
-		return 0;
-	}
+	data.sock = sock;
+	data.wsabufs = wsabufs;
+	data.count = count;
+	data.sent = &sent;
+	data.sendflags = sendflags;
+	interruptable_syscall (interruptable_send_array, &data, &interrupted);
+	ret = data.ret;
 
-	MONO_PREPARE_BLOCKING;
-
-	ret = WSASend (sock, wsabufs, count, &sent, sendflags, NULL, NULL);
-
-	MONO_FINISH_BLOCKING;
-
-	mono_thread_info_uninstall_interrupt (&interrupted);
 	if (interrupted) {
 		*error = WSAEINTR;
 		return 0;
@@ -1719,6 +1911,33 @@ ves_icall_System_Net_Sockets_Socket_Send_array_internal(SOCKET sock, MonoArray *
 	return(sent);
 }
 
+typedef struct {
+	/* IN */
+	SOCKET sock;
+	guchar *buf;
+	gint32 count;
+	gint sendflags;
+	struct sockaddr *sa;
+	socklen_t sa_size;
+	/* OUT */
+	gint ret;
+} InterruptableSendToData;
+
+static void
+interruptable_send_to (gpointer user_data)
+{
+	InterruptableSendToData *data;
+
+	g_assert (user_data);
+	data = user_data;
+
+	MONO_PREPARE_BLOCKING;
+
+	data->ret = _wapi_sendto (data->sock, data->buf, data->count, data->sendflags, data->sa, data->sa_size);
+
+	MONO_FINISH_BLOCKING;
+}
+
 gint32
 ves_icall_System_Net_Sockets_Socket_SendTo_internal(SOCKET sock, MonoArray *buffer, gint32 offset, gint32 count, gint32 flags, MonoObject *sockaddr, gint32 *error)
 {
@@ -1728,6 +1947,7 @@ ves_icall_System_Net_Sockets_Socket_SendTo_internal(SOCKET sock, MonoArray *buff
 	int sendflags=0;
 	struct sockaddr *sa;
 	socklen_t sa_size;
+	InterruptableSendToData data;
 	gboolean interrupted;
 	
 	*error = 0;
@@ -1755,22 +1975,18 @@ ves_icall_System_Net_Sockets_Socket_SendTo_internal(SOCKET sock, MonoArray *buff
 		return (0);
 	}
 
-	mono_thread_info_install_interrupt (interrupt_syscall, mono_thread_info_current (), &interrupted);
+	data.sock = sock;
+	data.buf = buf;
+	data.count = count;
+	data.sendflags = sendflags;
+	data.sa = sa;
+	data.sa_size = sa_size;
+	interruptable_syscall (interruptable_send_to, &data, &interrupted);
+	ret = data.ret;
+
+	g_free (sa);
+
 	if (interrupted) {
-		g_free (sa);
-		*error = WSAEINTR;
-		return 0;
-	}
-
-	MONO_PREPARE_BLOCKING;
-
-	ret = _wapi_sendto (sock, buf, count, sendflags, sa, sa_size);
-
-	MONO_FINISH_BLOCKING;
-
-	mono_thread_info_uninstall_interrupt (&interrupted);
-	if (interrupted) {
-		g_free (sa);
 		*error = WSAEINTR;
 		return 0;
 	}
@@ -1779,8 +1995,6 @@ ves_icall_System_Net_Sockets_Socket_SendTo_internal(SOCKET sock, MonoArray *buff
 		*error = WSAGetLastError ();
 	}
 
-	g_free(sa);
-	
 	return(ret);
 }
 
@@ -2404,34 +2618,46 @@ ves_icall_System_Net_Sockets_Socket_SetSocketOption_internal (SOCKET sock, gint3
 	}
 }
 
+typedef struct {
+	/* IN */
+	SOCKET sock;
+	gint32 how;
+	/* OUT */
+	gint ret;
+} InterruptableShutdownData;
+
+static void
+interruptable_shutdown (gpointer user_data)
+{
+	InterruptableShutdownData *data;
+
+	g_assert (user_data);
+	data = user_data;
+
+	MONO_PREPARE_BLOCKING;
+
+	data->ret = _wapi_shutdown (data->sock, data->how);
+
+	MONO_FINISH_BLOCKING;
+}
+
 void
 ves_icall_System_Net_Sockets_Socket_Shutdown_internal(SOCKET sock, gint32 how, gint32 *error)
 {
 	gint ret;
+	InterruptableShutdownData data;
 	gboolean interrupted;
 
 	*error = 0;
 
-	mono_thread_info_install_interrupt (interrupt_syscall, mono_thread_info_current (), &interrupted);
-	if (interrupted) {
+	data.sock = sock;
+	data.how = how;
+	interruptable_syscall (interruptable_shutdown, &data, &interrupted);
+	ret = data.ret;
+
+	if (interrupted)
 		*error = WSAEINTR;
-		return;
-	}
-
-	MONO_PREPARE_BLOCKING;
-
-	/* Currently, the values for how (recv=0, send=1, both=2) match the BSD API */
-	ret = _wapi_shutdown (sock, how);
-
-	MONO_FINISH_BLOCKING;
-
-	mono_thread_info_uninstall_interrupt (&interrupted);
-	if (interrupted) {
-		*error = WSAEINTR;
-		return;
-	}
-
-	if (ret == SOCKET_ERROR)
+	else if (ret == SOCKET_ERROR)
 		*error = WSAGetLastError ();
 }
 
@@ -2711,14 +2937,40 @@ ves_icall_System_Net_Dns_GetHostName_internal (MonoString **h_name)
 	return TRUE;
 }
 
+typedef struct {
+	/* IN */
+	SOCKET sock;
+	HANDLE file;
+	TRANSMIT_FILE_BUFFERS *buffers;
+	gint flags;
+	/* OUT */
+	gint ret;
+} InterruptableSendFileData;
+
+static void
+interruptable_sendfile (gpointer user_data)
+{
+	InterruptableSendFileData *data;
+
+	g_assert (user_data);
+	data = user_data;
+
+	MONO_PREPARE_BLOCKING;
+
+	data->ret = TransmitFile (data->sock, data->file, 0, 0, NULL, data->buffers, data->flags);
+
+	MONO_FINISH_BLOCKING;
+}
+
 gboolean
 ves_icall_System_Net_Sockets_Socket_SendFile_internal (SOCKET sock, MonoString *filename, MonoArray *pre_buffer, MonoArray *post_buffer, gint flags)
 {
 	HANDLE file;
 	gint32 error;
 	gboolean ret;
-	gboolean interrupted;
 	TRANSMIT_FILE_BUFFERS buffers;
+	InterruptableSendFileData data;
+	gboolean interrupted;
 
 	if (filename == NULL)
 		return FALSE;
@@ -2746,20 +2998,13 @@ ves_icall_System_Net_Sockets_Socket_SendFile_internal (SOCKET sock, MonoString *
 		buffers.TailLength = mono_array_length (post_buffer);
 	}
 
-	mono_thread_info_install_interrupt (interrupt_syscall, mono_thread_info_current (), &interrupted);
-	if (interrupted) {
-		CloseHandle (file);
-		SetLastError (WSAEINTR);
-		return FALSE;
-	}
+	data.sock = sock;
+	data.file = file;
+	data.buffers = &buffers;
+	data.flags = flags;
+	interruptable_syscall (interruptable_sendfile, &data, &interrupted);
+	ret = data.ret;
 
-	MONO_PREPARE_BLOCKING;
-
-	ret = TransmitFile (sock, file, 0, 0, NULL, &buffers, flags);
-
-	MONO_FINISH_BLOCKING;
-
-	mono_thread_info_uninstall_interrupt (&interrupted);
 	if (interrupted) {
 		CloseHandle (file);
 		SetLastError (WSAEINTR);
