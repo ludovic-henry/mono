@@ -1358,28 +1358,33 @@ namespace System.Diagnostics {
 			Stream stream;
 			StringBuilder sb = new StringBuilder ();
 
-			public AsyncReadHandler ReadHandler;
-
 			public ProcessAsyncReader (Process process, IntPtr handle, bool err_out)
 			{
+				this.process = process;
+				this.stream = new FileStream (this.handle, FileAccess.Read, false);
+				this.err_out = err_out;
+
 				this.handle = handle;
 				this.operation = IOOperation.In;
 
-				this.process = process;
-				this.stream = new FileStream (this.handle, FileAccess.Read, false);
-				this.ReadHandler = new AsyncReadHandler (AddInput);
-				this.err_out = err_out;
+				IOSelector.Add (this.handle, state => ((ProcessAsyncReader) state).ReadInput (), this);
 			}
 
-			public void AddInput ()
+			void ReadInput ()
 			{
 				lock (this) {
 					int nread = stream.Read (buffer, 0, buffer.Length);
 					if (nread == 0) {
-						completed = true;
-						if (wait_handle != null)
-							wait_handle.Set ();
-						FlushLast ();
+						IsCompleted = true;
+
+						IOSelector.Remove (this.handle);
+
+						Flush (true);
+						if (err_out)
+							process.OnOutputDataReceived (null);
+						else
+							process.OnErrorDataReceived (null);
+
 						return;
 					}
 
@@ -1393,17 +1398,8 @@ namespace System.Diagnostics {
 					}
 
 					Flush (false);
-					ReadHandler.BeginInvoke (null, this);
-				}
-			}
 
-			void FlushLast ()
-			{
-				Flush (true);
-				if (err_out) {
-					process.OnOutputDataReceived (null);
-				} else {
-					process.OnErrorDataReceived (null);
+					IOSelector.Add (this.handle, state => ((ProcessAsyncReader) state).ReadInput (), this);
 				}
 			}
 			
@@ -1441,16 +1437,7 @@ namespace System.Diagnostics {
 			}
 
 			public void Close () {
-				RemoveFromIOThreadPool (handle);
 				stream.Close ();
-			}
-
-			[MethodImplAttribute(MethodImplOptions.InternalCall)]
-			extern static void RemoveFromIOThreadPool (IntPtr handle);
-
-			protected override void Invoke ()
-			{
-				async_result.Invoke ();
 			}
 		}
 
@@ -1459,7 +1446,6 @@ namespace System.Diagnostics {
 		bool error_canceled;
 		ProcessAsyncReader async_output;
 		ProcessAsyncReader async_error;
-		delegate void AsyncReadHandler ();
 
 		[ComVisibleAttribute(false)] 
 		public void BeginOutputReadLine ()
@@ -1474,7 +1460,6 @@ namespace System.Diagnostics {
 			output_canceled = false;
 			if (async_output == null) {
 				async_output = new ProcessAsyncReader (this, stdout_rd, true);
-				async_output.ReadHandler.BeginInvoke (null, async_output);
 			}
 		}
 
@@ -1506,7 +1491,6 @@ namespace System.Diagnostics {
 			error_canceled = false;
 			if (async_error == null) {
 				async_error = new ProcessAsyncReader (this, stderr_rd, false);
-				async_error.ReadHandler.BeginInvoke (null, async_error);
 			}
 		}
 

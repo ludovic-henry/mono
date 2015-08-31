@@ -709,16 +709,8 @@ gpointer ves_icall_System_Net_Sockets_Socket_Socket_internal(MonoObject *this_ob
 /* FIXME: the SOCKET parameter (here and in other functions in this
  * file) is really an IntPtr which needs to be converted to a guint32.
  */
-void ves_icall_System_Net_Sockets_Socket_Close_internal(SOCKET sock,
-							gint32 *error)
+void ves_icall_System_Net_Sockets_Socket_closesocket (SOCKET sock)
 {
-	LOGDEBUG (g_message ("%s: closing 0x%x", __func__, sock));
-
-	*error = 0;
-
-	/* Clear any pending work item from this socket if the underlying
-	 * polling system does not notify when the socket is closed */
-	mono_threadpool_ms_io_remove_socket (GPOINTER_TO_INT (sock));
 	closesocket(sock);
 }
 

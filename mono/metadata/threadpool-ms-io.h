@@ -9,19 +9,14 @@
 
 typedef struct _MonoIOAsyncResult MonoIOAsyncResult;
 
-gboolean
-mono_threadpool_ms_is_io (MonoObject *target, MonoObject *state);
-
-MonoAsyncResult *
-mono_threadpool_ms_io_add (MonoAsyncResult *ares, MonoIOAsyncResult *sockares);
-void
-mono_threadpool_ms_io_remove_socket (int fd);
 void
 mono_threadpool_ms_io_remove_domain_jobs (MonoDomain *domain);
 void
 mono_threadpool_ms_io_cleanup (void);
 
 void
-icall_append_io_job (MonoObject *target, MonoIOAsyncResult *state);
+ves_icall_System_Threading_IOSelector_Add (gpointer handle, MonoDelegate *cb, MonoIOAsyncResult *state);
+void
+ves_icall_System_Threading_IOSelector_Remove (gpointer handle);
 
 #endif /* _MONO_THREADPOOL_MS_IO_H_ */

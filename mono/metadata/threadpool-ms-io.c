@@ -273,12 +273,12 @@ wait_callback (gint fd, gint events, gpointer user_data)
 		if (list && (events & EVENT_IN) != 0) {
 			MonoIOAsyncResult *ioares = get_ioares_for_operation (&list, EVENT_IN);
 			if (ioares)
-				mono_threadpool_ms_enqueue_work_item (((MonoObject*) ioares)->vtable->domain, (MonoObject*) ioares);
+				mono_threadpool_ms_enqueue_work_item (((MonoObject*) ioares->async_result)->vtable->domain, (MonoObject*) ioares->async_result);
 		}
 		if (list && (events & EVENT_OUT) != 0) {
 			MonoIOAsyncResult *ioares = get_ioares_for_operation (&list, EVENT_OUT);
 			if (ioares)
-				mono_threadpool_ms_enqueue_work_item (((MonoObject*) ioares)->vtable->domain, (MonoObject*) ioares);
+				mono_threadpool_ms_enqueue_work_item (((MonoObject*) ioares->async_result)->vtable->domain, (MonoObject*) ioares->async_result);
 		}
 
 		mono_g_hash_table_replace (states, GINT_TO_POINTER (fd), list);
@@ -569,74 +569,10 @@ cleanup (void)
 	g_assert (!threadpool_io);
 }
 
-gboolean
-mono_threadpool_ms_is_io (MonoObject *target, MonoObject *state)
-{
-	static MonoClass *io_async_result_class = NULL;
-
-	if (!io_async_result_class)
-		io_async_result_class = mono_class_from_name (mono_defaults.corlib, "System.Threading", "IOAsyncResult");
-	g_assert (io_async_result_class);
-
-	return mono_class_has_parent (target->vtable->klass, io_async_result_class);
-}
-
 void
 mono_threadpool_ms_io_cleanup (void)
 {
 	mono_lazy_cleanup (&io_status, cleanup);
-}
-
-MonoAsyncResult *
-mono_threadpool_ms_io_add (MonoAsyncResult *ares, MonoIOAsyncResult *ioares)
-{
-	ThreadPoolIOUpdate *update;
-
-	g_assert (ares);
-	g_assert (ioares);
-
-	if (mono_runtime_is_shutting_down ())
-		return NULL;
-	if (mono_domain_is_unloading (mono_object_domain (ioares)))
-		return NULL;
-
-	mono_lazy_initialize (&io_status, initialize);
-
-	MONO_OBJECT_SETREF (ioares, async_result, ares);
-
-	mono_mutex_lock (&threadpool_io->updates_lock);
-
-	update = update_get_new ();
-	update->type = UPDATE_ADD;
-	update->data.add.fd = GPOINTER_TO_INT (ioares->handle);
-	update->data.add.ioares = ioares;
-
-	selector_thread_wakeup ();
-
-	mono_mutex_unlock (&threadpool_io->updates_lock);
-
-	return ares;
-}
-
-void
-mono_threadpool_ms_io_remove_socket (int fd)
-{
-	ThreadPoolIOUpdate *update;
-
-	if (!mono_lazy_is_initialized (&io_status))
-		return;
-
-	mono_mutex_lock (&threadpool_io->updates_lock);
-
-	update = update_get_new ();
-	update->type = UPDATE_REMOVE_SOCKET;
-	update->data.add.fd = fd;
-
-	selector_thread_wakeup ();
-
-	mono_cond_wait (&threadpool_io->updates_cond, &threadpool_io->updates_lock);
-
-	mono_mutex_unlock (&threadpool_io->updates_lock);
 }
 
 void
@@ -661,41 +597,62 @@ mono_threadpool_ms_io_remove_domain_jobs (MonoDomain *domain)
 }
 
 void
-icall_append_io_job (MonoObject *target, MonoIOAsyncResult *state)
+ves_icall_System_Threading_IOSelector_Add (gpointer handle, MonoDelegate *callback, MonoIOAsyncResult *ioares)
 {
 	MonoAsyncResult *ares;
+	ThreadPoolIOUpdate *update;
+
+	if (mono_runtime_is_shutting_down ())
+		return;
+	if (mono_domain_is_unloading (mono_object_domain (ioares)))
+		return;
+
+	mono_lazy_initialize (&io_status, initialize);
 
 	/* Don't call mono_async_result_new() to avoid capturing the context */
 	ares = (MonoAsyncResult *) mono_object_new (mono_domain_get (), mono_defaults.asyncresult_class);
-	MONO_OBJECT_SETREF (ares, async_delegate, target);
-	MONO_OBJECT_SETREF (ares, async_state, state);
+	MONO_OBJECT_SETREF (ares, async_delegate, callback);
+	MONO_OBJECT_SETREF (ares, async_state, ioares);
 
-	mono_threadpool_ms_io_add (ares, state);
-	return;
+	MONO_OBJECT_SETREF (ioares, async_result, ares);
+
+	mono_mutex_lock (&threadpool_io->updates_lock);
+
+	update = update_get_new ();
+	update->type = UPDATE_ADD;
+	update->data.add.fd = GPOINTER_TO_INT (handle);
+	update->data.add.ioares = ioares;
+
+	selector_thread_wakeup ();
+
+	mono_mutex_unlock (&threadpool_io->updates_lock);
+}
+
+void
+ves_icall_System_Threading_IOSelector_Remove (gpointer handle)
+{
+	ThreadPoolIOUpdate *update;
+
+	if (!mono_lazy_is_initialized (&io_status))
+		return;
+
+	mono_mutex_lock (&threadpool_io->updates_lock);
+
+	update = update_get_new ();
+	update->type = UPDATE_REMOVE_SOCKET;
+	update->data.add.fd = GPOINTER_TO_INT (handle);
+
+	selector_thread_wakeup ();
+
+	mono_cond_wait (&threadpool_io->updates_cond, &threadpool_io->updates_lock);
+
+	mono_mutex_unlock (&threadpool_io->updates_lock);
 }
 
 #else
 
-gboolean
-mono_threadpool_ms_is_io (MonoObject *target, MonoObject *state)
-{
-	return FALSE;
-}
-
 void
 mono_threadpool_ms_io_cleanup (void)
-{
-	g_assert_not_reached ();
-}
-
-MonoAsyncResult *
-mono_threadpool_ms_io_add (MonoAsyncResult *ares, MonoIOAsyncResult *ioares)
-{
-	g_assert_not_reached ();
-}
-
-void
-mono_threadpool_ms_io_remove_socket (int fd)
 {
 	g_assert_not_reached ();
 }
@@ -707,7 +664,13 @@ mono_threadpool_ms_io_remove_domain_jobs (MonoDomain *domain)
 }
 
 void
-icall_append_io_job (MonoObject *target, MonoIOAsyncResult *state)
+ves_icall_System_Threading_IOSelector_Add (gpointer handle, MonoDelegate *callback, MonoIOAsyncResult *state)
+{
+	g_assert_not_reached ();
+}
+
+void
+ves_icall_System_Threading_IOSelector_Remove (gpointer handle)
 {
 	g_assert_not_reached ();
 }

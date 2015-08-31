@@ -160,7 +160,7 @@ typedef struct
 } MonoPeerCredData;
 
 extern gpointer ves_icall_System_Net_Sockets_Socket_Socket_internal(MonoObject *this_obj, gint32 family, gint32 type, gint32 proto, gint32 *error);
-extern void ves_icall_System_Net_Sockets_Socket_Close_internal(SOCKET sock, gint32 *error);
+extern void ves_icall_System_Net_Sockets_Socket_closesocket(SOCKET sock);
 extern gint32 ves_icall_System_Net_Sockets_SocketException_WSAGetLastError_internal(void);
 extern gint32 ves_icall_System_Net_Sockets_Socket_Available_internal(SOCKET sock, gint32 *error);
 extern void ves_icall_System_Net_Sockets_Socket_Blocking_internal(SOCKET sock, gboolean block, gint32 *error);

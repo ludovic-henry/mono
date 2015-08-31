@@ -33,6 +33,7 @@
  *  - metadata/threadpool-ms-io.c
  */
 
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Remoting.Messaging;
 
@@ -47,25 +48,32 @@ namespace System.Threading
 		Out       = 1 << 1,
 	}
 
+	internal delegate void IOAsyncCallback (IOAsyncResult ioares);
+
 	[StructLayout (LayoutKind.Sequential)]
-	internal abstract class IOAsyncResult : IAsyncResult, IThreadPoolWorkItem
+	internal abstract class IOAsyncResult : IAsyncResult
 	{
 		/* Same fields in the runtime. Keep this in sync with
 		 * MonoIOAsyncResult in metadata/threadpool-ms-io.c */
 
-		protected object state;
+		protected object async_state;
 		protected ManualResetEvent wait_handle;
 		protected bool completed_synchronously;
 		protected bool completed;
 
 		protected IntPtr handle;
-		protected AsyncResult async_result;
+		AsyncResult async_result;
 		protected AsyncCallback async_callback;
 		protected IOOperation operation;
 
+		public AsyncCallback AsyncCallback
+		{
+			get { return async_callback; }
+		}
+
 		public object AsyncState
 		{
-			get { return state; }
+			get { return async_state; }
 		}
 
 		public WaitHandle AsyncWaitHandle
@@ -97,16 +105,14 @@ namespace System.Threading
 				}
 			}
 		}
+	}
 
-		void IThreadPoolWorkItem.ExecuteWorkItem ()
-		{
-			Invoke ();
-		}
+	internal static class IOSelector
+	{
+		[MethodImplAttribute(MethodImplOptions.InternalCall)]
+		public static extern void Add (IntPtr handle, IOAsyncCallback cb, IOAsyncResult state);
 
-		void IThreadPoolWorkItem.MarkAborted (ThreadAbortException tae)
-		{
-		}
-
-		protected abstract void Invoke ();
+		[MethodImplAttribute(MethodImplOptions.InternalCall)]
+		public static extern void Remove (IntPtr handle);
 	}
 }

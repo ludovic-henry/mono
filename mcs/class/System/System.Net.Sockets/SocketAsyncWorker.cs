@@ -26,6 +26,8 @@
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
+using System.Threading;
+
 namespace System.Net.Sockets
 {
 	internal sealed class SocketAsyncWorker
@@ -97,6 +99,9 @@ namespace System.Net.Sockets
 			default:
 				throw new NotImplementedException (String.Format ("Operation {0} is not implemented", sar.socket_operation));
 			}
+
+			if (sar.IsCompleted && sar.AsyncCallback != null)
+				sar.AsyncCallback (sar);
 		}
 
 		/* This is called when reusing a SocketAsyncEventArgs */
@@ -351,7 +356,7 @@ namespace System.Net.Sockets
 				}
 
 				if (result.Size > 0) {
-					Socket.socket_pool_queue (SocketAsyncWorker.Dispatcher, result);
+					IOSelector.Add (result.socket.Handle, state => SocketAsyncWorker.Dispatcher ((SocketAsyncResult) state), result);
 					return; // Have to finish writing everything. See bug #74475.
 				}
 				result.Total = send_so_far;
@@ -368,7 +373,7 @@ namespace System.Net.Sockets
 
 				UpdateSendValues (total);
 				if (result.Size > 0) {
-					Socket.socket_pool_queue (SocketAsyncWorker.Dispatcher, result);
+					IOSelector.Add (result.socket.Handle, state => SocketAsyncWorker.Dispatcher ((SocketAsyncResult) state), result);
 					return; // Have to finish writing everything. See bug #74475.
 				}
 				result.Total = send_so_far;

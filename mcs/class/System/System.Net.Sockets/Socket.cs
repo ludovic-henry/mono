@@ -1375,7 +1375,7 @@ namespace System.Net.Sockets
 			is_bound = false;
 			connect_in_progress = true;
 
-			socket_pool_queue (SocketAsyncWorker.Dispatcher, sockares);
+			IOSelector.Add (this.Handle, s => SocketAsyncWorker.Dispatcher ((SocketAsyncResult) s), sockares);
 
 			return sockares;
 		}
@@ -1518,7 +1518,7 @@ namespace System.Net.Sockets
 
 			SocketAsyncResult sockares = e.Worker.result;
 
-			socket_pool_queue (SocketAsyncWorker.Dispatcher, sockares);
+			IOSelector.Add (this.Handle, state => SocketAsyncWorker.Dispatcher ((SocketAsyncResult) state), sockares);
 
 			return true;
 		}
@@ -1532,7 +1532,7 @@ namespace System.Net.Sockets
 				ReuseSocket = reuseSocket,
 			};
 
-			socket_pool_queue (SocketAsyncWorker.Dispatcher, sockares);
+			IOSelector.Add (this.Handle, s => SocketAsyncWorker.Dispatcher ((SocketAsyncResult) s), sockares);
 
 			return sockares;
 		}
@@ -2947,8 +2947,17 @@ namespace System.Net.Sockets
 			Dispose ();
 		}
 
+		/* for use by SafeSocketHandle when calling ReleaseHandle */
+		internal static void Close_internal (IntPtr socket, out int error)
+		{
+			error = (int) SocketError.Success;
+
+			IOSelector.Remove (socket);
+			closesocket (socket);
+		}
+
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		internal extern static void Close_internal (IntPtr socket, out int error);
+		internal extern static void closesocket (IntPtr socket);
 
 #endregion
 
@@ -3106,7 +3115,7 @@ namespace System.Net.Sockets
 			}
 
 			if (count == 1)
-				socket_pool_queue (SocketAsyncWorker.Dispatcher, sockares);
+				IOSelector.Add (this.Handle, state => SocketAsyncWorker.Dispatcher ((SocketAsyncResult) state), sockares);
 		}
 
 		[StructLayout (LayoutKind.Sequential)]
@@ -3117,9 +3126,6 @@ namespace System.Net.Sockets
 
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]
 		internal static extern void cancel_blocking_socket_operation (Thread thread);
-
-		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		internal static extern void socket_pool_queue (SocketAsyncCallback d, SocketAsyncResult r);
 	}
 }
 

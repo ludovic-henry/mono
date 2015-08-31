@@ -1278,11 +1278,6 @@ mono_threadpool_ms_begin_invoke (MonoDomain *domain, MonoObject *target, MonoMet
 	async_result = mono_async_result_new (domain, NULL, async_call->state, NULL, (MonoObject*) async_call);
 	MONO_OBJECT_SETREF (async_result, async_delegate, target);
 
-#ifndef DISABLE_SOCKETS
-	if (mono_threadpool_ms_is_io (target, state))
-		return mono_threadpool_ms_io_add (async_result, (MonoIOAsyncResult*) state);
-#endif
-
 	mono_threadpool_ms_enqueue_work_item (domain, (MonoObject*) async_result);
 
 	return async_result;

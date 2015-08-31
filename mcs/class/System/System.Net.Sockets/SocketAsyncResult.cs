@@ -98,12 +98,16 @@ namespace System.Net.Sockets
 			}
 		}
 
+		public AsyncCallback AsyncCallback {
+			get { return async_callback; }
+		}
+
 		public void Init (Socket socket, object state, AsyncCallback callback, SocketOperation operation, SocketAsyncWorker worker)
 		{
 			this.socket = socket;
 			this.is_blocking = socket != null ? socket.is_blocking : true;
 			this.handle = socket != null ? socket.Handle : IntPtr.Zero;
-			this.state = state;
+			this.async_state = state;
 			this.async_callback = callback;
 			this.socket_operation = operation;
 
@@ -150,7 +154,6 @@ namespace System.Net.Sockets
 			completed = false;
 			is_blocking = false;
 			error = 0;
-			async_result = null;
 			EndCalled = 0;
 			Worker = worker;
 		}
@@ -224,7 +227,8 @@ namespace System.Net.Sockets
 						queue.Dequeue (); /* remove ourselves */
 					if (queue.Count > 0) {
 						if (!socket.is_disposed) {
-							Socket.socket_pool_queue (SocketAsyncWorker.Dispatcher, (queue.Peek ()).result);
+							SocketAsyncResult sockares = queue.Peek ().result;
+							IOSelector.Add (sockares.socket.Handle, state => SocketAsyncWorker.Dispatcher ((SocketAsyncResult) state), sockares);
 						} else {
 							/* CompleteAllOnDispose */
 							SocketAsyncWorker [] workers = queue.ToArray ();
@@ -275,15 +279,6 @@ namespace System.Net.Sockets
 			this.accept_socket = s;
 			this.total = total;
 			Complete ();
-		}
-
-		protected override void Invoke()
-		{
-			async_result.Invoke ();
-
-			if (completed && async_callback != null) {
-				ThreadPool.UnsafeQueueCustomWorkItem (new AsyncResult (state => async_callback ((IAsyncResult) state), this, false), false);
-			}
 		}
 	}
 }
