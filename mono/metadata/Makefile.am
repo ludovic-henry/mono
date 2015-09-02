@@ -1,6 +1,7 @@
 if HOST_WIN32
 win32_sources = \
-	console-win32.c
+	console-win32.c	\
+	socket-io-win32.c
 
 platform_sources = $(win32_sources)
 
@@ -23,7 +24,8 @@ else
 assembliesdir = $(exec_prefix)/lib
 confdir = $(sysconfdir)
 unix_sources = \
-	console-unix.c
+	console-unix.c	\
+	socket-io-unix.c
 
 platform_sources = $(unix_sources)
 endif
@@ -174,7 +176,6 @@ common_sources = \
 	number-ms.h		\
 	object-internals.h	\
 	opcodes.c		\
-	socket-io.c		\
 	socket-io.h		\
 	process.c		\
 	process.h		\
