@@ -57,8 +57,6 @@ static MonoSemType suspend_semaphore;
 static size_t pending_suspends;
 static gboolean unified_suspend_enabled;
 
-#define mono_thread_info_run_state(info) (((MonoThreadInfo*)info)->thread_state & THREAD_STATE_MASK)
-
 /*warn at 50 ms*/
 #define SLEEP_DURATION_BEFORE_WARNING (10)
 /*abort at 1 sec*/
@@ -973,47 +971,6 @@ void
 mono_thread_info_suspend_unlock (void)
 {
 	MONO_SEM_POST (&global_suspend_semaphore);
-}
-
-/*
- * This is a very specific function whose only purpose is to
- * break a given thread from socket syscalls.
- *
- * This only exists because linux won't fail a call to connect
- * if the underlying is closed.
- *
- * TODO We should cleanup and unify this with the other syscall abort
- * facility.
- */
-void
-mono_thread_info_abort_socket_syscall_for_close (MonoNativeThreadId tid)
-{
-	MonoThreadHazardPointers *hp;
-	MonoThreadInfo *info;
-	
-	if (tid == mono_native_thread_id_get () || !mono_threads_core_needs_abort_syscall ())
-		return;
-
-	hp = mono_hazard_pointer_get ();	
-	info = mono_thread_info_lookup (tid); /*info on HP1*/
-	if (!info)
-		return;
-
-	if (mono_thread_info_run_state (info) > STATE_RUNNING) {
-		mono_hazard_pointer_clear (hp, 1);
-		return;
-	}
-
-	mono_thread_info_suspend_lock ();
-	mono_threads_begin_global_suspend ();
-
-	mono_threads_core_abort_syscall (info);
-	mono_threads_wait_pending_operations ();
-
-	mono_hazard_pointer_clear (hp, 1);
-
-	mono_threads_end_global_suspend ();
-	mono_thread_info_suspend_unlock ();
 }
 
 gboolean
