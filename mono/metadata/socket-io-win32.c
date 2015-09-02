@@ -2534,9 +2534,30 @@ void mono_network_cleanup(void)
 void
 icall_cancel_blocking_socket_operation (MonoThread *thread)
 {
-	MonoInternalThread *internal = thread->internal_thread;
-	
-	mono_thread_info_abort_socket_syscall_for_close ((MonoNativeThreadId)(gsize)internal->tid);
+	MonoThreadHazardPointers *hp;
+	MonoThreadInfo *info;
+
+	info = mono_thread_info_lookup (MONO_UINT_TO_NATIVE_THREAD_ID ((gsize) thread->internal_thread->tid));
+	if (!info || info == mono_thread_info_current ())
+		return;
+
+	hp = mono_hazard_pointer_get ();
+
+	if (mono_thread_info_run_state (info) > STATE_RUNNING) {
+		mono_hazard_pointer_clear (hp, 1);
+		return;
+	}
+
+	mono_thread_info_suspend_lock ();
+	mono_threads_begin_global_suspend ();
+
+	mono_threads_core_abort_syscall (info);
+	mono_threads_wait_pending_operations ();
+
+	mono_hazard_pointer_clear (hp, 1);
+
+	mono_threads_end_global_suspend ();
+	mono_thread_info_suspend_unlock ();
 }
 
 #endif /* #ifndef DISABLE_SOCKETS */

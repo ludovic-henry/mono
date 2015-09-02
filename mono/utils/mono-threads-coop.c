@@ -222,22 +222,6 @@ mono_threads_core_check_suspend_result (MonoThreadInfo *info)
 	return TRUE;
 }
 
-gboolean
-mono_threads_core_needs_abort_syscall (void)
-{
-	/*
-	Small digression.
-	Syscall abort can't be handled by the suspend machinery even though it's kind of implemented
-	in a similar way (with, like, signals).
-
-	So, having it here is wrong, it should be on mono-threads-(mach|posix|windows).
-	Ideally we would slice this in (coop|preemp) and target. Then have this file set:
-	mono-threads-mach, mono-threads-mach-preempt and mono-threads-mach-coop.
-	More files, less ifdef hell.
-	*/
-	return FALSE;
-}
-
 void
 mono_threads_init_platform (void)
 {

@@ -313,6 +313,8 @@ Snapshot iteration.
 #define mono_thread_info_get_tid(info) ((MonoNativeThreadId)((MonoThreadInfo*)info)->node.key)
 #define mono_thread_info_set_tid(info, val) do { ((MonoThreadInfo*)(info))->node.key = (uintptr_t)(val); } while (0)
 
+#define mono_thread_info_run_state(info) (((MonoThreadInfo*)info)->thread_state & THREAD_STATE_MASK)
+
 /*
  * @thread_info_size is sizeof (GcThreadInfo), a struct the GC defines to make it possible to have
  * a single block with info from both camps. 
@@ -385,9 +387,6 @@ mono_thread_info_suspend_lock (void);
 
 void
 mono_thread_info_suspend_unlock (void);
-
-void
-mono_thread_info_abort_socket_syscall_for_close (MonoNativeThreadId tid);
 
 void
 mono_thread_info_set_is_async_context (gboolean async_context);
@@ -512,7 +511,6 @@ gboolean mono_threads_core_begin_async_resume (THREAD_INFO_TYPE *info);
 void mono_threads_platform_register (THREAD_INFO_TYPE *info); //ok
 void mono_threads_platform_free (THREAD_INFO_TYPE *info);
 void mono_threads_core_abort_syscall (THREAD_INFO_TYPE *info);
-gboolean mono_threads_core_needs_abort_syscall (void);
 HANDLE mono_threads_core_create_thread (LPTHREAD_START_ROUTINE start, gpointer arg, guint32 stack_size, guint32 creation_flags, MonoNativeThreadId *out_tid);
 void mono_threads_core_resume_created (THREAD_INFO_TYPE *info, MonoNativeThreadId tid);
 void mono_threads_core_get_stack_bounds (guint8 **staddr, size_t *stsize);
