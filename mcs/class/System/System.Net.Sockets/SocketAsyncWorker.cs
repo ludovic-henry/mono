@@ -283,7 +283,7 @@ namespace System.Net.Sockets
 
 			int total = 0;
 			try {
-				total = Socket.Receive_internal (result.socket.safe_handle, result.Buffer, result.Offset, result.Size, result.SockFlags, out result.error);
+				total = result.socket.Receive_internal (result.socket.safe_handle, result.Buffer, result.Offset, result.Size, result.SockFlags, out result.error);
 			} catch (Exception e) {
 				result.Complete (e);
 				return;
@@ -337,7 +337,7 @@ namespace System.Net.Sockets
 
 			int total = 0;
 			try {
-				total = Socket.Send_internal (result.socket.safe_handle, result.Buffer, result.Offset, result.Size, result.SockFlags, out result.error);
+				total = result.socket.Send_internal (result.socket.safe_handle, result.Buffer, result.Offset, result.Size, result.SockFlags, out result.error);
 			} catch (Exception e) {
 				result.Complete (e);
 				return;

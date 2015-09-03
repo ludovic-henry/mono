@@ -193,23 +193,44 @@ typedef struct
 	gint gid;
 } MonoPeerCredData;
 
-extern gpointer ves_icall_System_Net_Sockets_Socket_Socket_internal(MonoObject *this_obj, gint32 family, gint32 type, gint32 proto, gint32 *error);
+typedef struct {
+	MonoObject object;
+	gchar __padding0 [48 - SIZEOF_VOID_P * 2];
+	MonoBoolean is_closed;
+	MonoBoolean is_listening;
+	MonoBoolean user_overlapped_io;
+	gint32 linger_timeout;
+	gint32 address_family;
+	gint32 socket_type;
+	gint32 protocol_type;
+	MonoSafeHandle *safe_handle;
+	MonoObject *seed_endpoint;
+	MonoObject *read_queue;
+	MonoObject *write_queue;
+	MonoBoolean is_blocking;
+	MonoBoolean is_bound;
+	MonoBoolean is_connected;
+	MonoBoolean is_disposed;
+	MonoBoolean connect_in_progress;
+} MonoSocket;
+
+extern gpointer ves_icall_System_Net_Sockets_Socket_Socket_internal(MonoSocket *this_obj, gint32 family, gint32 type, gint32 proto, gint32 *error);
 extern void ves_icall_System_Net_Sockets_Socket_Close_internal(SOCKET sock, gint32 *error);
 extern gint32 ves_icall_System_Net_Sockets_SocketException_WSAGetLastError_internal(void);
 extern gint32 ves_icall_System_Net_Sockets_Socket_Available_internal(SOCKET sock, gint32 *error);
 extern void ves_icall_System_Net_Sockets_Socket_Blocking_internal(SOCKET sock, gboolean block, gint32 *error);
-extern gpointer ves_icall_System_Net_Sockets_Socket_Accept_internal(SOCKET sock, gint32 *error, gboolean blocking);
+extern gpointer ves_icall_System_Net_Sockets_Socket_Accept_internal(MonoSocket *socket, gint32 *error, gboolean blocking);
 extern void ves_icall_System_Net_Sockets_Socket_Listen_internal(SOCKET sock, guint32 backlog, gint32 *error);
 extern MonoObject *ves_icall_System_Net_Sockets_Socket_LocalEndPoint_internal(SOCKET sock, gint32 af, gint32 *error);
 extern MonoObject *ves_icall_System_Net_Sockets_Socket_RemoteEndPoint_internal(SOCKET sock, gint32 af, gint32 *error);
 extern void ves_icall_System_Net_Sockets_Socket_Bind_internal(SOCKET sock, MonoObject *sockaddr, gint32 *error);
 extern void ves_icall_System_Net_Sockets_Socket_Connect_internal(SOCKET sock, MonoObject *sockaddr, gint32 *error);
-extern gint32 ves_icall_System_Net_Sockets_Socket_Receive_internal(SOCKET sock, MonoArray *buffer, gint32 offset, gint32 count, gint32 flags, gint32 *error);
-extern gint32 ves_icall_System_Net_Sockets_Socket_Receive_array_internal(SOCKET sock, MonoArray *buffers, gint32 flags, gint32 *error);
-extern gint32 ves_icall_System_Net_Sockets_Socket_ReceiveFrom_internal(SOCKET sock, MonoArray *buffer, gint32 offset, gint32 count, gint32 flags, MonoObject **sockaddr, gint32 *error);
-extern gint32 ves_icall_System_Net_Sockets_Socket_Send_internal(SOCKET sock, MonoArray *buffer, gint32 offset, gint32 count, gint32 flags, gint32 *error);
-extern gint32 ves_icall_System_Net_Sockets_Socket_Send_array_internal(SOCKET sock, MonoArray *buffers, gint32 flags, gint32 *error);
-extern gint32 ves_icall_System_Net_Sockets_Socket_SendTo_internal(SOCKET sock, MonoArray *buffer, gint32 offset, gint32 count, gint32 flags, MonoObject *sockaddr, gint32 *error);
+extern gint32 ves_icall_System_Net_Sockets_Socket_Receive_internal(SOCKET sock, MonoArray *buffer, gint32 offset, gint32 count, gint32 flags, gint32 timeout, gint32 *error);
+extern gint32 ves_icall_System_Net_Sockets_Socket_Receive_array_internal(SOCKET sock, MonoArray *buffers, gint32 flags, gint32 timeout, gint32 *error);
+extern gint32 ves_icall_System_Net_Sockets_Socket_ReceiveFrom_internal(SOCKET sock, MonoArray *buffer, gint32 offset, gint32 count, gint32 flags, MonoObject **sockaddr, gint32 timeout, gint32 *error);
+extern gint32 ves_icall_System_Net_Sockets_Socket_Send_internal(SOCKET sock, MonoArray *buffer, gint32 offset, gint32 count, gint32 flags, gint32 timeout, gint32 *error);
+extern gint32 ves_icall_System_Net_Sockets_Socket_Send_array_internal(SOCKET sock, MonoArray *buffers, gint32 flags, gint32 timeout, gint32 *error);
+extern gint32 ves_icall_System_Net_Sockets_Socket_SendTo_internal(SOCKET sock, MonoArray *buffer, gint32 offset, gint32 count, gint32 flags, MonoObject *sockaddr, gint32 timeout, gint32 *error);
 extern void ves_icall_System_Net_Sockets_Socket_Select_internal(MonoArray **sockets, gint32 timeout, gint32 *error);
 extern void ves_icall_System_Net_Sockets_Socket_Shutdown_internal(SOCKET sock, gint32 how, gint32 *error);
 extern void ves_icall_System_Net_Sockets_Socket_GetSocketOption_obj_internal(SOCKET sock, gint32 level, gint32 name, MonoObject **obj_val, gint32 *error);
@@ -221,7 +242,7 @@ extern MonoBoolean ves_icall_System_Net_Dns_GetHostByAddr_internal(MonoString *a
 extern MonoBoolean ves_icall_System_Net_Dns_GetHostName_internal(MonoString **h_name);
 extern MonoBoolean ves_icall_System_Net_Sockets_Socket_Poll_internal (SOCKET sock, gint mode, gint timeout, gint32 *error);
 extern void ves_icall_System_Net_Sockets_Socket_Disconnect_internal(SOCKET sock, MonoBoolean reuse, gint32 *error);
-extern gboolean ves_icall_System_Net_Sockets_Socket_SendFile_internal (SOCKET sock, MonoString *filename, MonoArray *pre_buffer, MonoArray *post_buffer, gint flags);
+extern gboolean ves_icall_System_Net_Sockets_Socket_SendFile_internal (SOCKET sock, MonoString *filename, MonoArray *pre_buffer, MonoArray *post_buffer, gint flags, gint32 timeout);
 void icall_cancel_blocking_socket_operation (MonoThread *thread);
 
 extern void mono_network_init(void);

@@ -668,7 +668,7 @@ static gint32 get_family_hint(void)
 	}
 }
 
-gpointer ves_icall_System_Net_Sockets_Socket_Socket_internal(MonoObject *this_obj, gint32 family, gint32 type, gint32 proto, gint32 *error)
+gpointer ves_icall_System_Net_Sockets_Socket_Socket_internal(MonoSocket *socket, gint32 family, gint32 type, gint32 proto, gint32 *error)
 {
 	SOCKET sock;
 	gint32 sock_family;
@@ -1348,7 +1348,7 @@ extern void ves_icall_System_Net_Sockets_Socket_Disconnect_internal(SOCKET sock,
 	MONO_FINISH_BLOCKING;
 }
 
-gint32 ves_icall_System_Net_Sockets_Socket_Receive_internal(SOCKET sock, MonoArray *buffer, gint32 offset, gint32 count, gint32 flags, gint32 *error)
+gint32 ves_icall_System_Net_Sockets_Socket_Receive_internal(SOCKET sock, MonoArray *buffer, gint32 offset, gint32 count, gint32 flags, gint32 timeout, gint32 *error)
 {
 	int ret;
 	guchar *buf;
@@ -1391,7 +1391,7 @@ gint32 ves_icall_System_Net_Sockets_Socket_Receive_internal(SOCKET sock, MonoArr
 	return(ret);
 }
 
-gint32 ves_icall_System_Net_Sockets_Socket_Receive_array_internal(SOCKET sock, MonoArray *buffers, gint32 flags, gint32 *error)
+gint32 ves_icall_System_Net_Sockets_Socket_Receive_array_internal(SOCKET sock, MonoArray *buffers, gint32 flags, gint32 timeout, gint32 *error)
 {
 	int ret, count;
 	DWORD recv;
@@ -1418,7 +1418,7 @@ gint32 ves_icall_System_Net_Sockets_Socket_Receive_array_internal(SOCKET sock, M
 	return(recv);
 }
 
-gint32 ves_icall_System_Net_Sockets_Socket_ReceiveFrom_internal(SOCKET sock, MonoArray *buffer, gint32 offset, gint32 count, gint32 flags, MonoObject **sockaddr, gint32 *error)
+gint32 ves_icall_System_Net_Sockets_Socket_ReceiveFrom_internal(SOCKET sock, MonoArray *buffer, gint32 offset, gint32 count, gint32 flags, MonoObject **sockaddr, gint32 timeout, gint32 *error)
 {
 	int ret;
 	guchar *buf;
@@ -1471,7 +1471,7 @@ gint32 ves_icall_System_Net_Sockets_Socket_ReceiveFrom_internal(SOCKET sock, Mon
 	return(ret);
 }
 
-gint32 ves_icall_System_Net_Sockets_Socket_Send_internal(SOCKET sock, MonoArray *buffer, gint32 offset, gint32 count, gint32 flags, gint32 *error)
+gint32 ves_icall_System_Net_Sockets_Socket_Send_internal(SOCKET sock, MonoArray *buffer, gint32 offset, gint32 count, gint32 flags, gint32 timeout, gint32 *error)
 {
 	int ret;
 	guchar *buf;
@@ -1508,7 +1508,7 @@ gint32 ves_icall_System_Net_Sockets_Socket_Send_internal(SOCKET sock, MonoArray 
 	return(ret);
 }
 
-gint32 ves_icall_System_Net_Sockets_Socket_Send_array_internal(SOCKET sock, MonoArray *buffers, gint32 flags, gint32 *error)
+gint32 ves_icall_System_Net_Sockets_Socket_Send_array_internal(SOCKET sock, MonoArray *buffers, gint32 flags, gint32 timeout, gint32 *error)
 {
 	int ret, count;
 	DWORD sent;
@@ -1535,7 +1535,7 @@ gint32 ves_icall_System_Net_Sockets_Socket_Send_array_internal(SOCKET sock, Mono
 	return(sent);
 }
 
-gint32 ves_icall_System_Net_Sockets_Socket_SendTo_internal(SOCKET sock, MonoArray *buffer, gint32 offset, gint32 count, gint32 flags, MonoObject *sockaddr, gint32 *error)
+gint32 ves_icall_System_Net_Sockets_Socket_SendTo_internal(SOCKET sock, MonoArray *buffer, gint32 offset, gint32 count, gint32 flags, MonoObject *sockaddr, gint32 timeout, gint32 *error)
 {
 	int ret;
 	guchar *buf;
@@ -2486,7 +2486,7 @@ extern MonoBoolean ves_icall_System_Net_Dns_GetHostName_internal(MonoString **h_
 }
 
 gboolean
-ves_icall_System_Net_Sockets_Socket_SendFile_internal (SOCKET sock, MonoString *filename, MonoArray *pre_buffer, MonoArray *post_buffer, gint flags)
+ves_icall_System_Net_Sockets_Socket_SendFile_internal (SOCKET sock, MonoString *filename, MonoArray *pre_buffer, MonoArray *post_buffer, gint flags, gint32 timeout)
 {
 	HANDLE file;
 	gint32 error;

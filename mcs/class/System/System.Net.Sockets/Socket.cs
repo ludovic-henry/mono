@@ -98,6 +98,9 @@ namespace System.Net.Sockets
 		internal bool is_disposed;
 		internal bool connect_in_progress;
 
+		internal int receive_timeout = 0;
+		internal int send_timeout = 0;
+
 #region Constructors
 
 		static Socket ()
@@ -275,7 +278,7 @@ namespace System.Net.Sockets
 
 		/* Creates a new system socket, returning the handle */
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		extern IntPtr Socket_internal (AddressFamily family, SocketType type, ProtocolType proto, out int error);
+		static extern IntPtr Socket_internal (AddressFamily family, SocketType type, ProtocolType proto, out int error);
 
 #endregion
 
@@ -574,6 +577,8 @@ namespace System.Net.Sockets
 				if (value == -1)
 					value = 0;
 
+				send_timeout = value;
+
 				SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.SendTimeout, value);
 			}
 		}
@@ -592,6 +597,8 @@ namespace System.Net.Sockets
 
 				if (value == -1)
 					value = 0;
+
+				receive_timeout = value;
 
 				SetSocketOption (SocketOptionLevel.Socket, SocketOptionName.ReceiveTimeout, value);
 			}
@@ -1059,11 +1066,11 @@ namespace System.Net.Sockets
 			return sockares.Socket;
 		}
 
-		static SafeSocketHandle Accept_internal (SafeSocketHandle safeHandle, out int error, bool blocking)
+		SafeSocketHandle Accept_internal (SafeSocketHandle safeHandle, out int error, bool blocking)
 		{
 			try {
 				safeHandle.RegisterForBlockingSyscall ();
-				var ret = Accept_internal (safeHandle.DangerousGetHandle (), out error, blocking);
+				var ret = Accept_internal (this, out error, blocking);
 				return new SafeSocketHandle (ret, true);
 			} finally {
 				safeHandle.UnRegisterForBlockingSyscall ();
@@ -1072,7 +1079,7 @@ namespace System.Net.Sockets
 
 		/* Creates a new system socket, returning the handle */
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		extern static IntPtr Accept_internal (IntPtr sock, out int error, bool blocking);
+		extern static IntPtr Accept_internal (Socket socket, out int error, bool blocking);
 
 #endregion
 
@@ -1834,31 +1841,31 @@ namespace System.Net.Sockets
 			return ret;
 		}
 
-		static int Receive_internal (SafeSocketHandle safeHandle, WSABUF[] bufarray, SocketFlags flags, out int error)
+		int Receive_internal (SafeSocketHandle safeHandle, WSABUF[] bufarray, SocketFlags flags, out int error)
 		{
 			try {
 				safeHandle.RegisterForBlockingSyscall ();
-				return Receive_internal (safeHandle.DangerousGetHandle (), bufarray, flags, out error);
+				return Receive_internal (safeHandle.DangerousGetHandle (), bufarray, flags, ReceiveTimeout, out error);
 			} finally {
 				safeHandle.UnRegisterForBlockingSyscall ();
 			}
 		}
 
 		[MethodImplAttribute (MethodImplOptions.InternalCall)]
-		extern static int Receive_internal (IntPtr sock, WSABUF[] bufarray, SocketFlags flags, out int error);
+		extern static int Receive_internal (IntPtr sock, WSABUF[] bufarray, SocketFlags flags, int timeout, out int error);
 
-		internal static int Receive_internal (SafeSocketHandle safeHandle, byte[] buffer, int offset, int count, SocketFlags flags, out int error)
+		internal int Receive_internal (SafeSocketHandle safeHandle, byte[] buffer, int offset, int count, SocketFlags flags, out int error)
 		{
 			try {
 				safeHandle.RegisterForBlockingSyscall ();
-				return Receive_internal (safeHandle.DangerousGetHandle (), buffer, offset, count, flags, out error);
+				return Receive_internal (safeHandle.DangerousGetHandle (), buffer, offset, count, flags, ReceiveTimeout, out error);
 			} finally {
 				safeHandle.UnRegisterForBlockingSyscall ();
 			}
 		}
 
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		extern static int Receive_internal(IntPtr sock, byte[] buffer, int offset, int count, SocketFlags flags, out int error);
+		extern static int Receive_internal(IntPtr sock, byte[] buffer, int offset, int count, SocketFlags flags, int timeout, out int error);
 
 #endregion
 
@@ -2022,18 +2029,18 @@ namespace System.Net.Sockets
 			return cnt;
 		}
 
-		static int ReceiveFrom_internal (SafeSocketHandle safeHandle, byte[] buffer, int offset, int count, SocketFlags flags, ref SocketAddress sockaddr, out int error)
+		int ReceiveFrom_internal (SafeSocketHandle safeHandle, byte[] buffer, int offset, int count, SocketFlags flags, ref SocketAddress sockaddr, out int error)
 		{
 			try {
 				safeHandle.RegisterForBlockingSyscall ();
-				return ReceiveFrom_internal (safeHandle.DangerousGetHandle (), buffer, offset, count, flags, ref sockaddr, out error);
+				return ReceiveFrom_internal (safeHandle.DangerousGetHandle (), buffer, offset, count, flags, ref sockaddr, ReceiveTimeout, out error);
 			} finally {
 				safeHandle.UnRegisterForBlockingSyscall ();
 			}
 		}
 
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		extern static int ReceiveFrom_internal(IntPtr sock, byte[] buffer, int offset, int count, SocketFlags flags, ref SocketAddress sockaddr, out int error);
+		extern static int ReceiveFrom_internal(IntPtr sock, byte[] buffer, int offset, int count, SocketFlags flags, ref SocketAddress sockaddr, int timeout, out int error);
 
 #endregion
 
@@ -2374,33 +2381,31 @@ namespace System.Net.Sockets
 			return sockares.Total;
 		}
 
-		static int Send_internal (SafeSocketHandle safeHandle, WSABUF[] bufarray, SocketFlags flags, out int error)
+		int Send_internal (SafeSocketHandle safeHandle, WSABUF[] bufarray, SocketFlags flags, out int error)
 		{
-			bool release = false;
 			try {
-				safeHandle.DangerousAddRef (ref release);
-				return Send_internal (safeHandle.DangerousGetHandle (), bufarray, flags, out error);
+				safeHandle.RegisterForBlockingSyscall ();
+				return Send_internal (safeHandle.DangerousGetHandle (), bufarray, flags, SendTimeout, out error);
 			} finally {
-				if (release)
-					safeHandle.DangerousRelease ();
+				safeHandle.UnRegisterForBlockingSyscall ();
 			}
 		}
 
 		[MethodImplAttribute (MethodImplOptions.InternalCall)]
-		extern static int Send_internal (IntPtr sock, WSABUF[] bufarray, SocketFlags flags, out int error);
+		extern static int Send_internal (IntPtr sock, WSABUF[] bufarray, SocketFlags flags, int timeout, out int error);
 
-		internal static int Send_internal (SafeSocketHandle safeHandle, byte[] buf, int offset, int count, SocketFlags flags, out int error)
+		internal int Send_internal (SafeSocketHandle safeHandle, byte[] buf, int offset, int count, SocketFlags flags, out int error)
 		{
 			try {
 				safeHandle.RegisterForBlockingSyscall ();
-				return Send_internal (safeHandle.DangerousGetHandle (), buf, offset, count, flags, out error);
+				return Send_internal (safeHandle.DangerousGetHandle (), buf, offset, count, flags, SendTimeout, out error);
 			} finally {
 				safeHandle.UnRegisterForBlockingSyscall ();
 			}
 		}
 
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		extern static int Send_internal(IntPtr sock, byte[] buf, int offset, int count, SocketFlags flags, out int error);
+		extern static int Send_internal(IntPtr sock, byte[] buf, int offset, int count, SocketFlags flags, int timeout, out int error);
 
 #endregion
 
@@ -2533,18 +2538,18 @@ namespace System.Net.Sockets
 			return sockares.Total;
 		}
 
-		static int SendTo_internal (SafeSocketHandle safeHandle, byte[] buffer, int offset, int count, SocketFlags flags, SocketAddress sa, out int error)
+		int SendTo_internal (SafeSocketHandle safeHandle, byte[] buffer, int offset, int count, SocketFlags flags, SocketAddress sa, out int error)
 		{
 			try {
 				safeHandle.RegisterForBlockingSyscall ();
-				return SendTo_internal (safeHandle.DangerousGetHandle (), buffer, offset, count, flags, sa, out error);
+				return SendTo_internal (safeHandle.DangerousGetHandle (), buffer, offset, count, flags, sa, SendTimeout, out error);
 			} finally {
 				safeHandle.UnRegisterForBlockingSyscall ();
 			}
 		}
 
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		extern static int SendTo_internal (IntPtr sock, byte[] buffer, int offset, int count, SocketFlags flags, SocketAddress sa, out int error);
+		extern static int SendTo_internal (IntPtr sock, byte[] buffer, int offset, int count, SocketFlags flags, SocketAddress sa, int timeout, out int error);
 
 #endregion
 
@@ -2619,18 +2624,18 @@ namespace System.Net.Sockets
 			ares.Delegate.EndInvoke (ares.Original);
 		}
 
-		static bool SendFile_internal (SafeSocketHandle safeHandle, string filename, byte [] pre_buffer, byte [] post_buffer, TransmitFileOptions flags)
+		bool SendFile_internal (SafeSocketHandle safeHandle, string filename, byte [] pre_buffer, byte [] post_buffer, TransmitFileOptions flags)
 		{
 			try {
 				safeHandle.RegisterForBlockingSyscall ();
-				return SendFile_internal (safeHandle.DangerousGetHandle (), filename, pre_buffer, post_buffer, flags);
+				return SendFile_internal (safeHandle.DangerousGetHandle (), filename, pre_buffer, post_buffer, flags, SendTimeout);
 			} finally {
 				safeHandle.UnRegisterForBlockingSyscall ();
 			}
 		}
 
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		extern static bool SendFile_internal (IntPtr sock, string filename, byte [] pre_buffer, byte [] post_buffer, TransmitFileOptions flags);
+		extern static bool SendFile_internal (IntPtr sock, string filename, byte [] pre_buffer, byte [] post_buffer, TransmitFileOptions flags, int timeout);
 
 		delegate void SendFileHandler (string fileName, byte [] preBuffer, byte [] postBuffer, TransmitFileOptions flags);
 
