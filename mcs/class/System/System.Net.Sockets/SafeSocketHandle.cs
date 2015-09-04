@@ -37,6 +37,7 @@ namespace System.Net.Sockets {
 			int error = 0;
 
 			Socket.Blocking_internal (handle, false, out error);
+			Socket.Close_internal (handle, out error);
 
 			if (blocking_threads != null) {
 				int abort_attempts = 0;
@@ -60,15 +61,15 @@ namespace System.Net.Sockets {
 					lock (blocking_threads) {
 						if (blocking_threads.Count == 1 && blocking_threads[0] == Thread.CurrentThread)
 							break;
+
+						foreach (var t in blocking_threads)
+							Socket.cancel_blocking_socket_operation (t);
 					}
 
-					AbortRegisteredThreads ();
 					// Sleep so other threads can resume
 					Thread.Sleep (1);
 				}
 			}
-
-			Socket.Close_internal (handle, out error);
 
 			return error == 0;
 		}
@@ -101,16 +102,6 @@ namespace System.Net.Sockets {
 			//If this NRE, we're in deep problems because Register Must have
 			lock (blocking_threads) {
 				blocking_threads.Remove (Thread.CurrentThread);
-			}
-		}
-
-		void AbortRegisteredThreads () {
-			if (blocking_threads == null)
-				return;
-
-			lock (blocking_threads) {
-				foreach (var t in blocking_threads)
-					Socket.cancel_blocking_socket_operation (t);
 			}
 		}
 	}

@@ -2529,9 +2529,11 @@ void mono_network_cleanup(void)
 void
 icall_cancel_blocking_socket_operation (MonoThread *thread)
 {
+#ifdef __linux__
 	MonoInternalThread *internal = thread->internal_thread;
 	
 	mono_thread_info_abort_socket_syscall_for_close ((MonoNativeThreadId)(gsize)internal->tid);
+#endif
 }
 
 #endif /* #ifndef DISABLE_SOCKETS */
