@@ -697,7 +697,7 @@ interrupt_syscall (gpointer data)
 }
 
 static void
-interruptable_syscall (void (*syscall) (gpointer user_data), gpointer user_data, gboolean *interrupted)
+interruptable_syscall (void (*syscall) (gpointer user_data), gpointer user_data, SOCKET sock, gboolean *interrupted)
 {
 	g_assert (interrupted);
 	*interrupted = FALSE;
@@ -849,7 +849,7 @@ ves_icall_System_Net_Sockets_Socket_Accept_internal (SOCKET sock, gint32 *error,
 	gboolean interrupted;
 
 	data.sock = sock;
-	interruptable_syscall (interruptable_accept, &data, &interrupted);
+	interruptable_syscall (interruptable_accept, &data, sock, &interrupted);
 	newsock = data.newsock;
 
 	if (interrupted) {
@@ -1310,7 +1310,7 @@ ves_icall_System_Net_Sockets_Socket_Poll_internal (SOCKET sock, gint mode,
 	do {
 		data.pfds = pfds;
 		data.timeout = timeout;
-		interruptable_syscall (interruptable_poll, &data, &interrupted);
+		interruptable_syscall (interruptable_poll, &data, sock, &interrupted);
 		ret = data.ret;
 
 		if (interrupted) {
@@ -1403,7 +1403,7 @@ ves_icall_System_Net_Sockets_Socket_Connect_internal (SOCKET sock, MonoObject *s
 	data.sock = sock;
 	data.sa = sa;
 	data.sa_size = sa_size;
-	interruptable_syscall (interruptable_connect, &data, &interrupted);
+	interruptable_syscall (interruptable_connect, &data, sock, &interrupted);
 	ret = data.ret;
 
 	if (interrupted)
@@ -1519,7 +1519,7 @@ ves_icall_System_Net_Sockets_Socket_Disconnect_internal (SOCKET sock, MonoBoolea
 	data.sock = sock;
 	data._wapi_disconnectex = _wapi_disconnectex;
 	data._wapi_transmitfile = _wapi_transmitfile;
-	interruptable_syscall (interruptable_disconnect, &data, &interrupted);
+	interruptable_syscall (interruptable_disconnect, &data, sock, &interrupted);
 	ret = data.ret;
 
 	if (interrupted)
@@ -1591,7 +1591,7 @@ ves_icall_System_Net_Sockets_Socket_Receive_internal (SOCKET sock, MonoArray *bu
 	data.buf = buf;
 	data.count = count;
 	data.recvflags = recvflags;
-	interruptable_syscall (interruptable_receive, &data, &interrupted);
+	interruptable_syscall (interruptable_receive, &data, sock, &interrupted);
 	ret = data.ret;
 
 	if (interrupted) {
@@ -1659,7 +1659,7 @@ ves_icall_System_Net_Sockets_Socket_Receive_array_internal (SOCKET sock, MonoArr
 	data.count = count;
 	data.recv = &recv;
 	data.recvflags = &recvflags;
-	interruptable_syscall (interruptable_receive_array, &data, &interrupted);
+	interruptable_syscall (interruptable_receive_array, &data, sock, &interrupted);
 	ret = data.ret;
 
 	if (interrupted) {
@@ -1740,7 +1740,7 @@ ves_icall_System_Net_Sockets_Socket_ReceiveFrom_internal (SOCKET sock, MonoArray
 	data.recvflags = recvflags;
 	data.sa = sa;
 	data.sa_size = &sa_size;
-	interruptable_syscall (interruptable_receive_from, &data, &interrupted);
+	interruptable_syscall (interruptable_receive_from, &data, sock, &interrupted);
 	ret = data.ret;
 
 	if (interrupted) {
@@ -1827,7 +1827,7 @@ ves_icall_System_Net_Sockets_Socket_Send_internal (SOCKET sock, MonoArray *buffe
 	data.buf = buf;
 	data.count = count;
 	data.sendflags = sendflags;
-	interruptable_syscall (interruptable_send, &data, &interrupted);
+	interruptable_syscall (interruptable_send, &data, sock, &interrupted);
 	ret = data.ret;
 
 	if (interrupted) {
@@ -1895,7 +1895,7 @@ ves_icall_System_Net_Sockets_Socket_Send_array_internal(SOCKET sock, MonoArray *
 	data.count = count;
 	data.sent = &sent;
 	data.sendflags = sendflags;
-	interruptable_syscall (interruptable_send_array, &data, &interrupted);
+	interruptable_syscall (interruptable_send_array, &data, sock, &interrupted);
 	ret = data.ret;
 
 	if (interrupted) {
@@ -1981,7 +1981,7 @@ ves_icall_System_Net_Sockets_Socket_SendTo_internal(SOCKET sock, MonoArray *buff
 	data.sendflags = sendflags;
 	data.sa = sa;
 	data.sa_size = sa_size;
-	interruptable_syscall (interruptable_send_to, &data, &interrupted);
+	interruptable_syscall (interruptable_send_to, &data, sock, &interrupted);
 	ret = data.ret;
 
 	g_free (sa);
@@ -2652,7 +2652,7 @@ ves_icall_System_Net_Sockets_Socket_Shutdown_internal(SOCKET sock, gint32 how, g
 
 	data.sock = sock;
 	data.how = how;
-	interruptable_syscall (interruptable_shutdown, &data, &interrupted);
+	interruptable_syscall (interruptable_shutdown, &data, sock, &interrupted);
 	ret = data.ret;
 
 	if (interrupted)
@@ -2977,11 +2977,7 @@ ves_icall_System_Net_Sockets_Socket_SendFile_internal (SOCKET sock, MonoString *
 
 	/* FIXME: replace file by a proper fd that we can call open and close on, as they are interruptible */
 
-	MONO_PREPARE_BLOCKING;
-
 	file = ves_icall_System_IO_MonoIO_Open (filename, FileMode_Open, FileAccess_Read, FileShare_Read, 0, &error);
-
-	MONO_FINISH_BLOCKING;
 
 	if (file == INVALID_HANDLE_VALUE) {
 		SetLastError (error);
@@ -3002,7 +2998,7 @@ ves_icall_System_Net_Sockets_Socket_SendFile_internal (SOCKET sock, MonoString *
 	data.file = file;
 	data.buffers = &buffers;
 	data.flags = flags;
-	interruptable_syscall (interruptable_sendfile, &data, &interrupted);
+	interruptable_syscall (interruptable_sendfile, &data, sock, &interrupted);
 	ret = data.ret;
 
 	if (interrupted) {
