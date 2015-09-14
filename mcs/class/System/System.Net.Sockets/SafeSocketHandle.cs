@@ -37,6 +37,7 @@ namespace System.Net.Sockets {
 			int error = 0;
 
 			Socket.Blocking_internal (handle, false, out error);
+			Socket.Close_internal (handle, out error);
 
 			if (blocking_threads != null) {
 				int abort_attempts = 0;
@@ -67,8 +68,6 @@ namespace System.Net.Sockets {
 					Thread.Sleep (1);
 				}
 			}
-
-			Socket.Close_internal (handle, out error);
 
 			return error == 0;
 		}

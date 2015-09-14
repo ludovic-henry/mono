@@ -197,7 +197,7 @@ mono_threads_finish_try_blocking (void* cookie)
 void
 mono_threads_core_abort_syscall (MonoThreadInfo *info)
 {
-	g_error ("FIXME");
+	g_assert_not_reached ();
 }
 
 gboolean
