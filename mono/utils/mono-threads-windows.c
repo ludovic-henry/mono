@@ -25,26 +25,6 @@ interrupt_apc (ULONG_PTR param)
 {
 }
 
-void
-mono_threads_core_abort_syscall (MonoThreadInfo *info)
-{
-	DWORD id = mono_thread_info_get_tid (info);
-	HANDLE handle;
-
-	handle = OpenThread (THREAD_ALL_ACCESS, FALSE, id);
-	g_assert (handle);
-
-	QueueUserAPC ((PAPCFUNC)interrupt_apc, handle, (ULONG_PTR)NULL);
-
-	CloseHandle (handle);
-}
-
-gboolean
-mono_threads_core_needs_abort_syscall (void)
-{
-	return TRUE;
-}
-
 gboolean
 mono_threads_core_begin_async_suspend (MonoThreadInfo *info, gboolean interrupt_kernel)
 {
@@ -159,6 +139,15 @@ mono_threads_core_begin_global_suspend (void)
 
 void
 mono_threads_core_end_global_suspend (void)
+{
+}
+
+#endif
+
+#if defined(USE_WINDOWS_SYSCALL_ABORT)
+
+void
+mono_threads_init_abort_syscall (void)
 {
 }
 

@@ -301,7 +301,7 @@ mono_threads_core_set_name (MonoNativeThreadId tid, const char *name)
 }
 
 
-#if defined (USE_POSIX_BACKEND) && !defined (USE_COOP_GC)
+#if (defined (USE_POSIX_BACKEND) && !defined (USE_COOP_GC)) || defined(USE_POSIX_SYSCALL_ABORT)
 
 static int suspend_signal_num;
 static int restart_signal_num;
@@ -512,12 +512,12 @@ mono_posix_add_signal_handler (int signo, gpointer handler, int flags)
 #endif
 }
 
+#if defined (USE_POSIX_BACKEND) && !defined (USE_COOP_GC)
 void
 mono_threads_init_platform (void)
 {
 	sigset_t signal_set;
 
-	abort_signal_num = mono_threads_get_abort_signal ();
 	if (mono_thread_info_unified_management_enabled ()) {
 		suspend_signal_num = DEFAULT_SUSPEND_SIGNAL;
 		restart_signal_num = DEFAULT_RESTART_SIGNAL;
@@ -534,32 +534,12 @@ mono_threads_init_platform (void)
 
 	mono_posix_add_signal_handler (suspend_signal_num, suspend_signal_handler, SA_RESTART);
 	mono_posix_add_signal_handler (restart_signal_num, restart_signal_handler, SA_RESTART);
-	mono_posix_add_signal_handler (abort_signal_num, abort_signal_handler, 0);
 
 	/* ensure all the new signals are unblocked */
 	sigemptyset (&signal_set);
 	sigaddset (&signal_set, suspend_signal_num);
 	sigaddset (&signal_set, restart_signal_num);
-	sigaddset (&signal_set, abort_signal_num);
 	sigprocmask (SIG_UNBLOCK, &signal_set, NULL);
-}
-
-void
-mono_threads_core_abort_syscall (MonoThreadInfo *info)
-{
-	/*
-	We signal a thread to break it from the urrent syscall.
-	This signal should not be interpreted as a suspend request.
-	*/
-	info->syscall_break_signal = TRUE;
-	if (!mono_threads_pthread_kill (info, abort_signal_num))
-		mono_threads_add_to_pending_operation_set (info);
-}
-
-gboolean
-mono_threads_core_needs_abort_syscall (void)
-{
-	return TRUE;
 }
 
 gboolean
@@ -616,6 +596,33 @@ mono_threads_core_end_global_suspend (void)
 {
 }
 
-#endif /*defined (USE_POSIX_BACKEND)*/
+#endif
+
+#if defined(USE_POSIX_SYSCALL_ABORT)
+
+int
+mono_thread_get_abort_signal_num (void)
+{
+	return abort_signal_num;
+}
+
+void
+mono_threads_init_abort_syscall (void)
+{
+	sigset_t signal_set;
+
+	abort_signal_num = mono_threads_get_abort_signal ();
+
+	mono_posix_add_signal_handler (abort_signal_num, abort_signal_handler, 0);
+
+	/* ensure all the new signals are unblocked */
+	sigemptyset (&signal_set);
+	sigaddset (&signal_set, abort_signal_num);
+	sigprocmask (SIG_UNBLOCK, &signal_set, NULL);
+}
+
+#endif
+
+#endif /* (defined (USE_POSIX_BACKEND) && !defined (USE_COOP_GC)) || defined(USE_POSIX_SYSCALL_ABORT) */
 
 #endif

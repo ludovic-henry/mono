@@ -147,6 +147,20 @@ and reduce the number of casts drastically.
 
 #endif
 
+#if defined (_POSIX_VERSION) || defined (__native_client__)
+# if defined (__MACH__) && !defined (USE_SIGNALS_ON_MACH)
+#  define USE_MACH_SYSCALL_ABORT
+# else
+#  define USE_POSIX_SYSCALL_ABORT
+# endif
+#elif HOST_WIN32
+# define USE_WINDOWS_SYSCALL_ABORT
+#else
+# error
+#endif
+
+
+
 enum {
 	STATE_STARTING				= 0x00,
 	STATE_RUNNING				= 0x01,
@@ -200,13 +214,12 @@ typedef struct {
 
 	MonoSemType resume_semaphore;
 
-	/* only needed by the posix backend */ 
-#if defined(USE_POSIX_BACKEND)
+	/* only needed by the posix backend */
+#if (defined(USE_POSIX_BACKEND) && !defined(USE_COOP_GC)) || defined(USE_POSIX_SYSCALL_ABORT)
 	MonoSemType finish_resume_semaphore;
 	gboolean syscall_break_signal;
 	gboolean suspend_can_continue;
 	int signal;
-
 #endif
 
 	/*In theory, only the posix backend needs this, but having it on mach/win32 simplifies things a lot.*/
@@ -472,6 +485,13 @@ mono_threads_pthread_kill (THREAD_INFO_TYPE *info, int signum);
 
 #endif /* !defined(HOST_WIN32) */
 
+#if defined (USE_POSIX_SYSCALL_ABORT)
+
+int
+mono_thread_get_abort_signal_num (void);
+
+#endif
+
 /* Internal API between mono-threads and its backends. */
 
 /* Backend functions - a backend must implement all of the following */
@@ -480,6 +500,8 @@ This is called very early in the runtime, it cannot access any runtime facilitie
 
 */
 void mono_threads_init_platform (void); //ok
+
+void mono_threads_init_abort_syscall (void);
 
 /*
 This begins async suspend. This function must do the following:
