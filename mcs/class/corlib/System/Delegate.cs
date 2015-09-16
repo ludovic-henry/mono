@@ -504,7 +504,7 @@ namespace System
 
 		public override int GetHashCode ()
 		{
-			return Method.GetHashCode () ^ (m_target != null ? m_target.GetHashCode () : 0);
+			return ((object) Method ?? (object) method).GetHashCode () ^ (m_target != null ? m_target.GetHashCode () : 0);
 		}
 
 		protected virtual MethodInfo GetMethodImpl ()

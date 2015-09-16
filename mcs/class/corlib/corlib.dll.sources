@@ -94,7 +94,6 @@ System/Console.iOS.cs
 System/ConsoleDriver.cs
 System/ControlCharacters.cs
 System/CrossAppDomainDelegate.cs
-System/Delegate.cs
 System/DelegateSerializationHolder.cs
 System/DomainManagerInitializationFlags.cs
 System/EmptyArray.cs
@@ -116,7 +115,6 @@ System/MonoCustomAttrs.cs
 System/MonoListItem.cs
 System/MonoType.cs
 System/MonoTouchAOTHelper.cs
-System/MulticastDelegate.cs
 System/NullConsoleDriver.cs
 System/Nullable.cs
 System/NumberFormatter.cs
@@ -888,6 +886,7 @@ ReferenceSources/CalendarData.cs
 ReferenceSources/CompatibilitySwitches.cs
 ReferenceSources/CultureData.cs
 ReferenceSources/DefaultBinder.cs
+ReferenceSources/Delegate.cs
 ReferenceSources/Environment.cs
 ReferenceSources/HashHelpers.cs
 ReferenceSources/ParseNumbers.cs
@@ -957,6 +956,7 @@ ReferenceSources/SecurityContext.cs
 ../../../external/referencesource/mscorlib/system/dayofweek.cs
 ../../../external/referencesource/mscorlib/system/decimal.cs
 ../../../external/referencesource/mscorlib/system/defaultbinder.cs
+../../../external/referencesource/mscorlib/system/delegate.cs
 ../../../external/referencesource/mscorlib/system/dbnull.cs
 ../../../external/referencesource/mscorlib/system/dividebyzeroexception.cs
 ../../../external/referencesource/mscorlib/system/dllnotfoundexception.cs
@@ -1006,6 +1006,7 @@ ReferenceSources/SecurityContext.cs
 ../../../external/referencesource/mscorlib/system/missingfieldexception.cs
 ../../../external/referencesource/mscorlib/system/missingmemberexception.cs
 ../../../external/referencesource/mscorlib/system/missingmethodexception.cs
+../../../external/referencesource/mscorlib/system/multicastdelegate.cs
 ../../../external/referencesource/mscorlib/system/multicastnotsupportedexception.cs
 ../../../external/referencesource/mscorlib/system/nonserializedattribute.cs
 ../../../external/referencesource/mscorlib/system/notfinitenumberexception.cs
