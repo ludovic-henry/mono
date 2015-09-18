@@ -832,31 +832,30 @@ monitor_thread (void)
 	do {
 		MonoInternalThread *thread;
 		gboolean all_waitsleepjoin = TRUE;
-		gint32 interval_left = MONITOR_INTERVAL;
+		gint64 now, end;
 		gint32 awake = 0; /* number of spurious awakes we tolerate before doing a round of rebalancing */
 
 		g_assert (monitor_status != MONITOR_STATUS_NOT_RUNNING);
 
-		mono_gc_set_skip_thread (TRUE);
-
-		do {
-			guint32 ts;
-
+		for (now = mono_msec_ticks (), end = now + MONITOR_INTERVAL; now < end; now = mono_msec_ticks ()) {
+			if (awake++ >= 10)
+				break;
 			if (mono_runtime_is_shutting_down ())
 				break;
 
-			ts = mono_msec_ticks ();
-			if (SleepEx (interval_left, TRUE) == 0)
-				break;
-			interval_left -= mono_msec_ticks () - ts;
+			MONO_PREPARE_BLOCKING
+
+			mono_gc_set_skip_thread (TRUE);
+
+			SleepEx (end - now, TRUE);
 
 			mono_gc_set_skip_thread (FALSE);
+
+			MONO_FINISH_BLOCKING
+
 			if ((current_thread->state & (ThreadState_StopRequested | ThreadState_SuspendRequested)) != 0)
 				mono_thread_interruption_checkpoint ();
-			mono_gc_set_skip_thread (TRUE);
-		} while (interval_left > 0 && ++awake < 10);
-
-		mono_gc_set_skip_thread (FALSE);
+		}
 
 		if (threadpool->suspended)
 			continue;

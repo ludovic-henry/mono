@@ -883,7 +883,7 @@ mono_thread_info_safe_suspend_and_run (MonoNativeThreadId id, gboolean interrupt
 	MonoThreadInfo *info = NULL;
 	MonoThreadHazardPointers *hp = mono_hazard_pointer_get ();
 
-	THREADS_SUSPEND_DEBUG ("SUSPENDING tid %p\n", (void*)id);
+	printf ("SUSPENDING tid %p\n", (void*)id);
 	/*FIXME: unify this with self-suspend*/
 	g_assert (id != mono_native_thread_id_get ());
 

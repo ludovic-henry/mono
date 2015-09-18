@@ -59,6 +59,8 @@ suspend_thread (SgenThreadInfo *info, void *context)
 	MonoContext ctx;
 	gpointer stack_start;
 
+	printf ("suspend_thread %p (%p)\n", info, mono_thread_info_get_tid (info));
+
 	info->client_info.stopped_domain = mono_domain_get ();
 	info->client_info.signal = 0;
 	stop_count = sgen_global_stop_count;
@@ -117,6 +119,7 @@ suspend_thread (SgenThreadInfo *info, void *context)
 	pthread_sigmask (SIG_BLOCK, &suspend_ack_signal_mask, NULL);
 
 	/* notify the waiting thread */
+	printf ("post suspend_ack_semaphore_ptr\n");
 	SGEN_SEMAPHORE_POST (suspend_ack_semaphore_ptr);
 	info->client_info.stop_count = stop_count;
 
@@ -185,10 +188,14 @@ sgen_wait_for_suspend_ack (int count)
 	int i, result;
 
 	for (i = 0; i < count; ++i) {
-		while ((result = SGEN_SEMAPHORE_WAIT (suspend_ack_semaphore_ptr)) != 0) {
-			if (errno != EINTR) {
+		for (;;) {
+			printf ("wait suspend_ack_semaphore_ptr\n");
+			result = SGEN_SEMAPHORE_WAIT (suspend_ack_semaphore_ptr);
+			if (result == 0)
+				break;
+			printf ("wait suspend_ack_semaphore_ptr, result != 0, (errno == EINTR) = %d\n", errno == EINTR);
+			if (errno != EINTR)
 				g_error ("SGEN_SEMAPHORE_WAIT FAILED with %d errno %d (%s)", result, errno, strerror (errno));
-			}
 		}
 	}
 }
@@ -214,6 +221,7 @@ sgen_thread_handshake (BOOL suspend)
 		/*if (signum == suspend_signal_num && info->stop_count == global_stop_count)
 			continue;*/
 		result = mono_threads_pthread_kill (info, signum);
+		printf ("pthread_kill on %p (%p), result = %d\n", info, mono_thread_info_get_tid (info), result);
 		if (result == 0) {
 			count++;
 		} else {
