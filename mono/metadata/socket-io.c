@@ -96,13 +96,54 @@
 #define LOGDEBUG(...)  
 /* define LOGDEBUG(...) g_message(__VA_ARGS__)  */
 
+/*
+ * We disable signal based abort on posix and non unified suspend platforms
+ * because sgen uses it's own implementation of thread suspending/resuming,
+ * which is in conflict with the mono-threads one, and that causes hang.
+ * The issue arise with the following conditions :
+ *  - Thread T1 call a blocking syscall
+ *   - it installs a interrupt token with abort syscall
+ *  - Thread T2 runs the GC:
+ *   - it tries to suspend all the other threads
+ *   - T1 is interrupted: it calls the abort signal handler in mono-threads
+ *   - T2 waits for T1 to be suspended [0]
+ * [0] is never going to finish as T1 is in the mono-threads abort signal handler, which
+ *  is different from the SGen suspend signal handler.
+ */
+
 static void
-abort_syscall (gpointer data)
+syscall_abort (gpointer data)
 {
 	MonoThreadInfo *info = data;
 
+	g_assert (mono_thread_info_unified_management_enabled ());
+
 	if (mono_threads_core_needs_abort_syscall ())
 		mono_threads_core_abort_syscall (info);
+}
+
+static inline void
+syscall_install_interrupt_token (gboolean *interrupted)
+{
+	g_assert (interrupted);
+
+	if (!mono_thread_info_unified_management_enabled ()) {
+		*interrupted = FALSE;
+	} else {
+		mono_thread_info_install_interrupt (syscall_abort, mono_thread_info_current (), interrupted);
+	}
+}
+
+static inline void
+syscall_uninstall_interrupt_token (gboolean *interrupted)
+{
+	g_assert (interrupted);
+
+	if (!mono_thread_info_unified_management_enabled ()) {
+		*interrupted = FALSE;
+	} else {
+		mono_thread_info_uninstall_interrupt (interrupted);
+	}
 }
 
 static gint32
@@ -749,7 +790,7 @@ ves_icall_System_Net_Sockets_Socket_Accept_internal (SOCKET sock, gint32 *error,
 
 	*error = 0;
 
-	mono_thread_info_install_interrupt (abort_syscall, mono_thread_info_current (), &interrupted);
+	syscall_install_interrupt_token (&interrupted);
 	if (interrupted) {
 		*error = WSAEINTR;
 		return NULL;
@@ -770,7 +811,7 @@ ves_icall_System_Net_Sockets_Socket_Accept_internal (SOCKET sock, gint32 *error,
 
 	MONO_FINISH_BLOCKING;
 
-	mono_thread_info_uninstall_interrupt (&interrupted);
+	syscall_uninstall_interrupt_token (&interrupted);
 	if (interrupted) {
 		*error = WSAEINTR;
 		return NULL;
@@ -1200,7 +1241,7 @@ ves_icall_System_Net_Sockets_Socket_Poll_internal (SOCKET sock, gint mode,
 	start = time (NULL);
 
 	do {
-		mono_thread_info_install_interrupt (abort_syscall, mono_thread_info_current (), &interrupted);
+		syscall_install_interrupt_token (&interrupted);
 		if (interrupted) {
 			g_free (pfds);
 			*error = WSAEINTR;
@@ -1213,7 +1254,7 @@ ves_icall_System_Net_Sockets_Socket_Poll_internal (SOCKET sock, gint mode,
 
 		MONO_FINISH_BLOCKING;
 
-		mono_thread_info_uninstall_interrupt (&interrupted);
+		syscall_uninstall_interrupt_token (&interrupted);
 		if (interrupted) {
 			g_free (pfds);
 			*error = WSAEINTR;
@@ -1275,7 +1316,7 @@ ves_icall_System_Net_Sockets_Socket_Connect_internal (SOCKET sock, MonoObject *s
 
 	LOGDEBUG (g_message("%s: connecting to %s port %d", __func__, inet_ntoa(((struct sockaddr_in *)sa)->sin_addr), ntohs (((struct sockaddr_in *)sa)->sin_port)));
 
-	mono_thread_info_install_interrupt (abort_syscall, mono_thread_info_current (), &interrupted);
+	syscall_install_interrupt_token (&interrupted);
 	if (interrupted) {
 		*error = WSAEINTR;
 		return;
@@ -1287,7 +1328,7 @@ ves_icall_System_Net_Sockets_Socket_Connect_internal (SOCKET sock, MonoObject *s
 
 	MONO_FINISH_BLOCKING;
 
-	mono_thread_info_uninstall_interrupt (&interrupted);
+	syscall_uninstall_interrupt_token (&interrupted);
 	if (interrupted) {
 		*error = WSAEINTR;
 		return;
@@ -1365,7 +1406,7 @@ ves_icall_System_Net_Sockets_Socket_Disconnect_internal (SOCKET sock, MonoBoolea
 			_wapi_transmitfile = NULL;
 	}
 
-	mono_thread_info_install_interrupt (abort_syscall, mono_thread_info_current (), &interrupted);
+	syscall_install_interrupt_token (&interrupted);
 	if (interrupted) {
 		*error = WSAEINTR;
 		return;
@@ -1385,7 +1426,7 @@ ves_icall_System_Net_Sockets_Socket_Disconnect_internal (SOCKET sock, MonoBoolea
 
 	MONO_FINISH_BLOCKING;
 
-	mono_thread_info_uninstall_interrupt (&interrupted);
+	syscall_uninstall_interrupt_token (&interrupted);
 	if (interrupted)
 		*error = WSAEINTR;
 }
@@ -1415,7 +1456,7 @@ ves_icall_System_Net_Sockets_Socket_Receive_internal (SOCKET sock, MonoArray *bu
 		return (0);
 	}
 
-	mono_thread_info_install_interrupt (abort_syscall, mono_thread_info_current (), &interrupted);
+	syscall_install_interrupt_token (&interrupted);
 	if (interrupted)
 		return 0;
 
@@ -1433,7 +1474,7 @@ ves_icall_System_Net_Sockets_Socket_Receive_internal (SOCKET sock, MonoArray *bu
 
 	MONO_FINISH_BLOCKING;
 
-	mono_thread_info_uninstall_interrupt (&interrupted);
+	syscall_uninstall_interrupt_token (&interrupted);
 	if (interrupted) {
 		*error = WSAEINTR;
 		return 0;
@@ -1467,7 +1508,7 @@ ves_icall_System_Net_Sockets_Socket_Receive_array_internal (SOCKET sock, MonoArr
 		return(0);
 	}
 
-	mono_thread_info_install_interrupt (abort_syscall, mono_thread_info_current (), &interrupted);
+	syscall_install_interrupt_token (&interrupted);
 	if (interrupted) {
 		*error = WSAEINTR;
 		return 0;
@@ -1479,7 +1520,7 @@ ves_icall_System_Net_Sockets_Socket_Receive_array_internal (SOCKET sock, MonoArr
 
 	MONO_FINISH_BLOCKING;
 
-	mono_thread_info_uninstall_interrupt (&interrupted);
+	syscall_uninstall_interrupt_token (&interrupted);
 	if (interrupted) {
 		*error = WSAEINTR;
 		return 0;
@@ -1524,7 +1565,7 @@ ves_icall_System_Net_Sockets_Socket_ReceiveFrom_internal (SOCKET sock, MonoArray
 		return (0);
 	}
 
-	mono_thread_info_install_interrupt (abort_syscall, mono_thread_info_current (), &interrupted);
+	syscall_install_interrupt_token (&interrupted);
 	if (interrupted) {
 		g_free(sa);
 		*error = WSAEINTR;
@@ -1537,7 +1578,7 @@ ves_icall_System_Net_Sockets_Socket_ReceiveFrom_internal (SOCKET sock, MonoArray
 
 	MONO_FINISH_BLOCKING;
 
-	mono_thread_info_uninstall_interrupt (&interrupted);
+	syscall_uninstall_interrupt_token (&interrupted);
 	if (interrupted) {
 		g_free(sa);
 		*error = WSAEINTR;
@@ -1592,7 +1633,7 @@ ves_icall_System_Net_Sockets_Socket_Send_internal (SOCKET sock, MonoArray *buffe
 		return (0);
 	}
 
-	mono_thread_info_install_interrupt (abort_syscall, mono_thread_info_current (), &interrupted);
+	syscall_install_interrupt_token (&interrupted);
 	if (interrupted) {
 		*error = WSAEINTR;
 		return 0;
@@ -1604,7 +1645,7 @@ ves_icall_System_Net_Sockets_Socket_Send_internal (SOCKET sock, MonoArray *buffe
 
 	MONO_FINISH_BLOCKING;
 
-	mono_thread_info_uninstall_interrupt (&interrupted);
+	syscall_uninstall_interrupt_token (&interrupted);
 	if (interrupted) {
 		*error = WSAEINTR;
 		return 0;
@@ -1638,7 +1679,7 @@ ves_icall_System_Net_Sockets_Socket_Send_array_internal(SOCKET sock, MonoArray *
 		return(0);
 	}
 
-	mono_thread_info_install_interrupt (abort_syscall, mono_thread_info_current (), &interrupted);
+	syscall_install_interrupt_token (&interrupted);
 	if (interrupted) {
 		*error = WSAEINTR;
 		return 0;
@@ -1650,7 +1691,7 @@ ves_icall_System_Net_Sockets_Socket_Send_array_internal(SOCKET sock, MonoArray *
 
 	MONO_FINISH_BLOCKING;
 
-	mono_thread_info_uninstall_interrupt (&interrupted);
+	syscall_uninstall_interrupt_token (&interrupted);
 	if (interrupted) {
 		*error = WSAEINTR;
 		return 0;
@@ -1700,7 +1741,7 @@ ves_icall_System_Net_Sockets_Socket_SendTo_internal(SOCKET sock, MonoArray *buff
 		return (0);
 	}
 
-	mono_thread_info_install_interrupt (abort_syscall, mono_thread_info_current (), &interrupted);
+	syscall_install_interrupt_token (&interrupted);
 	if (interrupted) {
 		g_free (sa);
 		*error = WSAEINTR;
@@ -1713,7 +1754,7 @@ ves_icall_System_Net_Sockets_Socket_SendTo_internal(SOCKET sock, MonoArray *buff
 
 	MONO_FINISH_BLOCKING;
 
-	mono_thread_info_uninstall_interrupt (&interrupted);
+	syscall_uninstall_interrupt_token (&interrupted);
 	if (interrupted) {
 		g_free (sa);
 		*error = WSAEINTR;
@@ -1789,7 +1830,7 @@ ves_icall_System_Net_Sockets_Socket_Select_internal (MonoArray **sockets, gint32
 	timeout = (timeout >= 0) ? (timeout / 1000) : -1;
 	start = time (NULL);
 	do {
-		mono_thread_info_install_interrupt (abort_syscall, mono_thread_info_current (), &interrupted);
+		syscall_install_interrupt_token (&interrupted);
 		if (interrupted) {
 			g_free (pfds);
 			*error = WSAEINTR;
@@ -1802,7 +1843,7 @@ ves_icall_System_Net_Sockets_Socket_Select_internal (MonoArray **sockets, gint32
 
 		MONO_FINISH_BLOCKING;
 
-		mono_thread_info_uninstall_interrupt (&interrupted);
+		syscall_uninstall_interrupt_token (&interrupted);
 		if (interrupted) {
 			g_free (pfds);
 			*error = WSAEINTR;
@@ -2368,7 +2409,7 @@ ves_icall_System_Net_Sockets_Socket_Shutdown_internal(SOCKET sock, gint32 how, g
 
 	*error = 0;
 
-	mono_thread_info_install_interrupt (abort_syscall, mono_thread_info_current (), &interrupted);
+	syscall_install_interrupt_token (&interrupted);
 	if (interrupted) {
 		*error = WSAEINTR;
 		return;
@@ -2381,7 +2422,7 @@ ves_icall_System_Net_Sockets_Socket_Shutdown_internal(SOCKET sock, gint32 how, g
 
 	MONO_FINISH_BLOCKING;
 
-	mono_thread_info_uninstall_interrupt (&interrupted);
+	syscall_uninstall_interrupt_token (&interrupted);
 	if (interrupted) {
 		*error = WSAEINTR;
 		return;
@@ -2695,7 +2736,7 @@ ves_icall_System_Net_Sockets_Socket_SendFile_internal (SOCKET sock, MonoString *
 		buffers.TailLength = mono_array_length (post_buffer);
 	}
 
-	mono_thread_info_install_interrupt (abort_syscall, mono_thread_info_current (), &interrupted);
+	syscall_install_interrupt_token (&interrupted);
 	if (interrupted) {
 		CloseHandle (file);
 		SetLastError (WSAEINTR);
@@ -2708,7 +2749,7 @@ ves_icall_System_Net_Sockets_Socket_SendFile_internal (SOCKET sock, MonoString *
 
 	MONO_FINISH_BLOCKING;
 
-	mono_thread_info_uninstall_interrupt (&interrupted);
+	syscall_uninstall_interrupt_token (&interrupted);
 	if (interrupted) {
 		CloseHandle (file);
 		SetLastError (WSAEINTR);
