@@ -121,7 +121,11 @@ void
 mono_threads_add_to_pending_operation_set (MonoThreadInfo* info)
 {
 	THREADS_SUSPEND_DEBUG ("added %p to pending suspend\n", mono_thread_info_get_tid (info));
-	++pending_suspends;
+#if SIFEOF_VOID_P == 4
+	InterlockedIncrement (&pending_suspends);
+#elif SIFEOF_VOID_P == 8
+	InterlockedIncrement64 (&pending_suspends);
+#endif
 	InterlockedIncrement (&pending_ops);
 }
 
@@ -195,7 +199,7 @@ mono_threads_wait_pending_operations (void)
 
 	}
 
-	pending_suspends = 0;
+	mono_atomic_store_release (&pending_suspends, 0);
 
 	return c > 0;
 }
