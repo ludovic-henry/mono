@@ -691,12 +691,8 @@ ves_icall_System_Net_Sockets_Socket_Close_internal (SOCKET sock, gint32 *werror)
 
 	*werror = 0;
 
-	/* Clear any pending work item from this socket if the underlying
-	 * polling system does not notify when the socket is closed */
-	mono_threadpool_ms_io_remove_socket (GPOINTER_TO_INT (sock));
-
 	MONO_ENTER_GC_SAFE;
-	closesocket (sock);
+	closesocket(sock);
 	MONO_EXIT_GC_SAFE;
 }
 
