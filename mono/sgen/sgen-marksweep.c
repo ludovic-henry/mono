@@ -1199,12 +1199,14 @@ static guint64 stat_drain_loops;
 static void major_scan_object_with_evacuation (GCObject *start, mword desc, SgenGrayQueue *queue);
 
 #define COPY_OR_MARK_FUNCTION_NAME	major_copy_or_mark_object_no_evacuation
+#define SCAN_OBJECT_FUNCTION_NAME_HANDLE_PTR	major_scan_object_no_evacuation_handle_ptr
 #define SCAN_OBJECT_FUNCTION_NAME	major_scan_object_no_evacuation
 #define DRAIN_GRAY_STACK_FUNCTION_NAME	drain_gray_stack_no_evacuation
 #include "sgen-marksweep-drain-gray-stack.h"
 
 #define COPY_OR_MARK_WITH_EVACUATION
 #define COPY_OR_MARK_FUNCTION_NAME	major_copy_or_mark_object_with_evacuation
+#define SCAN_OBJECT_FUNCTION_NAME_HANDLE_PTR	major_scan_object_with_evacuation_handle_ptr
 #define SCAN_OBJECT_FUNCTION_NAME	major_scan_object_with_evacuation
 #define DRAIN_GRAY_STACK_FUNCTION_NAME	drain_gray_stack_with_evacuation
 #include "sgen-marksweep-drain-gray-stack.h"

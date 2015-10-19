@@ -49,6 +49,7 @@
 #include "sgen/sgen-hash-table.h"
 #include "sgen/sgen-qsort.h"
 #include "sgen/sgen-client.h"
+#include "sgen/sgen-scan-object.h"
 #include "tabledefs.h"
 #include "utils/mono-logger-internal.h"
 
@@ -623,15 +624,21 @@ static int dfs1_passes, dfs2_passes;
  * NULL, entry: entry has already been expanded and needs to be finished
  */
 
-#undef HANDLE_PTR
-#define HANDLE_PTR(ptr,obj)	do {					\
-		GCObject *dst = (GCObject*)*(ptr);			\
-		if (dst && object_needs_expansion (&dst)) {			\
-			++num_links;					\
-			dyn_array_ptr_push (&dfs_stack, obj_entry);	\
-			dyn_array_ptr_push (&dfs_stack, follow_forward (get_hash_entry (dst, NULL))); \
-		}							\
-	} while (0)
+typedef struct {
+	HashEntry *obj_entry;
+	int *num_links;
+} DFS1HandlePtrData;
+
+static inline MONO_ALWAYS_INLINE void
+dfs1_handle_ptr (GCObject **ptr, GCObject *obj, gpointer data)
+{
+	GCObject *dst = *ptr;
+	if (dst && object_needs_expansion (&dst)) {
+		*((DFS1HandlePtrData*) data)->num_links += 1;
+		dyn_array_ptr_push (&dfs_stack, ((DFS1HandlePtrData*) data)->obj_entry);
+		dyn_array_ptr_push (&dfs_stack, follow_forward (get_hash_entry (dst, NULL)));
+	}
+}
 
 static void
 dfs1 (HashEntry *obj_entry)
@@ -664,7 +671,6 @@ dfs1 (HashEntry *obj_entry)
 
 			if (!obj_entry->v.dfs1.is_visited) {
 				int num_links = 0;
-				mword desc = sgen_obj_get_descriptor_safe (obj);
 
 				obj_entry->v.dfs1.is_visited = 1;
 
@@ -672,7 +678,8 @@ dfs1 (HashEntry *obj_entry)
 				dyn_array_ptr_push (&dfs_stack, obj_entry);
 				dyn_array_ptr_push (&dfs_stack, NULL);
 
-#include "sgen/sgen-scan-object.h"
+				DFS1HandlePtrData data = { .obj_entry = obj_entry, .num_links = &num_links };
+				sgen_scan_object (sgen_obj_get_descriptor_safe (obj), obj, dfs1_handle_ptr, &data, 0);
 
 				/*
 				 * We can remove non-bridge objects with a single outgoing

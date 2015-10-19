@@ -763,6 +763,8 @@ sgen_safe_object_get_size_unaligned (GCObject *obj)
 #include "metadata/sgen-client-mono.h"
 #endif
 
+#include "mono/sgen/sgen-scan-object.h"
+
 gboolean sgen_object_is_live (GCObject *obj);
 
 void  sgen_init_fin_weak_hash (void);

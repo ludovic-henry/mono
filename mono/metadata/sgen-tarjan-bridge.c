@@ -47,6 +47,7 @@
 #include "sgen-bridge-internal.h"
 #include "sgen/sgen-hash-table.h"
 #include "sgen/sgen-qsort.h"
+#include "sgen/sgen-scan-object.h"
 #include "tabledefs.h"
 #include "utils/mono-logger-internal.h"
 
@@ -647,24 +648,24 @@ push_object (GCObject *obj)
 	dyn_array_ptr_push (&scan_stack, data);
 }
 
-#undef HANDLE_PTR
-#define HANDLE_PTR(ptr,obj)	do {					\
-		GCObject *dst = (GCObject*)*(ptr);			\
-		if (dst) push_object (dst); 			\
-	} while (0)
+static inline MONO_ALWAYS_INLINE void
+push_all_handle_ptr (GCObject **ptr, GCObject *obj, gpointer data)
+{
+	GCObject *dst = *ptr;
+	if (dst)
+		push_object (dst);
+}
 
 static void
 push_all (ScanData *data)
 {
 	GCObject *obj = data->obj;
-	char *start = (char*)obj;
-	mword desc = sgen_obj_get_descriptor_safe (obj);
 
 #if DUMP_GRAPH
 	printf ("**scanning %p %s\n", obj, safe_name_bridge (obj));
 #endif
 
-	#include "sgen/sgen-scan-object.h"
+	sgen_scan_object (sgen_obj_get_descriptor_safe (obj), obj, push_all_handle_ptr, NULL, 0);
 }
 
 
@@ -699,20 +700,19 @@ compute_low_index (ScanData *data, GCObject *obj)
 	}
 }
 
-#undef HANDLE_PTR
-#define HANDLE_PTR(ptr,obj)	do {					\
-		GCObject *dst = (GCObject*)*(ptr);			\
-		if (dst) compute_low_index (data, dst); 			\
-	} while (0)
+static inline MONO_ALWAYS_INLINE void
+compute_low_handle_ptr (GCObject **ptr, GCObject *obj, gpointer data)
+{
+		GCObject *dst = *ptr;
+		if (dst)
+			compute_low_index (data, dst);
+}
 
 static void
 compute_low (ScanData *data)
 {
 	GCObject *obj = data->obj;
-	char *start = (char*)obj;
-	mword desc = sgen_obj_get_descriptor_safe (obj);
-
-	#include "sgen/sgen-scan-object.h"
+	sgen_scan_object (sgen_obj_get_descriptor_safe (obj), obj, compute_low_handle_ptr, NULL, 0);
 }
 
 static ColorData*

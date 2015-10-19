@@ -48,6 +48,7 @@
 #include "sgen/sgen-hash-table.h"
 #include "sgen/sgen-qsort.h"
 #include "sgen/sgen-client.h"
+#include "sgen/sgen-scan-object.h"
 #include "utils/mono-logger-internal.h"
 
 typedef struct {
@@ -494,14 +495,15 @@ static DynPtrArray dfs_stack;
 static int dfs1_passes, dfs2_passes;
 
 
-#undef HANDLE_PTR
-#define HANDLE_PTR(ptr,obj)	do {					\
-		GCObject *dst = (GCObject*)*(ptr);			\
-		if (dst && !object_is_live (&dst)) {			\
-			dyn_array_ptr_push (&dfs_stack, obj_entry);	\
-			dyn_array_ptr_push (&dfs_stack, get_hash_entry (dst, NULL)); \
-		}							\
-	} while (0)
+static inline MONO_ALWAYS_INLINE void
+dfs1_handle_ptr (GCObject **ptr, GCObject *obj, gpointer data)
+{
+	GCObject *dst = *ptr;
+	if (dst && !object_is_live (&dst)) {
+		dyn_array_ptr_push (&dfs_stack, (HashEntry*) data);
+		dyn_array_ptr_push (&dfs_stack, get_hash_entry (dst, NULL));
+	}
+}
 
 static void
 dfs1 (HashEntry *obj_entry)
@@ -518,12 +520,9 @@ dfs1 (HashEntry *obj_entry)
 
 		obj_entry = dyn_array_ptr_pop (&dfs_stack);
 		if (obj_entry) {
-			char *start;
-			mword desc;
 			src = dyn_array_ptr_pop (&dfs_stack);
 
 			obj = obj_entry->obj;
-			desc = sgen_obj_get_descriptor_safe (obj);
 
 			if (src) {
 				//g_print ("link %s -> %s\n", sgen_safe_name (src->obj), sgen_safe_name (obj));
@@ -541,8 +540,7 @@ dfs1 (HashEntry *obj_entry)
 			/* NULL marks that the next entry is to be finished */
 			dyn_array_ptr_push (&dfs_stack, NULL);
 
-			start = (char*)obj;
-#include "sgen/sgen-scan-object.h"
+			sgen_scan_object (sgen_obj_get_descriptor_safe (obj), obj, dfs1_handle_ptr, obj_entry, 0);
 		} else {
 			obj_entry = dyn_array_ptr_pop (&dfs_stack);
 

@@ -23,33 +23,34 @@ extern guint64 stat_scan_object_called_nursery;
 
 #if defined(SGEN_SIMPLE_NURSERY)
 #define SERIAL_SCAN_OBJECT simple_nursery_serial_scan_object
+#define SERIAL_SCAN_OBJECT_OR_VTYPE_HANDLE_PTR simple_nursery_serial_scan_object_handle_ptr
 #define SERIAL_SCAN_VTYPE simple_nursery_serial_scan_vtype
 
 #elif defined (SGEN_SPLIT_NURSERY)
 #define SERIAL_SCAN_OBJECT split_nursery_serial_scan_object
+#define SERIAL_SCAN_OBJECT_OR_VTYPE_HANDLE_PTR split_nursery_serial_scan_object_handle_ptr
 #define SERIAL_SCAN_VTYPE split_nursery_serial_scan_vtype
 
 #else
 #error "Please define GC_CONF_NAME"
 #endif
 
-#undef HANDLE_PTR
 /* Global remsets are handled in SERIAL_COPY_OBJECT_FROM_OBJ */
-#define HANDLE_PTR(ptr,obj)	do {	\
-		void *__old = *(ptr);	\
-		SGEN_OBJECT_LAYOUT_STATISTICS_MARK_BITMAP ((obj), (ptr)); \
-		binary_protocol_scan_process_reference ((obj), (ptr), __old); \
-		if (__old) {	\
-			SERIAL_COPY_OBJECT_FROM_OBJ ((ptr), queue);	\
-			SGEN_COND_LOG (9, __old != *(ptr), "Overwrote field at %p with %p (was: %p)", (ptr), *(ptr), __old); \
-		}	\
-	} while (0)
+static inline MONO_ALWAYS_INLINE void
+SERIAL_SCAN_OBJECT_OR_VTYPE_HANDLE_PTR (GCObject **ptr, GCObject *obj, gpointer data)
+{
+	void *old = *ptr;
+	SGEN_OBJECT_LAYOUT_STATISTICS_MARK_BITMAP (obj, ptr);
+	binary_protocol_scan_process_reference (obj, ptr, old);
+	if (old) {
+		SERIAL_COPY_OBJECT_FROM_OBJ (ptr, (SgenGrayQueue*) data);
+		SGEN_COND_LOG (9, old != *ptr, "Overwrote field at %p with %p (was: %p)", ptr, *ptr, old);
+	}
+}
 
 static void
 SERIAL_SCAN_OBJECT (GCObject *object, SgenDescriptor desc, SgenGrayQueue *queue)
 {
-	char *start = (char*)object;
-
 	SGEN_OBJECT_LAYOUT_STATISTICS_DECLARE_BITMAP;
 
 #ifdef HEAVY_STATISTICS
@@ -58,8 +59,7 @@ SERIAL_SCAN_OBJECT (GCObject *object, SgenDescriptor desc, SgenGrayQueue *queue)
 
 	SGEN_ASSERT (9, sgen_get_current_collection_generation () == GENERATION_NURSERY, "Must not use minor scan during major collection.");
 
-#define SCAN_OBJECT_PROTOCOL
-#include "sgen-scan-object.h"
+	sgen_scan_object (desc, object, SERIAL_SCAN_OBJECT_OR_VTYPE_HANDLE_PTR, queue, SCAN_OBJECT_PROTOCOL);
 
 	SGEN_OBJECT_LAYOUT_STATISTICS_COMMIT_BITMAP;
 	HEAVY_STAT (++stat_scan_object_called_nursery);
@@ -75,9 +75,7 @@ SERIAL_SCAN_VTYPE (GCObject *full_object, char *start, SgenDescriptor desc, Sgen
 	/* The descriptors include info about the MonoObject header as well */
 	start -= SGEN_CLIENT_OBJECT_HEADER_SIZE;
 
-#define SCAN_OBJECT_NOVTABLE
-#define SCAN_OBJECT_PROTOCOL
-#include "sgen-scan-object.h"
+	sgen_scan_object (desc, full_object, SERIAL_SCAN_OBJECT_OR_VTYPE_HANDLE_PTR, queue, SCAN_OBJECT_NOVTABLE | SCAN_OBJECT_PROTOCOL);
 }
 
 #define FILL_MINOR_COLLECTOR_SCAN_OBJECT(collector)	do {			\

@@ -193,11 +193,23 @@ COPY_OR_MARK_FUNCTION_NAME (GCObject **ptr, GCObject *obj, SgenGrayQueue *queue)
 	return FALSE;
 }
 
+static inline MONO_ALWAYS_INLINE void
+SCAN_OBJECT_FUNCTION_NAME_HANDLE_PTR (GCObject **ptr, GCObject *obj, gpointer data)
+{
+	void *old = *ptr;
+	binary_protocol_scan_process_reference (obj, ptr, old);
+	if (old) {
+		gboolean still_in_nursery = COPY_OR_MARK_FUNCTION_NAME (ptr, old, (SgenGrayQueue*) data);
+		if (G_UNLIKELY (still_in_nursery && !sgen_ptr_in_nursery (ptr) && !SGEN_OBJECT_IS_CEMENTED (*ptr))) {
+			void *copy = *ptr;
+			sgen_add_to_global_remset (ptr, copy);
+		}
+	}
+}
+
 static void
 SCAN_OBJECT_FUNCTION_NAME (GCObject *obj, SgenDescriptor desc, SgenGrayQueue *queue)
 {
-	char *start = (char*)obj;
-
 #ifdef HEAVY_STATISTICS
 	++stat_optimized_major_scan;
 	if (!sgen_gc_descr_has_references (desc))
@@ -205,26 +217,11 @@ SCAN_OBJECT_FUNCTION_NAME (GCObject *obj, SgenDescriptor desc, SgenGrayQueue *qu
 	sgen_descriptor_count_scanned_object (desc);
 #endif
 #ifdef SGEN_HEAVY_BINARY_PROTOCOL
-	add_scanned_object (start);
+	add_scanned_object ((char*) obj);
 #endif
 
 	/* Now scan the object. */
-
-#undef HANDLE_PTR
-#define HANDLE_PTR(ptr,obj)	do {					\
-		void *__old = *(ptr);					\
-		binary_protocol_scan_process_reference ((obj), (ptr), __old); \
-		if (__old) {						\
-			gboolean __still_in_nursery = COPY_OR_MARK_FUNCTION_NAME ((ptr), __old, queue); \
-			if (G_UNLIKELY (__still_in_nursery && !sgen_ptr_in_nursery ((ptr)) && !SGEN_OBJECT_IS_CEMENTED (*(ptr)))) { \
-				void *__copy = *(ptr);			\
-				sgen_add_to_global_remset ((ptr), __copy); \
-			}						\
-		}							\
-	} while (0)
-
-#define SCAN_OBJECT_PROTOCOL
-#include "sgen-scan-object.h"
+	sgen_scan_object (desc, obj, SCAN_OBJECT_FUNCTION_NAME_HANDLE_PTR, queue, SCAN_OBJECT_PROTOCOL);
 }
 
 static gboolean
@@ -250,5 +247,6 @@ DRAIN_GRAY_STACK_FUNCTION_NAME (ScanCopyContext ctx)
 
 #undef COPY_OR_MARK_FUNCTION_NAME
 #undef COPY_OR_MARK_WITH_EVACUATION
+#undef SCAN_OBJECT_FUNCTION_NAME_HANDLE_PTR
 #undef SCAN_OBJECT_FUNCTION_NAME
 #undef DRAIN_GRAY_STACK_FUNCTION_NAME

@@ -22,6 +22,7 @@
 
 #include "sgen/sgen-gc.h"
 #include "sgen/sgen-protocol.h"
+#include "sgen/sgen-scan-object.h"
 #include "metadata/monitor.h"
 #include "sgen/sgen-layout-stats.h"
 #include "sgen/sgen-client.h"
@@ -89,20 +90,21 @@ ptr_on_stack (void *ptr)
 }
 
 #ifdef SGEN_HEAVY_BINARY_PROTOCOL
-#undef HANDLE_PTR
-#define HANDLE_PTR(ptr,obj) do {					\
-		gpointer o = *(gpointer*)(ptr);				\
-		if ((o)) {						\
-			gpointer d = ((char*)dest) + ((char*)(ptr) - (char*)(obj)); \
-			binary_protocol_wbarrier (d, o, (gpointer) SGEN_LOAD_VTABLE (o)); \
-		}							\
-	} while (0)
+
+static inline MONO_ALWAYS_INLINE void
+scan_object_for_binary_protocol_copy_wbarrier_handle_ptr (GCObject **ptr, GCObject *obj, gpointer data)
+{
+	gpointer o = *(gpointer*) ptr;
+	if (o) {
+		gpointer d = (char*) dest + (char*) ptr - (char*) obj;
+		binary_protocol_wbarrier (d, o, (gpointer) SGEN_LOAD_VTABLE (o));
+	}
+}
 
 static void
 scan_object_for_binary_protocol_copy_wbarrier (gpointer dest, char *start, mword desc)
 {
-#define SCAN_OBJECT_NOVTABLE
-#include "sgen/sgen-scan-object.h"
+	sgen_scan_object (desc, (GCObject*) start, scan_object_for_binary_protocol_copy_wbarrier_handle_ptr, NULL, SCAN_OBJECT_NOVTABLE)
 }
 #endif
 
@@ -2081,26 +2083,31 @@ typedef struct {
 	uintptr_t offsets [REFS_SIZE];
 } HeapWalkInfo;
 
-#undef HANDLE_PTR
-#define HANDLE_PTR(ptr,obj)	do {	\
-		if (*(ptr)) {	\
-			if (hwi->count == REFS_SIZE) {	\
-				hwi->callback ((MonoObject*)start, mono_object_class (start), hwi->called? 0: size, hwi->count, hwi->refs, hwi->offsets, hwi->data);	\
-				hwi->count = 0;	\
-				hwi->called = 1;	\
-			}	\
-			hwi->offsets [hwi->count] = (char*)(ptr)-(char*)start;	\
-			hwi->refs [hwi->count++] = *(ptr);	\
-		}	\
-	} while (0)
+typedef struct {
+	HeapWalkInfo *hwi;
+	size_t size;
+} CollectReferencesHandlePtrData;
+
+static inline MONO_ALWAYS_INLINE void
+collect_references_handle_ptr (GCObject **ptr, GCObject *obj, gpointer data)
+{
+	if (*ptr) {
+		HeapWalkInfo *hwi = ((CollectReferencesHandlePtrData*) data)->hwi;
+		if (hwi->count == REFS_SIZE) {
+			hwi->callback (obj, mono_object_class (obj), hwi->called? 0: ((CollectReferencesHandlePtrData*) data)->size, hwi->count, hwi->refs, hwi->offsets, hwi->data);
+			hwi->count = 0;
+			hwi->called = 1;
+		}
+		hwi->offsets [hwi->count] = (char*) ptr - (char*) obj;
+		hwi->refs [hwi->count++] = *ptr;
+	}
+}
 
 static void
 collect_references (HeapWalkInfo *hwi, GCObject *obj, size_t size)
 {
-	char *start = (char*)obj;
-	mword desc = sgen_obj_get_descriptor (obj);
-
-#include "sgen/sgen-scan-object.h"
+	CollectReferencesHandlePtrData data = { .hwi = hwi, .size = size };
+	sgen_scan_object (sgen_obj_get_descriptor (obj), obj, collect_references_handle_ptr, &data, 0);
 }
 
 static void
