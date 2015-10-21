@@ -15,7 +15,6 @@
 #endif
 
 #include <mono/utils/mono-threads.h>
-#include <mono/utils/mono-threads-posix-signals.h>
 #include <mono/metadata/gc-internal.h>
 
 #include <errno.h>
