@@ -18,7 +18,6 @@
 #include <signal.h>
 
 #include "mono-semaphore.h"
-#include "mono-threads-posix-signals.h"
 
 #if defined(__APPLE__) || defined(__OpenBSD__) || defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
 #define DEFAULT_SUSPEND_SIGNAL SIGXFSZ
@@ -73,45 +72,6 @@ signal_add_handler (int signo, gpointer handler, int flags)
 }
 
 static int
-suspend_signal_get (void)
-{
-#if defined(PLATFORM_ANDROID)
-	return SIGUNUSED;
-#elif !defined (SIGRTMIN)
-#ifdef SIGUSR1
-	return SIGUSR1;
-#else
-	return -1;
-#endif /* SIGUSR1 */
-#else
-	static int suspend_signum = -1;
-	if (suspend_signum == -1)
-		suspend_signum = signal_search_alternative (-1);
-	return suspend_signum;
-#endif /* SIGRTMIN */
-}
-
-static int
-restart_signal_get (void)
-{
-#if defined(PLATFORM_ANDROID)
-	return SIGTTOU;
-#elif !defined (SIGRTMIN)
-#ifdef SIGUSR2
-	return SIGUSR2;
-#else
-	return -1;
-#endif /* SIGUSR1 */
-#else
-	static int resume_signum = -1;
-	if (resume_signum == -1)
-		resume_signum = signal_search_alternative (suspend_signal_get () + 1);
-	return resume_signum;
-#endif /* SIGRTMIN */
-}
-
-
-static int
 abort_signal_get (void)
 {
 #if defined(PLATFORM_ANDROID)
@@ -125,7 +85,7 @@ abort_signal_get (void)
 #else
 	static int abort_signum = -1;
 	if (abort_signum == -1)
-		abort_signum = signal_search_alternative (restart_signal_get () + 1);
+		abort_signum = signal_search_alternative (MAX (DEFAULT_RESTART_SIGNAL, DEFAULT_SUSPEND_SIGNAL) + 1);
 	return abort_signum;
 #endif /* SIGRTMIN */
 }
@@ -251,13 +211,8 @@ mono_threads_posix_init_signals (MonoThreadPosixInitSignals signals)
 
 	switch (signals) {
 	case MONO_THREADS_POSIX_INIT_SIGNALS_SUSPEND_RESTART: {
-		if (mono_thread_info_unified_management_enabled ()) {
-			suspend_signal_num = DEFAULT_SUSPEND_SIGNAL;
-			restart_signal_num = DEFAULT_RESTART_SIGNAL;
-		} else {
-			suspend_signal_num = suspend_signal_get ();
-			restart_signal_num = restart_signal_get ();
-		}
+		suspend_signal_num = DEFAULT_SUSPEND_SIGNAL;
+		restart_signal_num = DEFAULT_RESTART_SIGNAL;
 
 		sigfillset (&suspend_signal_mask);
 		sigdelset (&suspend_signal_mask, restart_signal_num);
@@ -305,6 +260,26 @@ gint
 mono_threads_posix_get_abort_signal (void)
 {
 	return abort_signal_num;
+}
+
+#else /* defined(USE_POSIX_BACKEND) || defined(USE_POSIX_SYSCALL_ABORT) */
+
+gint
+mono_threads_posix_get_suspend_signal (void)
+{
+	return -1;
+}
+
+gint
+mono_threads_posix_get_restart_signal (void)
+{
+	return -1;
+}
+
+gint
+mono_threads_posix_get_abort_signal (void)
+{
+	return -1;
 }
 
 #endif /* defined(USE_POSIX_BACKEND) || defined(USE_POSIX_SYSCALL_ABORT) */
