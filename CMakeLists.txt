@@ -17,3 +17,5 @@ include (CheckTypeSize)
 include (CheckCSourceCompiles)
 
 add_subdirectory (eglib)
+add_subdirectory (mono)
+add_subdirectory (mcs)
