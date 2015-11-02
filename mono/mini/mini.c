@@ -3049,6 +3049,15 @@ is_open_method (MonoMethod *method)
 	return FALSE;
 }
 
+#if !defined(OP_GC_SAFE_POINT)
+
+static void
+mono_insert_safepoints (MonoCompile *cfg)
+{
+}
+
+#else
+
 static void
 mono_create_gc_safepoint (MonoCompile *cfg, MonoBasicBlock *bblock)
 {
@@ -3161,6 +3170,8 @@ mono_insert_safepoints (MonoCompile *cfg)
 		mono_print_code (cfg, "AFTER SAFEPOINTS");
 
 }
+
+#endif
 
 static void
 init_backend (MonoBackend *backend)
