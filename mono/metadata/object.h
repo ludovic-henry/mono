@@ -31,6 +31,8 @@ typedef struct _MonoObject {
 	MonoThreadsSync *synchronisation;
 } MonoObject;
 
+typedef struct _MonoManagedObject MonoManagedObject;
+
 typedef MonoObject* (*MonoInvokeFunc)	     (MonoMethod *method, void *obj, void **params, MonoObject **exc);
 typedef void*    (*MonoCompileFunc)	     (MonoMethod *method);
 typedef void	    (*MonoMainThreadFunc)    (void* user_data);

@@ -4209,12 +4209,15 @@ mono_mb_emit_auto_layout_exception (MonoMethodBuilder *mb, MonoClass *klass)
 MonoMethod *
 mono_marshal_get_icall_wrapper (MonoMethodSignature *sig, const char *name, gconstpointer func, gboolean check_exceptions)
 {
+	static MonoMethod *mono_managed_object_create_method = NULL, *mono_managed_object_destroy_method = NULL;
+	MonoClass *mono_managed_object_class;
 	MonoMethodSignature *csig, *csig2;
 	MonoMethodBuilder *mb;
 	MonoMethod *res;
-	int i;
+	int i, loc;
 	WrapperInfo *info;
-	
+	gboolean create_mono_managed_object;
+
 	g_assert (sig->pinvoke);
 
 	mb = mono_mb_new (mono_defaults.object_class, name, MONO_WRAPPER_MANAGED_TO_NATIVE);
@@ -4228,15 +4231,85 @@ mono_marshal_get_icall_wrapper (MonoMethodSignature *sig, const char *name, gcon
 		csig2 = mono_metadata_signature_dup_full (mono_defaults.corlib, sig);
 
 #ifndef DISABLE_JIT
-	if (sig->hasthis)
-		mono_mb_emit_byte (mb, CEE_LDARG_0);
+	if (!mono_managed_object_create_method || !mono_managed_object_create_method) {
+		mono_managed_object_class = mono_class_from_name (mono_defaults.corlib, "System", "MonoManagedObject");
+		g_assert (mono_managed_object_class);
+		mono_managed_object_create_method = mono_class_get_method_from_name (mono_managed_object_class, "Create", 1);
+		g_assert (mono_managed_object_create_method);
+		mono_managed_object_destroy_method = mono_class_get_method_from_name (mono_managed_object_class, "Destroy", 1);
+		g_assert (mono_managed_object_destroy_method);
+	}
 
-	for (i = 0; i < sig->param_count; i++)
-		mono_mb_emit_ldarg (mb, i + sig->hasthis);
+	if (!mono_threads_is_coop_enabled ()) {
+		create_mono_managed_object = FALSE;
+	} else {
+		if (func == mono_object_isinst) {
+			create_mono_managed_object = FALSE;
+		} else {
+			if (sig->hasthis) {
+				create_mono_managed_object = TRUE;
+			} else {
+				create_mono_managed_object = FALSE;
+				for (i = 0; i < sig->param_count; i++) {
+					if (mono_type_is_reference (sig->params [i])) {
+						create_mono_managed_object = TRUE;
+						break;
+					}
+				}
+			}
+		}
+	}
+
+	if (!create_mono_managed_object) {
+		printf ("Generate without MonoManagedObject %s\n", name);
+		if (sig->hasthis)
+			mono_mb_emit_ldarg (mb, 0);
+
+		for (i = 0; i < sig->param_count; i++)
+			mono_mb_emit_ldarg (mb, i + sig->hasthis);
+	} else {
+		printf ("Generate with MonoManagedObject %s\n", name);
+
+		if (sig->hasthis)
+			mono_mb_add_local (mb, &mono_defaults.object_class->byval_arg);
+
+		for (i = 0; i < sig->param_count; i++) {
+			if (mono_type_is_reference (sig->params [i]))
+				mono_mb_add_local (mb, &mono_defaults.object_class->byval_arg);
+		}
+
+		loc = 0;
+
+		if (sig->hasthis) {
+			mono_mb_emit_ldarg (mb, 0);
+			mono_mb_emit_managed_call (mb, mono_managed_object_create_method, NULL);
+			mono_mb_emit_stloc (mb, loc);
+			mono_mb_emit_ldloc (mb, loc);
+			loc += 1;
+		}
+
+		for (i = 0; i < sig->param_count; i++) {
+			mono_mb_emit_ldarg (mb, i + sig->hasthis);
+			if (mono_type_is_reference (sig->params [i])) {
+				mono_mb_emit_managed_call (mb, mono_managed_object_create_method, NULL);
+				mono_mb_emit_stloc (mb, loc);
+				mono_mb_emit_ldloc (mb, loc);
+				loc += 1;
+			}
+		}
+	}
 
 	mono_mb_emit_byte (mb, MONO_CUSTOM_PREFIX);
 	mono_mb_emit_op (mb, CEE_MONO_JIT_ICALL_ADDR, (gpointer)func);
 	mono_mb_emit_calli (mb, csig2);
+
+	if (create_mono_managed_object) {
+		for (i = 0; i < loc; i++) {
+			mono_mb_emit_ldloc (mb, loc);
+			mono_mb_emit_managed_call (mb, mono_managed_object_destroy_method, NULL);
+		}
+	}
+
 	if (check_exceptions)
 		emit_thread_interrupt_checkpoint (mb);
 	mono_mb_emit_byte (mb, CEE_RET);
@@ -4251,6 +4324,8 @@ mono_marshal_get_icall_wrapper (MonoMethodSignature *sig, const char *name, gcon
 	info->d.icall.func = (gpointer)func;
 	res = mono_mb_create (mb, csig, csig->param_count + 16, info);
 	mono_mb_free (mb);
+
+	mono_method_print_code (res);
 
 	return res;
 }

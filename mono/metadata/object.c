@@ -6927,3 +6927,6 @@ mono_glist_to_array (GList *list, MonoClass *eclass)
 	return res;
 }
 
+struct _MonoManagedObject {
+	MonoObject obj;
+};

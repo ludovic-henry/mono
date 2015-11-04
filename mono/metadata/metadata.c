@@ -6405,11 +6405,19 @@ mono_type_is_pointer (MonoType *type)
 mono_bool
 mono_type_is_reference (MonoType *type)
 {
-	return (type && (((type->type == MONO_TYPE_STRING) ||
-		(type->type == MONO_TYPE_SZARRAY) || (type->type == MONO_TYPE_CLASS) ||
-		(type->type == MONO_TYPE_OBJECT) || (type->type == MONO_TYPE_ARRAY)) ||
-		((type->type == MONO_TYPE_GENERICINST) &&
-		!mono_metadata_generic_class_is_valuetype (type->data.generic_class))));
+	if (!type)
+		return FALSE;
+	switch (type->type) {
+	case MONO_TYPE_STRING:
+	case MONO_TYPE_CLASS:
+	case MONO_TYPE_SZARRAY:
+	case MONO_TYPE_ARRAY:
+		return TRUE;
+	case MONO_TYPE_GENERICINST:
+		return !mono_metadata_generic_class_is_valuetype (type->data.generic_class);
+	default:
+		return FALSE;
+	}
 }
 
 /**
