@@ -900,6 +900,42 @@ namespace MonoTests.System.Threading
 				Thread.Sleep (1);
 			}
 		}
+
+		[Test]
+		public void AbortThenJoinNotWorking_Bug36143 ()
+		{
+			/* https://bugzilla.xamarin.com/show_bug.cgi?id=36143 */
+
+			/* this is a transient bug by nature, as it is the
+			 * manifestation of a race in the theading code. */
+
+			TimeSpan seconds = TimeSpan.FromSeconds (int.Parse (Environment.GetEnvironmentVariable ("MONO_TEST_BUG36143") ?? "10"));
+			DateTime start = DateTime.Now;
+
+			for (int i = 1; ; ++i) {
+				ManualResetEvent mre = new ManualResetEvent (false);
+				Thread thread = new Thread (state => {
+					((ManualResetEvent) state).Set ();
+
+					uint j = 1;
+					while (true) {
+						if ((j = (j + 1) % 1000) == 0)
+							Thread.Yield ();
+					}
+				});
+
+				thread.IsBackground = true;
+				thread.Start (mre);
+
+				Assert.IsTrue (mre.WaitOne (5000));
+
+				thread.Abort ();
+				thread.Join ();
+
+				if (i % 100 == 0)
+					Console.WriteLine ("started, aborted and joined {0} threads", i);
+			}
+		}
 	}
 
 	[TestFixture]
