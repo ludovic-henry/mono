@@ -399,6 +399,8 @@ static void thread_cleanup (MonoInternalThread *thread)
 {
 	g_assert (thread != NULL);
 
+	MOSTLY_ASYNC_SAFE_PRINTF ("Abort  %p (cleanup)\n", (gpointer)(gsize) thread->tid);
+
 	if (thread->abort_state_handle) {
 		mono_gchandle_free (thread->abort_state_handle);
 		thread->abort_state_handle = 0;
@@ -1201,6 +1203,7 @@ ves_icall_System_Threading_Thread_Sleep_internal(gint32 ms)
 		mono_thread_clr_state (thread, ThreadState_WaitSleepJoin);
 
 		if (res == WAIT_IO_COMPLETION) { /* we might have been interrupted */
+			MOSTLY_ASYNC_SAFE_PRINTF ("Abort  %p (ves_icall_System_Threading_Thread_Sleep_internal)\n", (gpointer)(gsize) thread->tid);
 			MonoException* exc = mono_thread_execute_interruption (thread);
 			if (exc) {
 				mono_raise_exception (exc);
@@ -1398,6 +1401,8 @@ ves_icall_System_Threading_Thread_Join_internal(MonoThread *this, int ms)
 	
 	if ((this_obj->state & ThreadState_Unstarted) != 0) {
 		UNLOCK_THREAD (this_obj);
+
+		MOSTLY_ASYNC_SAFE_PRINTF ("Joined %p (unstarted)\n", (gpointer)(gsize) this_obj->tid);
 		
 		mono_set_pending_exception (mono_get_exception_thread_state ("Thread has not been started."));
 		return FALSE;
@@ -1421,10 +1426,14 @@ ves_icall_System_Threading_Thread_Join_internal(MonoThread *this, int ms)
 	if(ret==WAIT_OBJECT_0) {
 		THREAD_DEBUG (g_message ("%s: join successful", __func__));
 
+		MOSTLY_ASYNC_SAFE_PRINTF ("Joined %p (success)\n", (gpointer)(gsize) this_obj->tid);
+
 		return(TRUE);
 	}
 	
 	THREAD_DEBUG (g_message ("%s: join failed", __func__));
+
+	MOSTLY_ASYNC_SAFE_PRINTF ("Joined %p (failure)\n", (gpointer)(gsize) this_obj->tid);
 
 	return(FALSE);
 }
@@ -1450,6 +1459,7 @@ mono_wait_uninterrupted (MonoInternalThread *thread, gboolean multiple, guint32 
 		if (ret != WAIT_IO_COMPLETION)
 			break;
 
+		MOSTLY_ASYNC_SAFE_PRINTF ("Abort  %p (mono_wait_uninterrupted)\n", (gpointer)(gsize) thread->tid);
 		exc = mono_thread_execute_interruption (thread);
 		if (exc)
 			mono_raise_exception (exc);
@@ -2061,24 +2071,32 @@ void mono_thread_current_check_pending_interrupt ()
 	}
 }
 
+static gint32 last_abort_action = -1;
+
 void
 ves_icall_System_Threading_Thread_Abort (MonoInternalThread *thread, MonoObject *state)
 {
 	LOCK_THREAD (thread);
-	
+
+	last_abort_action = -1;
+
 	if ((thread->state & ThreadState_AbortRequested) != 0 || 
 		(thread->state & ThreadState_StopRequested) != 0 ||
 		(thread->state & ThreadState_Stopped) != 0)
 	{
+		MOSTLY_ASYNC_SAFE_PRINTF ("Abort  %p (abort|stop|stopped)\n", (gpointer)(gsize) thread->tid);
 		UNLOCK_THREAD (thread);
 		return;
 	}
 
 	if ((thread->state & ThreadState_Unstarted) != 0) {
+		MOSTLY_ASYNC_SAFE_PRINTF ("Abort  %p (unstarted)\n", (gpointer)(gsize) thread->tid);
 		thread->state |= ThreadState_Aborted;
 		UNLOCK_THREAD (thread);
 		return;
 	}
+
+	MOSTLY_ASYNC_SAFE_PRINTF ("Abort  %p\n", (gpointer)(gsize) thread->tid);
 
 	thread->state |= ThreadState_AbortRequested;
 	if (thread->abort_state_handle)
@@ -2095,10 +2113,11 @@ ves_icall_System_Threading_Thread_Abort (MonoInternalThread *thread, MonoObject 
 
 	THREAD_DEBUG (g_message ("%s: (%"G_GSIZE_FORMAT") Abort requested for %p (%"G_GSIZE_FORMAT")", __func__, GetCurrentThreadId (), thread, (gsize)thread->tid));
 
-	/* During shutdown, we can't wait for other threads */
-	if (!shutting_down)
-		/* Make sure the thread is awake */
-		mono_thread_resume (thread);
+	// /* During shutdown, we can't wait for other threads */
+	// if (!shutting_down) {
+	// 	/* Make sure the thread is awake */
+	// 	mono_thread_resume (thread);
+	// }
 	
 	abort_thread_internal (thread, TRUE, TRUE);
 }
@@ -2110,6 +2129,7 @@ ves_icall_System_Threading_Thread_ResetAbort (MonoThread *this)
 	gboolean was_aborting;
 
 	LOCK_THREAD (thread);
+	MOSTLY_ASYNC_SAFE_PRINTF ("Abort  %p (reset!!)\n", (gpointer)(gsize) thread->tid);
 	was_aborting = thread->state & ThreadState_AbortRequested;
 	thread->state &= ~ThreadState_AbortRequested;
 	UNLOCK_THREAD (thread);
@@ -2133,6 +2153,7 @@ mono_thread_internal_reset_abort (MonoInternalThread *thread)
 {
 	LOCK_THREAD (thread);
 
+	MOSTLY_ASYNC_SAFE_PRINTF ("Abort  %p (reset!!) (2)\n", (gpointer)(gsize) thread->tid);
 	thread->state &= ~ThreadState_AbortRequested;
 
 	if (thread->abort_exc) {
@@ -2295,6 +2316,7 @@ void mono_thread_internal_stop (MonoInternalThread *thread)
 	/* Make sure the thread is awake */
 	mono_thread_resume (thread);
 
+	MOSTLY_ASYNC_SAFE_PRINTF ("Abort  %p (stop)\n", (gpointer)(gsize) thread->tid);
 	thread->state |= ThreadState_StopRequested;
 	thread->state &= ~ThreadState_AbortRequested;
 	
@@ -2649,6 +2671,7 @@ void mono_thread_cleanup (void)
 	 * won't exit in time.
 	 */
 	info = mono_thread_info_current ();
+	MOSTLY_ASYNC_SAFE_PRINTF ("Abort  %p (mono_thread_cleanup)\n", (gpointer)(gsize) mono_thread_info_get_tid (info));
 	wapi_thread_handle_set_exited (info->handle, mono_environment_exitcode_get ());
 #endif
 
@@ -2918,6 +2941,7 @@ mono_threads_set_shutting_down (void)
 		    (current_thread->state & ThreadState_AbortRequested) ||
 		    (current_thread->state & ThreadState_StopRequested)) {
 			UNLOCK_THREAD (current_thread);
+			g_assert_not_reached ();
 			mono_thread_execute_interruption (current_thread);
 		} else {
 			current_thread->state |= ThreadState_Stopped;
@@ -2986,6 +3010,7 @@ void mono_thread_manage (void)
 	if (!mono_runtime_try_shutdown ()) {
 		/*FIXME mono_thread_suspend probably should call mono_thread_execute_interruption when self interrupting. */
 		mono_thread_suspend (mono_thread_internal_current ());
+		g_assert_not_reached ();
 		mono_thread_execute_interruption (mono_thread_internal_current ());
 	}
 
@@ -4021,6 +4046,7 @@ static MonoException*
 mono_thread_execute_interruption (MonoInternalThread *thread)
 {
 	LOCK_THREAD (thread);
+	MOSTLY_ASYNC_SAFE_PRINTF ("Abort  %p (execute interruption)\n", (gpointer)(gsize) thread->tid);
 
 	/* MonoThread::interruption_requested can only be changed with atomics */
 	if (InterlockedCompareExchange (&thread->interruption_requested, FALSE, TRUE)) {
@@ -4036,26 +4062,32 @@ mono_thread_execute_interruption (MonoInternalThread *thread)
 	if ((thread->state & ThreadState_AbortRequested) != 0) {
 		UNLOCK_THREAD (thread);
 		if (thread->abort_exc == NULL) {
+			MOSTLY_ASYNC_SAFE_PRINTF ("Abort  %p (set abort exc)\n", (gpointer)(gsize) thread->tid);
 			/* 
 			 * This might be racy, but it has to be called outside the lock
 			 * since it calls managed code.
 			 */
 			MONO_OBJECT_SETREF (thread, abort_exc, mono_get_exception_thread_abort ());
+		} else {
+			MOSTLY_ASYNC_SAFE_PRINTF ("Abort  %p (NOT set abort exc)\n", (gpointer)(gsize) thread->tid);
 		}
 		return thread->abort_exc;
 	}
 	else if ((thread->state & ThreadState_SuspendRequested) != 0) {
+		MOSTLY_ASYNC_SAFE_PRINTF ("Abort  %p (suspend requested)\n", (gpointer)(gsize) thread->tid);
 		self_suspend_internal (thread);		
 		return NULL;
 	}
 	else if ((thread->state & ThreadState_StopRequested) != 0) {
+		MOSTLY_ASYNC_SAFE_PRINTF ("Abort  %p (stop requested)\n", (gpointer)(gsize) thread->tid);
 		/* FIXME: do this through the JIT? */
 
 		UNLOCK_THREAD (thread);
-		
+
 		mono_thread_exit ();
 		return NULL;
 	} else if (thread->pending_exception) {
+		MOSTLY_ASYNC_SAFE_PRINTF ("Abort  %p (pending exception)\n", (gpointer)(gsize) thread->tid);
 		MonoException *exc;
 
 		exc = thread->pending_exception;
@@ -4064,11 +4096,14 @@ mono_thread_execute_interruption (MonoInternalThread *thread)
         UNLOCK_THREAD (thread);
         return exc;
 	} else if (thread->thread_interrupt_requested) {
+		MOSTLY_ASYNC_SAFE_PRINTF ("Abort  %p (interrupt requested)\n", (gpointer)(gsize) thread->tid);
 
 		thread->thread_interrupt_requested = FALSE;
 		UNLOCK_THREAD (thread);
 		
 		return(mono_get_exception_thread_interrupted ());
+	} else {
+		MOSTLY_ASYNC_SAFE_PRINTF ("Abort  %p (unknown)\n", (gpointer)(gsize) thread->tid);
 	}
 	
 	UNLOCK_THREAD (thread);
@@ -4084,7 +4119,7 @@ mono_thread_execute_interruption (MonoInternalThread *thread)
  * the thread. If the result is an exception that needs to be throw, it is 
  * provided as return value.
  */
-MonoException*
+static MonoException*
 mono_thread_request_interruption (gboolean running_managed)
 {
 	MonoInternalThread *thread = mono_thread_internal_current ();
@@ -4125,6 +4160,7 @@ mono_thread_request_interruption (gboolean running_managed)
 		return NULL;
 	}
 	else {
+		MOSTLY_ASYNC_SAFE_PRINTF ("Abort  %p (mono_thread_request_interruption)\n", (gpointer)(gsize) thread->tid);
 		return mono_thread_execute_interruption (thread);
 	}
 }
@@ -4155,6 +4191,7 @@ mono_thread_resume_interruption (void)
 
 	mono_thread_info_self_interrupt ();
 
+	MOSTLY_ASYNC_SAFE_PRINTF ("Abort  %p (mono_thread_resume_interruption)\n", (gpointer)(gsize) thread->tid);
 	return mono_thread_execute_interruption (thread);
 }
 
@@ -4178,11 +4215,18 @@ mono_thread_interruption_checkpoint_request (gboolean bypass_abort_protection)
 	if (thread == NULL)
 		return NULL;
 
-	if (thread->interruption_requested && (bypass_abort_protection || !is_running_protected_wrapper ())) {
+	gboolean ir = thread->interruption_requested;
+	gboolean running_protected_wrapper = is_running_protected_wrapper ();
+
+	MOSTLY_ASYNC_SAFE_PRINTF ("Abort  %p (mono_thread_interruption_checkpoint_request. ir = %d, bap = %d, rpw %d)\n",
+		(gpointer)(gsize) thread->tid, ir, bypass_abort_protection, running_protected_wrapper);
+
+	if (ir && (bypass_abort_protection || !running_protected_wrapper)) {
 		MonoException* exc = mono_thread_execute_interruption (thread);
 		if (exc)
 			return exc;
 	}
+
 	return NULL;
 }
 
@@ -4194,7 +4238,10 @@ mono_thread_interruption_checkpoint_request (gboolean bypass_abort_protection)
 MonoException*
 mono_thread_interruption_checkpoint (void)
 {
-	return mono_thread_interruption_checkpoint_request (FALSE);
+	MonoException *exc = mono_thread_interruption_checkpoint_request (FALSE);
+	if (exc)
+		MOSTLY_ASYNC_SAFE_PRINTF ("Abort  %p (pending exception)\n", (gpointer)(gsize) mono_thread_info_get_tid (mono_thread_info_current ()));
+	return exc;
 }
 
 /*
@@ -4236,6 +4283,7 @@ mono_thread_get_and_clear_pending_exception (void)
 		return NULL;
 
 	if (thread->interruption_requested && !is_running_protected_wrapper ()) {
+		MOSTLY_ASYNC_SAFE_PRINTF ("Abort  %p (mono_thread_get_and_clear_pending_exception)\n", (gpointer)(gsize) thread->tid);
 		return mono_thread_execute_interruption (thread);
 	}
 	
@@ -4361,14 +4409,25 @@ mono_runtime_has_tls_get (void)
 	return has_tls_get;
 }
 
+static gint64 self_interrupt_thread_counter = 0;
+
 static void
 self_interrupt_thread (void *_unused)
 {
-	MonoThreadInfo *info = mono_thread_info_current ();
-	MonoException *exc = mono_thread_execute_interruption (mono_thread_internal_current ()); 
-	if (exc) /*We must use _with_context since we didn't trampoline into the runtime*/
-		mono_raise_exception_with_context (exc, &info->thread_saved_state [ASYNC_SUSPEND_STATE_INDEX].ctx); /* FIXME using thread_saved_state [ASYNC_SUSPEND_STATE_INDEX] can race with another suspend coming in. */
-	g_assert_not_reached (); /*this MUST not happen since we can't resume from an async call*/
+	MonoThreadInfo *info;
+	MonoException *exc;
+
+	info = mono_thread_info_current ();
+	g_assert (info);
+
+	MOSTLY_ASYNC_SAFE_PRINTF ("Abort  %p (self_interrupt_thread)\n", (gpointer)(gsize) mono_thread_info_get_tid (info));
+	exc = mono_thread_execute_interruption (mono_thread_internal_current ());
+	g_assert (exc);
+
+	/*We must use _with_context since we didn't trampoline into the runtime*/
+	mono_raise_exception_with_context (exc, &info->thread_saved_state [ASYNC_SUSPEND_STATE_INDEX].ctx); /* FIXME using thread_saved_state [ASYNC_SUSPEND_STATE_INDEX] can race with another suspend coming in. */
+
+	g_assert_not_reached ();
 }
 
 static gboolean
@@ -4403,6 +4462,8 @@ typedef struct {
 	gpointer interrupt_handle;
 } AbortThreadData;
 
+static gint32 has_interrupt_handle = -1;
+
 static SuspendThreadResult
 abort_thread_critical (MonoThreadInfo *info, gpointer ud)
 {
@@ -4426,15 +4487,22 @@ abort_thread_critical (MonoThreadInfo *info, gpointer ud)
 	running_managed = mono_jit_info_match (ji, MONO_CONTEXT_GET_IP (&mono_thread_info_get_suspend_state (info)->ctx));
 
 	if (!protected_wrapper && running_managed) {
+		last_abort_action = 0;
 		/*We are in managed code*/
 		/*Set the thread to call */
-		if (data->install_async_abort)
+		if (data->install_async_abort) {
+			InterlockedIncrement64 (&self_interrupt_thread_counter);
+			// MOSTLY_ASYNC_SAFE_PRINTF ("Abort  %p (install async call)\n", (gpointer)(gsize) mono_thread_info_get_tid (info));
 			mono_thread_info_setup_async_call (info, self_interrupt_thread, NULL);
-		return MonoResumeThread;
+		}
 	} else {
-		if (mono_thread_notify_pending_exc_fn)
-			/* The JIT will notify the thread about the interruption */
-			mono_thread_notify_pending_exc_fn (info);
+		last_abort_action = 1;
+		g_assert (!mono_thread_notify_pending_exc_fn);
+//		if (mono_thread_notify_pending_exc_fn) {
+//			g_assert (!running_managed);
+//			/* The JIT will notify the thread about the interruption */
+//			mono_thread_notify_pending_exc_fn (info);
+//		}
 
 		/* 
 		 * This will cause waits to be broken.
@@ -4444,8 +4512,9 @@ abort_thread_critical (MonoThreadInfo *info, gpointer ud)
 		 * make it return.
 		 */
 		data->interrupt_handle = mono_thread_info_prepare_interrupt (thread->handle);
-		return MonoResumeThread;
+		has_interrupt_handle = !!data->interrupt_handle;
 	}
+	return MonoResumeThread;
 }
 
 static void
@@ -4469,8 +4538,11 @@ abort_thread_internal (MonoInternalThread *thread, gboolean can_raise_exception,
 	}
 
 	mono_thread_info_safe_suspend_and_run ((MonoNativeThreadId)(gsize)thread->tid, TRUE, abort_thread_critical, &data);
-	if (data.interrupt_handle)
+	if (data.interrupt_handle) {
+		g_assert (last_abort_action == 1);
 		mono_thread_info_finish_interrupt (data.interrupt_handle);
+	}
+
 	/*FIXME we need to wait for interruption to complete -- figure out how much into interruption we should wait for here*/
 }
 

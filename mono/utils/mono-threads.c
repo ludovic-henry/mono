@@ -617,46 +617,6 @@ mono_threads_get_runtime_callbacks (void)
 }
 
 /*
-The return value is only valid until a matching mono_thread_info_resume is called
-*/
-static MonoThreadInfo*
-mono_thread_info_suspend_sync (MonoNativeThreadId tid, gboolean interrupt_kernel, const char **error_condition)
-{
-	MonoThreadHazardPointers *hp = mono_hazard_pointer_get ();	
-	MonoThreadInfo *info = mono_thread_info_lookup (tid); /*info on HP1*/
-	if (!info) {
-		*error_condition = "Thread not found";
-		return NULL;
-	}
-
-	switch (mono_threads_transition_request_async_suspension (info)) {
-	case AsyncSuspendAlreadySuspended:
-		mono_hazard_pointer_clear (hp, 1); //XXX this is questionable we got to clean the suspend/resume nonsense of critical sections
-		return info;
-	case AsyncSuspendWait:
-		mono_threads_add_to_pending_operation_set (info);
-		break;
-	case AsyncSuspendInitSuspend:
-		if (!mono_threads_core_begin_async_suspend (info, interrupt_kernel)) {
-			mono_hazard_pointer_clear (hp, 1);
-			*error_condition = "Could not suspend thread";
-			return NULL;
-		}
-	}
-
-	//Wait for the pending suspend to finish
-	mono_threads_wait_pending_operations ();
-
-	if (!mono_threads_core_check_suspend_result (info)) {
-
-		mono_hazard_pointer_clear (hp, 1);
-		*error_condition = "Post suspend failed";
-		return NULL;
-	}
-	return info;
-}
-
-/*
 Signal that the current thread wants to be suspended.
 This function can be called without holding the suspend lock held.
 To finish suspending, call mono_suspend_check.
@@ -834,69 +794,101 @@ mono_thread_info_in_critical_location (MonoThreadInfo *info)
 	return is_thread_in_critical_region (info);
 }
 
-static MonoThreadInfo*
-suspend_sync_nolock (MonoNativeThreadId id, gboolean interrupt_kernel)
+/*
+The return value is only valid until a matching mono_thread_info_resume is called
+*/
+static gboolean
+suspend_sync (MonoThreadInfo *info, gboolean interrupt_kernel)
 {
-	MonoThreadInfo *info = NULL;
-	int sleep_duration = 0;
-	for (;;) {
-		const char *suspend_error = "Unknown error";
-		if (!(info = mono_thread_info_suspend_sync (id, interrupt_kernel, &suspend_error))) {
-			mono_hazard_pointer_clear (mono_hazard_pointer_get (), 1);
-			return NULL;
-		}
+	g_assert (info);
 
-		/*WARNING: We now are in interrupt context until we resume the thread. */
-		if (!is_thread_in_critical_region (info))
-			break;
-
-		if (!mono_thread_info_core_resume (info)) {
-			mono_hazard_pointer_clear (mono_hazard_pointer_get (), 1);
-			return NULL;
-		}
-		THREADS_SUSPEND_DEBUG ("RESTARTED thread tid %p\n", (void*)id);
-
-		/* Wait for the pending resume to finish */
-		mono_threads_wait_pending_operations ();
-
-		if (!sleep_duration) {
-#ifdef HOST_WIN32
-			SwitchToThread ();
-#else
-			sched_yield ();
-#endif
-		}
-		else {
-			g_usleep (sleep_duration);
-		}
-		sleep_duration += 10;
+	switch (mono_threads_transition_request_async_suspension (info)) {
+	case AsyncSuspendAlreadySuspended:
+		return TRUE;
+	case AsyncSuspendWait:
+		mono_threads_add_to_pending_operation_set (info);
+		break;
+	case AsyncSuspendInitSuspend:
+		if (!mono_threads_core_begin_async_suspend (info, interrupt_kernel))
+			return FALSE;
 	}
-	return info;
+
+	//Wait for the pending suspend to finish
+	mono_threads_wait_pending_operations ();
+
+	if (!mono_threads_core_check_suspend_result (info))
+		return FALSE;
+
+	return TRUE;
+}
+
+static gboolean
+suspend_sync_nolock (MonoThreadInfo *info, gboolean interrupt_kernel)
+{
+	gint sleep_duration;
+
+	g_assert (info);
+
+	sleep_duration = 0;
+
+retry:
+
+	if (!suspend_sync (info, interrupt_kernel))
+		return FALSE;
+
+	/*WARNING: We now are in interrupt context until we resume the thread. */
+	if (!is_thread_in_critical_region (info))
+		return TRUE;
+
+	/* we are in a critical region, so we restart the
+	 * thread, yield or sleep, and retry suspending it */
+
+	if (!mono_thread_info_core_resume (info))
+		return FALSE;
+
+	THREADS_SUSPEND_DEBUG ("RESTARTED thread tid %p\n", (gpointer) MONO_NATIVE_THREAD_ID_TO_UINT (mono_thread_info_get_tid (info)));
+
+	/* Wait for the pending resume to finish */
+	mono_threads_wait_pending_operations ();
+
+	if (sleep_duration == 0) {
+		mono_thread_info_yield ();
+	} else {
+		MONO_PREPARE_BLOCKING;
+		g_usleep (sleep_duration);
+		MONO_FINISH_BLOCKING
+	}
+
+	sleep_duration += 10;
+
+	goto retry;
 }
 
 void
-mono_thread_info_safe_suspend_and_run (MonoNativeThreadId id, gboolean interrupt_kernel, MonoSuspendThreadCallback callback, gpointer user_data)
+mono_thread_info_safe_suspend_and_run (MonoNativeThreadId tid, gboolean interrupt_kernel, MonoSuspendThreadCallback callback, gpointer user_data)
 {
-	int result;
-	MonoThreadInfo *info = NULL;
-	MonoThreadHazardPointers *hp = mono_hazard_pointer_get ();
+	MonoThreadInfo *info;
+	MonoThreadHazardPointers *hp;
+	gint result;
 
-	THREADS_SUSPEND_DEBUG ("SUSPENDING tid %p\n", (void*)id);
+	hp = mono_hazard_pointer_get ();
+
+	THREADS_SUSPEND_DEBUG ("SUSPENDING tid %p\n", (gpointer) MONO_NATIVE_THREAD_ID_TO_UINT (tid));
 	/*FIXME: unify this with self-suspend*/
-	g_assert (id != mono_native_thread_id_get ());
+	g_assert (tid != mono_native_thread_id_get ());
 
 	mono_thread_info_suspend_lock ();
 	mono_threads_begin_global_suspend ();
 
-	info = suspend_sync_nolock (id, interrupt_kernel);
-	if (!info)
+	info = mono_thread_info_lookup (tid);
+	if (!info || !suspend_sync_nolock (info, interrupt_kernel))
 		goto done;
 
 	switch (result = callback (info, user_data)) {
 	case MonoResumeThread:
 		mono_hazard_pointer_set (hp, 1, info);
-		mono_thread_info_core_resume (info);
-		mono_threads_wait_pending_operations ();
+		g_assert (mono_thread_info_core_resume (info));
+		g_assert (mono_threads_wait_pending_operations ());
 		break;
 	case KeepSuspended:
 		break;
@@ -908,38 +900,6 @@ done:
 	mono_hazard_pointer_clear (hp, 1);
 	mono_threads_end_global_suspend ();
 	mono_thread_info_suspend_unlock ();
-}
-
-/*
-WARNING:
-If we are trying to suspend a target that is on a critical region
-and running a syscall we risk looping forever if @interrupt_kernel is FALSE.
-So, be VERY carefull in calling this with @interrupt_kernel == FALSE.
-
-Info is not put on a hazard pointer as a suspended thread cannot exit and be freed.
-
-This function MUST be matched with mono_thread_info_finish_suspend or mono_thread_info_finish_suspend_and_resume
-*/
-MonoThreadInfo*
-mono_thread_info_safe_suspend_sync (MonoNativeThreadId id, gboolean interrupt_kernel)
-{
-	MonoThreadInfo *info = NULL;
-
-	THREADS_SUSPEND_DEBUG ("SUSPENDING tid %p\n", (void*)id);
-	/*FIXME: unify this with self-suspend*/
-	g_assert (id != mono_native_thread_id_get ());
-
-	mono_thread_info_suspend_lock ();
-	mono_threads_begin_global_suspend ();
-
-	info = suspend_sync_nolock (id, interrupt_kernel);
-
-	/* XXX this clears HP 1, so we restated it again */
-	// mono_atomic_store_release (&mono_thread_info_current ()->inside_critical_region, TRUE);
-	mono_threads_end_global_suspend ();
-	mono_thread_info_suspend_unlock ();
-
-	return info;
 }
 
 /**
@@ -1119,6 +1079,7 @@ mono_thread_info_tls_set (THREAD_INFO_TYPE *info, MonoTlsKey key, gpointer value
 void
 mono_thread_info_exit (void)
 {
+	MOSTLY_ASYNC_SAFE_PRINTF ("Abort  %p (mono_thread_info_exit)\n", (gpointer)(gsize) mono_thread_info_get_tid (mono_thread_info_current ()));
 	mono_threads_core_exit (0);
 }
 

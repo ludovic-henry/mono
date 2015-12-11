@@ -96,6 +96,7 @@ inner_start_thread (void *arg)
 	/* Run the actual main function of the thread */
 	result = start_func (t_arg);
 
+	MOSTLY_ASYNC_SAFE_PRINTF ("Abort  %p (inner_start_thread)\n", (gpointer)(gsize) mono_thread_info_get_tid (info));
 	mono_threads_core_exit (GPOINTER_TO_UINT (result));
 	g_assert_not_reached ();
 }
@@ -183,6 +184,7 @@ mono_threads_core_exit (int exit_code)
 	nacl_shutdown_gc_thread();
 #endif
 
+	// MOSTLY_ASYNC_SAFE_PRINTF ("Abort  %p (mono_threads_core_exit)\n", (gpointer)(gsize) mono_thread_info_get_tid (current));
 	wapi_thread_handle_set_exited (current->handle, exit_code);
 
 	mono_thread_info_detach ();
@@ -194,6 +196,7 @@ void
 mono_threads_core_unregister (MonoThreadInfo *info)
 {
 	if (info->handle) {
+		// MOSTLY_ASYNC_SAFE_PRINTF ("Abort  %p (mono_threads_core_unregister)\n", (gpointer)(gsize) mono_thread_info_get_tid (info));
 		wapi_thread_handle_set_exited (info->handle, 0);
 		info->handle = NULL;
 	}
@@ -438,6 +441,7 @@ suspend_signal_handler (int _dummy, siginfo_t *info, void *context)
 
 	THREADS_SUSPEND_DEBUG ("SIGNAL HANDLER FOR %p [%p]\n", current, (void*)current->native_handle);
 	if (current->syscall_break_signal) {
+		g_assert_not_reached ();
 		current->syscall_break_signal = FALSE;
 		THREADS_SUSPEND_DEBUG ("\tsyscall break for %p\n", current);
 		mono_threads_notify_initiator_of_abort (current);
@@ -446,6 +450,7 @@ suspend_signal_handler (int _dummy, siginfo_t *info, void *context)
 
 	/* Have we raced with self suspend? */
 	if (!mono_threads_transition_finish_async_suspend (current)) {
+		MOSTLY_ASYNC_SAFE_PRINTF ("Abort  %p (signal handler, self_suspend race)\n", (gpointer)(gsize) mono_thread_info_get_tid (current));
 		current->suspend_can_continue = TRUE;
 		THREADS_SUSPEND_DEBUG ("\tlost race with self suspend %p\n", current);
 		goto done;
@@ -455,7 +460,6 @@ suspend_signal_handler (int _dummy, siginfo_t *info, void *context)
 
 	/* thread_state_init_from_sigctx return FALSE if the current thread is detaching and suspend can't continue. */
 	current->suspend_can_continue = ret;
-
 
 	/*
 	Block the restart signal.
@@ -469,6 +473,8 @@ suspend_signal_handler (int _dummy, siginfo_t *info, void *context)
 
 	/* This thread is doomed, all we can do is give up and let the suspender recover. */
 	if (!ret) {
+		MOSTLY_ASYNC_SAFE_PRINTF ("Abort  %p (signal handler, detaching)\n", (gpointer)(gsize) mono_thread_info_get_tid (current));
+
 		THREADS_SUSPEND_DEBUG ("\tThread is dying, failed to capture state %p\n", current);
 		mono_threads_transition_async_suspend_compensation (current);
 		/* Unblock the restart signal. */
@@ -494,6 +500,8 @@ suspend_signal_handler (int _dummy, siginfo_t *info, void *context)
 #else
 		g_error ("The new interruption machinery requires a working mono-context");
 #endif
+	} else {
+		MOSTLY_ASYNC_SAFE_PRINTF ("Abort  %p (NOT setup async callback)\n", (gpointer)(gsize) mono_thread_info_get_tid (current));
 	}
 
 	/* We're done resuming */

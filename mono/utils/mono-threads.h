@@ -87,9 +87,9 @@ and reduce the number of casts drastically.
 
 /* Logging - enable them below if you need specific logging for the category you need */
 #define MOSTLY_ASYNC_SAFE_PRINTF(...) do { \
-	char __buff[1024];	__buff [0] = '\0'; \
+	char __buff[128];	__buff [0] = '\0'; \
 	g_snprintf (__buff, sizeof (__buff), __VA_ARGS__);	\
-	write (1, __buff, strlen (__buff));	\
+	write (2, __buff, strlen (__buff));	\
 } while (0)
 
 
@@ -340,9 +340,6 @@ mono_thread_info_list_head (void);
 
 THREAD_INFO_TYPE*
 mono_thread_info_lookup (MonoNativeThreadId id);
-
-THREAD_INFO_TYPE*
-mono_thread_info_safe_suspend_sync (MonoNativeThreadId tid, gboolean interrupt_kernel);
 
 gboolean
 mono_thread_info_resume (MonoNativeThreadId tid);

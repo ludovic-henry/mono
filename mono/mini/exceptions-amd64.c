@@ -990,6 +990,8 @@ mono_arch_notify_pending_exc (MonoThreadInfo *info)
 		/* Already hijacked or trampoline LMF entry */
 		return;
 
+	MOSTLY_ASYNC_SAFE_PRINTF ("Abort  %p (horrible horrible hack)\n", (gpointer)(gsize) mono_thread_info_get_tid (info));
+
 	/* lmf->rsp is set just before making the call which transitions to unmanaged code */
 	lmf->rip = *(guint64*)(lmf->rsp - 8);
 	/* Signal that lmf->rip is set */

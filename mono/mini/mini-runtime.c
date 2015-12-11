@@ -894,6 +894,7 @@ mono_thread_abort (MonoObject *obj)
 
 	if ((mono_runtime_unhandled_exception_policy_get () == MONO_UNHANDLED_POLICY_LEGACY) ||
 			(obj->vtable->klass == mono_defaults.threadabortexception_class)) {
+		MOSTLY_ASYNC_SAFE_PRINTF ("Abort  %p (thread abort)\n", (gpointer)(gsize) mono_thread_info_get_tid (mono_thread_info_current ()));
 		mono_thread_exit ();
 	} else {
 		mono_invoke_unhandled_exception_hook (obj);
@@ -963,22 +964,11 @@ mono_thread_start_cb (intptr_t tid, gpointer stack_start, gpointer func)
 	mono_arch_cpu_init ();
 }
 
-void (*mono_thread_attach_aborted_cb ) (MonoObject *obj) = NULL;
-
-static void
-mono_thread_abort_dummy (MonoObject *obj)
-{
-  if (mono_thread_attach_aborted_cb)
-    mono_thread_attach_aborted_cb (obj);
-  else
-    mono_thread_abort (obj);
-}
-
 static void
 mono_thread_attach_cb (intptr_t tid, gpointer stack_start)
 {
 	MonoThreadInfo *thread;
-	void *jit_tls = setup_jit_tls_data (stack_start, mono_thread_abort_dummy);
+	void *jit_tls = setup_jit_tls_data (stack_start, mono_thread_abort);
 	thread = mono_thread_info_current_unchecked ();
 	if (thread)
 		thread->jit_data = jit_tls;
@@ -3034,10 +3024,10 @@ mini_init (const char *filename, const char *runtime_version)
 #endif
 	mono_threads_install_cleanup (mini_thread_cleanup);
 
-#ifdef MONO_ARCH_HAVE_NOTIFY_PENDING_EXC
-	check_for_pending_exc = FALSE;
-	mono_threads_install_notify_pending_exc ((MonoThreadNotifyPendingExcFunc)mono_arch_notify_pending_exc);
-#endif
+// #ifdef MONO_ARCH_HAVE_NOTIFY_PENDING_EXC
+// 	check_for_pending_exc = FALSE;
+// 	mono_threads_install_notify_pending_exc ((MonoThreadNotifyPendingExcFunc)mono_arch_notify_pending_exc);
+// #endif
 
 #define JIT_TRAMPOLINES_WORK
 #ifdef JIT_TRAMPOLINES_WORK

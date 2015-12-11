@@ -25,20 +25,31 @@ void mono_thread_hazardous_try_free_some (void);
 MonoThreadHazardPointers* mono_hazard_pointer_get (void);
 gpointer get_hazardous_pointer (gpointer volatile *pp, MonoThreadHazardPointers *hp, int hazard_index);
 
-#define mono_hazard_pointer_set(hp,i,v)	\
-	do { g_assert ((i) >= 0 && (i) < HAZARD_POINTER_COUNT); \
-		(hp)->hazard_pointers [(i)] = (v); \
-		mono_memory_write_barrier (); \
-	} while (0)
+static inline void
+mono_hazard_pointer_set (MonoThreadHazardPointers* hp, int index, gpointer value)
+{
+	g_assert (index >= 0);
+	g_assert (index < HAZARD_POINTER_COUNT);
 
-#define mono_hazard_pointer_get_val(hp,i)	\
-	((hp)->hazard_pointers [(i)])
+	hp->hazard_pointers [index] = value;
+	mono_memory_write_barrier ();
+}
 
-#define mono_hazard_pointer_clear(hp,i)	\
-	do { g_assert ((i) >= 0 && (i) < HAZARD_POINTER_COUNT); \
-		(hp)->hazard_pointers [(i)] = NULL; \
-	} while (0)
+static inline gpointer
+mono_hazard_pointer_get_val (MonoThreadHazardPointers* hp, int index)
+{
+	return hp->hazard_pointers [index];
+}
 
+static inline void
+mono_hazard_pointer_clear (MonoThreadHazardPointers* hp, int index)
+{
+	g_assert (index >= 0);
+	g_assert (index < HAZARD_POINTER_COUNT);
+
+	hp->hazard_pointers [index] = NULL;
+	mono_memory_write_barrier ();
+}
 
 void mono_thread_small_id_free (int id);
 int mono_thread_small_id_alloc (void);
