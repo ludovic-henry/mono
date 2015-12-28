@@ -34,6 +34,7 @@
 #include "metadata/runtime.h"
 #include "metadata/sgen-bridge-internals.h"
 #include "metadata/gc-internals.h"
+#include "metadata/handle.h"
 #include "utils/mono-memory-model.h"
 #include "utils/mono-logger-internals.h"
 #include "utils/mono-error.h"
@@ -2172,6 +2173,8 @@ sgen_client_thread_register (SgenThreadInfo* info, void *stack_bottom_fallback)
 	memset (&info->client_info.regs, 0, sizeof (info->client_info.regs));
 #endif
 
+	mono_handle_arena_initialize ((MonoHandleArena**) &info->client_info.info.handle_arena);
+
 	if (mono_gc_get_gc_callbacks ()->thread_attach_func)
 		info->client_info.runtime_data = mono_gc_get_gc_callbacks ()->thread_attach_func ();
 
@@ -2200,6 +2203,8 @@ sgen_client_thread_unregister (SgenThreadInfo *p)
 		mono_gc_get_gc_callbacks ()->thread_detach_func (p->client_info.runtime_data);
 		p->client_info.runtime_data = NULL;
 	}
+
+	mono_handle_arena_deinitialize ((MonoHandleArena**) &p->client_info.info.handle_arena);
 
 	binary_protocol_thread_unregister ((gpointer)tid);
 	SGEN_LOG (3, "unregister thread %p (%p)", p, (gpointer)tid);
