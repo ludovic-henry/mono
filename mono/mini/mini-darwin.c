@@ -272,6 +272,7 @@ mono_gdb_render_native_backtraces (pid_t crashed_pid)
 
 	commands = fopen (template, "w");
 	if (using_lldb) {
+		printf ("using lldb\n");
 		fprintf (commands, "process attach --pid %ld\n", (long) crashed_pid);
 		fprintf (commands, "thread list\n");
 		fprintf (commands, "thread backtrace all\n");

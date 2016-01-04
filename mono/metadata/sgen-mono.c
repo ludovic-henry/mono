@@ -2993,4 +2993,178 @@ mono_gc_is_null (void)
 	return FALSE;
 }
 
+/* Handle API specifics */
+
+MonoHandle*
+mono_gc_handle_alloc_pinned_obj (MonoVTable *vtable, size_t size)
+{
+	MonoHandle *handle = mono_handle_new (sgen_alloc_obj_pinned (vtable, size));
+
+	if (G_UNLIKELY (alloc_events)) {
+		MONO_PREPARE_CRITICAL;
+		mono_profiler_allocation (mono_handle_obj (handle));
+		MONO_FINISH_CRITICAL;
+	}
+
+	return handle;
+}
+
+MonoHandle*
+mono_gc_handle_alloc_obj (MonoVTable *vtable, size_t size)
+{
+	MonoHandle *handle = mono_handle_new (sgen_alloc_obj (vtable, size));
+
+	if (G_UNLIKELY (alloc_events)) {
+		MONO_PREPARE_CRITICAL;
+		mono_profiler_allocation (mono_handle_obj (handle));
+		MONO_FINISH_CRITICAL;
+	}
+
+	return handle;
+}
+
+MONO_HANDLE_TYPE (MonoArray)*
+mono_gc_handle_alloc_vector (MonoVTable *vtable, size_t size, uintptr_t max_length)
+{
+	MONO_HANDLE_TYPE (MonoArray) *arr;
+	TLAB_ACCESS_INIT;
+
+	if (!SGEN_CAN_ALIGN_UP (size))
+		return MONO_HANDLE_NEW (MonoArray, NULL);
+
+#ifndef DISABLE_CRITICAL_REGION
+	ENTER_CRITICAL_REGION;
+	arr = MONO_HANDLE_NEW (MonoArray, sgen_try_alloc_obj_nolock (vtable, size));
+	if (!mono_handle_obj_is_null (arr)) {
+		/*This doesn't require fencing since EXIT_CRITICAL_REGION already does it for us*/
+		MONO_HANDLE_SET (arr, max_length, (mono_array_size_t)max_length);
+		EXIT_CRITICAL_REGION;
+		goto done;
+	}
+	EXIT_CRITICAL_REGION;
+#endif
+
+	LOCK_GC;
+
+	arr = MONO_HANDLE_NEW (MonoArray, sgen_try_alloc_obj_nolock (vtable, size));
+	if (G_UNLIKELY (mono_handle_obj_is_null (arr))) {
+		UNLOCK_GC;
+		return mono_gc_handle_out_of_memory (size);
+	}
+
+	MONO_HANDLE_SET (arr, max_length, (mono_array_size_t)max_length);
+
+	UNLOCK_GC;
+
+done:
+	if (G_UNLIKELY (alloc_events)) {
+		MONO_PREPARE_CRITICAL;
+		mono_profiler_allocation ((MonoObject*) mono_handle_obj (arr));
+		MONO_FINISH_CRITICAL;
+	}
+
+	MONO_PREPARE_CRITICAL;
+	SGEN_ASSERT (6, SGEN_ALIGN_UP (size) == SGEN_ALIGN_UP (sgen_client_par_object_get_size (vtable, (GCObject*) mono_handle_obj (arr))), "Vector has incorrect size.");
+	MONO_FINISH_CRITICAL;
+
+	return arr;
+}
+
+MONO_HANDLE_TYPE (MonoArray)*
+mono_gc_handle_alloc_array (MonoVTable *vtable, size_t size, uintptr_t max_length, uintptr_t bounds_size)
+{
+	MONO_HANDLE_TYPE (MonoArray) *arr;
+	TLAB_ACCESS_INIT;
+
+	if (!SGEN_CAN_ALIGN_UP (size))
+		return MONO_HANDLE_NEW (MonoArray, NULL);
+
+#ifndef DISABLE_CRITICAL_REGION
+	ENTER_CRITICAL_REGION;
+	arr = MONO_HANDLE_NEW (MonoArray, sgen_try_alloc_obj_nolock (vtable, size));
+	if (!mono_handle_obj_is_null (arr)) {
+		/*This doesn't require fencing since EXIT_CRITICAL_REGION already does it for us*/
+		MONO_PREPARE_CRITICAL;
+		MONO_HANDLE_SET (arr, max_length, (mono_array_size_t)max_length);
+		MONO_HANDLE_SET (arr, bounds, (MonoArrayBounds*) ((char*) mono_handle_obj (arr) + size - bounds_size));
+		MONO_FINISH_CRITICAL;
+
+		EXIT_CRITICAL_REGION;
+		goto done;
+	}
+	EXIT_CRITICAL_REGION;
+#endif
+
+	LOCK_GC;
+
+	arr = MONO_HANDLE_NEW (MonoArray, sgen_alloc_obj_nolock (vtable, size));
+	if (G_UNLIKELY (mono_handle_obj_is_null (arr))) {
+		UNLOCK_GC;
+		return mono_gc_handle_out_of_memory (size);
+	}
+
+	MONO_PREPARE_CRITICAL;
+	MONO_HANDLE_SET (arr, max_length, (mono_array_size_t)max_length);
+	MONO_HANDLE_SET (arr, bounds, (MonoArrayBounds*) ((char*) mono_handle_obj (arr) + size - bounds_size));
+	MONO_FINISH_CRITICAL;
+
+	UNLOCK_GC;
+
+ done:
+	if (G_UNLIKELY (alloc_events)) {
+		MONO_PREPARE_CRITICAL;
+		mono_profiler_allocation ((MonoObject*) mono_handle_obj (arr));
+		MONO_FINISH_CRITICAL;
+	}
+
+	MONO_PREPARE_CRITICAL;
+	SGEN_ASSERT (6, SGEN_ALIGN_UP (size) == SGEN_ALIGN_UP (sgen_client_par_object_get_size (vtable, (GCObject*) mono_handle_obj (arr))), "Array has incorrect size.");
+	MONO_FINISH_CRITICAL;
+
+	return arr;
+}
+
+MONO_HANDLE_TYPE (MonoString)*
+mono_gc_handle_alloc_string (MonoVTable *vtable, size_t size, gint32 len)
+{
+	MONO_HANDLE_TYPE (MonoString) *str;
+	TLAB_ACCESS_INIT;
+
+	if (!SGEN_CAN_ALIGN_UP (size))
+		return MONO_HANDLE_NEW (MonoString, NULL);
+
+#ifndef DISABLE_CRITICAL_REGION
+	ENTER_CRITICAL_REGION;
+	str = MONO_HANDLE_NEW (MonoString, sgen_try_alloc_obj_nolock (vtable, size));
+	if (!mono_handle_obj_is_null (str)) {
+		/*This doesn't require fencing since EXIT_CRITICAL_REGION already does it for us*/
+		MONO_HANDLE_SET (str, length, len);
+		EXIT_CRITICAL_REGION;
+		goto done;
+	}
+	EXIT_CRITICAL_REGION;
+#endif
+
+	LOCK_GC;
+
+	str = MONO_HANDLE_NEW (MonoString, sgen_alloc_obj_nolock (vtable, size));
+	if (G_UNLIKELY (mono_handle_obj_is_null (str))) {
+		UNLOCK_GC;
+		return mono_gc_handle_out_of_memory (size);
+	}
+
+	MONO_HANDLE_SET (str, length, len);
+
+	UNLOCK_GC;
+
+ done:
+	if (G_UNLIKELY (alloc_events)) {
+		MONO_PREPARE_CRITICAL;
+		mono_profiler_allocation ((MonoObject*) mono_handle_obj (str));
+		MONO_FINISH_CRITICAL;
+	}
+
+	return str;
+}
+
 #endif

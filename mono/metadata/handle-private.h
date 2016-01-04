@@ -10,9 +10,9 @@ MonoHandle*
 mono_handle_arena_elevate (MonoHandleArena *arena, MonoHandle *handle);
 
 void
-mono_handle_arena_stack_push (MonoHandleArena **arena_stack, MonoHandleArena *arena, gsize nb_handles);
+mono_handle_arena_stack_push (MonoHandleArena **arena_stack, MonoHandleArena *arena);
 
 void
-mono_handle_arena_stack_pop (MonoHandleArena **arena_stack, MonoHandleArena *arena, gsize nb_handles);
+mono_handle_arena_stack_pop (MonoHandleArena **arena_stack, MonoHandleArena *arena);
 
 #endif/*__MONO_HANDLE_PRIVATE_H__*/

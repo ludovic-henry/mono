@@ -534,4 +534,36 @@ mono_gc_is_null (void)
 	return TRUE;
 }
 
+/* Handle API specifics */
+
+MonoHandle*
+mono_gc_handle_alloc_pinned_obj (MonoVTable *vtable, size_t size)
+{
+	return mono_handle_new (mono_gc_alloc_pinned_obj (vtable, size));
+}
+
+MonoHandle*
+mono_gc_handle_alloc_obj (MonoVTable *vtable, size_t size)
+{
+	return mono_handle_new (mono_gc_alloc_obj (vtable, size));
+}
+
+MONO_HANDLE_TYPE (MonoArray)*
+mono_gc_handle_alloc_vector (MonoVTable *vtable, size_t size, uintptr_t max_length)
+{
+	return mono_handle_new (mono_gc_alloc_vector (vtable, size, max_length));
+}
+
+MONO_HANDLE_TYPE (MonoArray)*
+mono_gc_handle_alloc_array (MonoVTable *vtable, size_t size, uintptr_t max_length, uintptr_t bounds_size)
+{
+	return mono_handle_new (mono_gc_alloc_array (vtable, size, max_length, bounds_size));
+}
+
+MONO_HANDLE_TYPE (MonoString)*
+mono_gc_handle_alloc_string (MonoVTable *vtable, size_t size, gint32 len)
+{
+	return mono_handle_new (mono_gc_alloc_string (vtable, size, len));
+}
+
 #endif

@@ -611,8 +611,11 @@ namespace Mono.Globalization.Unicode
 		const int CollationTableIdxCjkKO = 10;
 		const int CollationTableIdxCjkKOLv2 = 11;
 
-		[MethodImplAttribute (MethodImplOptions.InternalCall)]
-		static extern void load_collation_resource (int resource_index, byte** data);
+		static void load_collation_resource (int resource_index, byte** data)
+		{
+			Console.WriteLine ("Should not be called");
+			throw new NotImplementedException ();
+		}
 #else
 		static readonly string corlibPath = Assembly.GetExecutingAssembly ().Location;
 
@@ -624,8 +627,11 @@ namespace Mono.Globalization.Unicode
 		const int CollationResourceCJKKOlv2 = 5;
 		const int CollationResourceTailoring = 6;
 
-		[MethodImplAttribute (MethodImplOptions.InternalCall)]
-		static extern void load_collation_resource (string path, int resource_index, byte** data, int* size);
+		static void load_collation_resource (string path, int resource_index, byte** data, int* size)
+		{
+			Console.WriteLine ("Should not be called");
+			throw new NotImplementedException ();
+		}
 #endif
 
 		static uint UInt32FromBytePtr (byte* raw, uint idx)

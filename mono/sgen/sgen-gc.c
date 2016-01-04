@@ -2509,7 +2509,7 @@ sgen_register_root (char *start, size_t size, SgenDescriptor descr, int root_typ
 	sgen_hash_table_replace (&roots_hash [root_type], start, &new_root, NULL);
 	roots_size += size;
 
-	SGEN_LOG (3, "Added root for range: %p-%p, descr: %llx  (%d/%d bytes)", start, new_root.end_root, (long long)descr, (int)size, (int)roots_size);
+	SGEN_LOG (0, "Added root for range: %p-%p, descr: %llx  (%d/%d bytes)", start, new_root.end_root, (long long)descr, (int)size, (int)roots_size);
 
 	UNLOCK_GC;
 	return TRUE;

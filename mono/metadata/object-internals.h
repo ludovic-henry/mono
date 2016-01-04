@@ -180,24 +180,6 @@ struct _MonoString {
 #define mono_string_chars_fast(s) ((mono_unichar2*)(s)->chars)
 #define mono_string_length_fast(s) ((s)->length)
 
-static inline gint32
-mono_handle_string_length (MONO_HANDLE_TYPE (MonoString) *string_handle)
-{
-	return mono_handle_obj (string_handle)->length;
-}
-
-static inline gchar*
-mono_handle_string_to_utf8 (MONO_HANDLE_TYPE (MonoString) *str_handle)
-{
-	gchar *ret;
-
-	MONO_PREPARE_CRITICAL;
-	ret = mono_string_to_utf8 (mono_handle_obj (str_handle));
-	MONO_FINISH_CRITICAL;
-
-	return ret;
-}
-
 #define mono_array_length_fast(array) ((array)->max_length)
 #define mono_array_addr_with_size_fast(array,size,index) ( ((char*)(array)->vector) + (size) * (index) )
 
