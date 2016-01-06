@@ -190,6 +190,7 @@ mono_handle_domain (MonoHandle handle)
 
 /* Some common handle types */
 
+MONO_HANDLE_TYPE_DECL (MonoObject);
 MONO_HANDLE_TYPE_DECL (MonoArray);
 MONO_HANDLE_TYPE_DECL (MonoString);
 
