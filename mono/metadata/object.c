@@ -6993,3 +6993,182 @@ mono_glist_to_array (GList *list, MonoClass *eclass)
 	return res;
 }
 
+/* Handle API specifics */
+
+/**
+ * mono_array_new:
+ * @domain: domain where the object is created
+ * @element_class: element class
+ * @size: number of array elements
+ * @error: a MonoError
+ *
+ * This routine creates a new szarray with @n elements of type @eclass.
+ */
+MONO_HANDLE_TYPE (MonoArray)
+mono_handle_array_new (MonoDomain *domain, MonoClass *element_class, uintptr_t size, MonoError *error)
+{
+	MonoClass *array_class;
+	MonoVTable *array_vtable;
+
+	array_class = mono_array_class_get (element_class, 1);
+	g_assert (array_class);
+
+	array_vtable = mono_class_vtable_checked (domain, array_class, error);
+	if (!mono_error_ok (error))
+		return MONO_HANDLE_NEW (MonoArray, NULL);
+
+	return mono_handle_array_new_specific (array_vtable, size, error);
+}
+
+/**
+ * mono_array_new_specific:
+ * @vtable: a vtable in the appropriate domain for an initialized class
+ * @size: number of array elements
+ * @error: a MonoError
+ *
+ * This routine is a fast alternative to mono_array_new() for code which
+ * can be sure about the domain it operates in.
+ */
+MONO_HANDLE_TYPE (MonoArray)
+mono_handle_array_new_specific (MonoVTable *vtable, uintptr_t size, MonoError *error)
+{
+	uintptr_t byte_size;
+
+	mono_error_init (error);
+
+	if (G_UNLIKELY (size > MONO_ARRAY_MAX_INDEX)) {
+		mono_error_set_generic_error (error, "System", "OverflowException", "");
+		return MONO_HANDLE_NEW (MonoArray, NULL);
+	}
+
+	if (!mono_array_calc_byte_len (vtable->klass, size, &byte_size)) {
+		mono_error_set_out_of_memory (error, "Could not allocate array of size " G_GSIZE_FORMAT, size);
+		return MONO_HANDLE_NEW (MonoArray, NULL);
+	}
+
+	return mono_handle_gc_alloc_vector (vtable, byte_size, size, error);
+}
+
+MONO_HANDLE_TYPE (MonoObject)
+mono_handle_array_value_box (MonoDomain *domain, MonoClass *element_class, MONO_HANDLE_TYPE (MonoArray) arr_handle, gint32 pos, MonoError *error)
+{
+	MONO_HANDLE_TYPE (MonoObject) ret;
+	MonoVTable *vtable;
+	gsize element_size;
+
+	g_assert (element_class->valuetype);
+	if (mono_class_is_nullable (element_class))
+		return mono_handle_array_nullable_box (domain, element_class, arr_handle, pos, error);
+
+	mono_error_init (error);
+
+	vtable = mono_class_vtable_checked (domain, element_class, error);
+	if (!mono_error_ok (error))
+		return MONO_HANDLE_NEW (MonoObject, NULL);
+
+	ret = mono_handle_object_new_alloc_specific (vtable, error);
+
+	if (!mono_error_ok (error))
+		return ret;
+
+	element_size = mono_class_instance_size (element_class) - sizeof (MonoObject);
+
+	MONO_PREPARE_GC_CRITICAL_REGION;
+
+	guint8 *src = (guint8*) mono_handle_array_addr_with_size (arr_handle, element_size, pos);
+	guint8 *dst = (guint8*) mono_handle_obj (ret) + sizeof (MonoObject);
+
+	mono_gc_wbarrier_value_copy (dst, src, 1, element_class);
+
+	MONO_FINISH_GC_CRITICAL_REGION;
+
+	return ret;
+}
+
+MONO_HANDLE_TYPE (MonoObject)
+mono_handle_array_nullable_box (MonoDomain *domain, MonoClass *element_class, MONO_HANDLE_TYPE (MonoArray) arr_handle, gint32 pos, MonoError *error)
+{
+	MonoClass *param_class;
+	MonoBoolean has_value;
+	gsize element_size;
+
+	mono_error_init (error);
+
+	param_class = element_class->cast_class;
+
+	mono_class_setup_fields_locking (element_class);
+	g_assert (element_class->fields_inited);
+
+	g_assert (mono_class_from_mono_type (element_class->fields [0].type) == param_class);
+	g_assert (mono_class_from_mono_type (element_class->fields [1].type) == mono_defaults.boolean_class);
+
+	element_size = mono_class_instance_size (element_class) - sizeof (MonoObject);
+
+	MONO_PREPARE_GC_CRITICAL_REGION;
+	has_value = *(mono_handle_array_addr_with_size (arr_handle, element_size, pos) + element_class->fields [1].offset - sizeof (MonoObject));
+	MONO_FINISH_GC_CRITICAL_REGION;
+
+	if (!has_value) {
+		return MONO_HANDLE_NEW (MonoObject, NULL);
+	} else {
+		MONO_HANDLE_TYPE (MonoObject) ret;
+
+		ret = mono_handle_object_new (domain, param_class, error);
+		if (!mono_error_ok (error))
+			return ret;
+
+		/* mono_gc_wbarrier_value_copy -> mono_class_value_size -> mono_class_instance_size -> mono_class_init can enter a safepoint */
+		mono_class_init (param_class);
+
+		MONO_PREPARE_GC_CRITICAL_REGION;
+
+		guint8 *src = (guint8*) mono_handle_array_addr_with_size (arr_handle, element_size, pos) + element_class->fields [0].offset - sizeof (MonoObject);
+		guint8 *dst = (guint8*) mono_handle_obj (ret) + sizeof (MonoObject);
+
+		mono_gc_wbarrier_value_copy (dst, src, 1, param_class);
+
+		MONO_FINISH_GC_CRITICAL_REGION;
+
+		return ret;
+	}
+}
+
+void
+mono_handle_array_nullable_init (MonoDomain *domain, MonoClass *element_class, MONO_HANDLE_TYPE (MonoArray) arr_handle, gint32 pos, MONO_HANDLE_TYPE (MonoObject) value_handle, MonoError *error)
+{
+	MonoClass *param_class;
+	gsize element_size;
+
+	mono_error_init (error);
+
+	param_class = element_class->cast_class;
+
+	mono_class_setup_fields_locking (element_class);
+	g_assert (element_class->fields_inited);
+
+	g_assert (mono_class_from_mono_type (element_class->fields [0].type) == param_class);
+	g_assert (mono_class_from_mono_type (element_class->fields [1].type) == mono_defaults.boolean_class);
+
+	mono_class_init (param_class);
+
+	element_size = mono_class_instance_size (element_class) - sizeof (MonoObject);
+
+	MONO_PREPARE_GC_CRITICAL_REGION;
+
+	guint8* dst;
+
+	dst = mono_handle_array_addr_with_size (arr_handle, element_size, pos) + element_class->fields [1].offset - sizeof (MonoObject);
+
+	/* Set HasValue */
+	*dst = mono_handle_obj_is_null (value_handle) ? FALSE : TRUE;
+
+	dst = mono_handle_array_addr_with_size (arr_handle, element_size, pos) + element_class->fields [0].offset - sizeof (MonoObject);
+
+	/* Set Value */
+	if (mono_handle_obj_is_null (value_handle))
+		mono_gc_bzero_atomic (dst, mono_class_value_size (param_class, NULL));
+	else
+		mono_gc_wbarrier_value_copy (dst, mono_handle_obj (value_handle) + sizeof (MonoObject), 1, param_class);
+
+	MONO_FINISH_GC_CRITICAL_REGION;
+}

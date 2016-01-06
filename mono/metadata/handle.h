@@ -185,13 +185,33 @@ mono_handle_domain (MonoHandle handle)
 		MONO_FINISH_GC_CRITICAL_REGION;	\
 	} while (0)
 
-
-
-
 /* Some common handle types */
 
 MONO_HANDLE_TYPE_DECL (MonoObject);
+
 MONO_HANDLE_TYPE_DECL (MonoArray);
+
+MONO_HANDLE_TYPE (MonoArray)
+mono_handle_array_new (MonoDomain *domain, MonoClass *element_class, uintptr_t size, MonoError *error);
+
+MONO_HANDLE_TYPE (MonoArray)
+mono_handle_array_new_specific (MonoVTable *vtable, uintptr_t size, MonoError *error);
+
+static inline guint8*
+mono_handle_array_addr_with_size (MONO_HANDLE_TYPE (MonoArray) arr_handle, gsize element_size, gint32 pos)
+{
+	return (guint8*) mono_array_addr_with_size (mono_handle_obj (arr_handle), element_size, pos);
+}
+
+MONO_HANDLE_TYPE (MonoObject)
+mono_handle_array_value_box (MonoDomain *domain, MonoClass *element_class, MONO_HANDLE_TYPE (MonoArray) arr_handle, gint32 pos, MonoError *error);
+
+MONO_HANDLE_TYPE (MonoObject)
+mono_handle_array_nullable_box (MonoDomain *domain, MonoClass *element_class, MONO_HANDLE_TYPE (MonoArray) arr_handle, gint32 pos, MonoError *error);
+
+void
+mono_handle_array_nullable_init (MonoDomain *domain, MonoClass *element_class, MONO_HANDLE_TYPE (MonoArray) arr_handle, gint32 pos, MONO_HANDLE_TYPE (MonoObject) value_handle, MonoError *error);
+
 MONO_HANDLE_TYPE_DECL (MonoString);
 
 G_END_DECLS
