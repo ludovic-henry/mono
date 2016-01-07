@@ -1,9 +1,17 @@
-#ifndef __MONO_HANDLE_PRIVATE_H__
-#define __MONO_HANDLE_PRIVATE_H__
+/*
+ * handle.h: Allocation arenas for handles to objects
+ *
+ * Authors:
+ *  - Aleksey Kliger <aleksey@xamarin.com>
+ *  - Ludovic Henry <ludovic@xamarin.com>
+ *
+ * Copyright 2016 Xamarin, Inc. (www.xamarin.com)
+ */
 
-#include <mono/metadata/handle.h>
+#ifndef __MONO_HANDLE_ARENA_H__
+#define __MONO_HANDLE_ARENA_H__
 
-typedef struct _MonoHandleArena MonoHandleArena;
+#include "handle-fwd.h"
 
 gsize
 mono_handle_arena_size (void);
@@ -52,4 +60,4 @@ mono_handle_arena_current_addr (void);
 		mono_handle_arena_stack_pop(__arena_stack, __arena);	\
 	} while (0)
 
-#endif/*__MONO_HANDLE_PRIVATE_H__*/
+#endif/*__MONO_HANDLE_ARENA_H__*/

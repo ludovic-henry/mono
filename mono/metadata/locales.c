@@ -943,7 +943,7 @@ ves_icall_System_Globalization_CultureInfo_internal_get_cultures (MonoBoolean ne
 		gint last = 0;
 
 		if (neutral)
-			MONO_HANDLE_ARRAY_SETREF (ret_handle, last++, NULL);
+			MONO_HANDLE_ARRAY_SETREF_NULL (ret_handle, last++);
 
 		for (i = 0; i < NUM_CULTURE_ENTRIES; i++) {
 			ci = &culture_entries [i];

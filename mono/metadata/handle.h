@@ -16,6 +16,9 @@
 #include <mono/metadata/object.h>
 #include <mono/metadata/class.h>
 #include <mono/utils/mono-error.h>
+#include <mono/utils/checked-build.h>
+#include "handle-fwd.h"
+#include "handle-arena.h"
 
 /*
  * DO NOT ACCESS DIRECTLY
@@ -24,13 +27,9 @@
  * The field obj is not private as there is no way to do that
  * in C, but using a C++ template would simplify that a lot
  */
-typedef struct {
+struct _MonoHandleStorage {
 	MonoObject *__private_obj;
-} MonoHandleStorage;
-
-typedef MonoHandleStorage* MonoHandle;
-
-#include "handle-arena.h"
+};
 
 G_BEGIN_DECLS
 
@@ -99,6 +98,14 @@ mono_handle_domain (MonoHandle handle)
 		MONO_FINISH_GC_CRITICAL_REGION;					\
 	} while (0)
 
+#define MONO_HANDLE_SETREF_NULL(handle,fieldname)			\
+	do {								\
+		MONO_PREPARE_GC_CRITICAL_REGION;			\
+		MONO_OBJECT_SETREF (mono_handle_obj ((handle)), fieldname, NULL); \
+		MONO_FINISH_GC_CRITICAL_REGION;				\
+	} while (0)
+
+
 #define MONO_HANDLE_SET(handle,fieldname,value)	\
 	do {	\
 		MONO_PREPARE_GC_CRITICAL_REGION;	\
@@ -113,6 +120,14 @@ mono_handle_domain (MonoHandle handle)
 		mono_array_setref (mono_handle_obj ((handle)), (index), mono_handle_obj (__value)); \
 		MONO_FINISH_GC_CRITICAL_REGION;					\
 	} while (0)
+
+#define MONO_HANDLE_ARRAY_SETREF_NULL(handle,index)			\
+	do {								\
+		MONO_PREPARE_GC_CRITICAL_REGION;			\
+		mono_array_setref (mono_handle_obj ((handle)), (index), NULL); \
+		MONO_FINISH_GC_CRITICAL_REGION;				\
+	} while (0)
+	
 
 #define MONO_HANDLE_ARRAY_SET(handle,type,index,value)	\
 	do {	\
