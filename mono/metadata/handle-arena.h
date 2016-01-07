@@ -1,9 +1,8 @@
 #ifndef __MONO_HANDLE_PRIVATE_H__
 #define __MONO_HANDLE_PRIVATE_H__
 
-#include <mono/metadata/handle.h>
 
-typedef struct _MonoHandleArena MonoHandleArena;
+#include "handle-fwd.h"
 
 gsize
 mono_handle_arena_size (void);

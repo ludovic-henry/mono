@@ -16,6 +16,9 @@
 #include <mono/metadata/object.h>
 #include <mono/metadata/class.h>
 #include <mono/utils/mono-error.h>
+#include <mono/utils/checked-build.h>
+#include "handle-fwd.h"
+#include "handle-arena.h"
 
 /*
  * DO NOT ACCESS DIRECTLY
@@ -24,13 +27,9 @@
  * The field obj is not private as there is no way to do that
  * in C, but using a C++ template would simplify that a lot
  */
-typedef struct {
+struct _MonoHandleStorage {
 	MonoObject *__private_obj;
-} MonoHandleStorage;
-
-typedef MonoHandleStorage* MonoHandle;
-
-#include "handle-arena.h"
+};
 
 G_BEGIN_DECLS
 
