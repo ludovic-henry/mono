@@ -7347,5 +7347,24 @@ mono_handle_array_nullable_box (MonoDomain *domain, MonoClass *element_class, MO
 void
 mono_handle_array_nullable_init (MonoDomain *domain, MonoClass *element_class, MONO_HANDLE_TYPE (MonoArray) arr_handle, gint32 pos, MONO_HANDLE_TYPE (MonoObject) value_handle, MonoError *error)
 {
-	g_error ("not implemented");
+	MonoClass *param_class;
+	gsize element_size;
+
+	mono_error_init (error);
+
+	param_class =  element_class->cast_class;
+
+	mono_class_setup_fields_locking (element_class);
+	g_assert (element_class->fields_inited);
+
+	g_assert (mono_class_from_mono_type (element_class->fields [0].type) == param_class);
+	g_assert (mono_class_from_mono_type (element_class->fields [1].type) == mono_defaults.boolean_class);
+
+	element_size = mono_class_instance_size (element_class) - sizeof (MonoObject);
+
+	MONO_PREPARE_GC_CRITICAL_REGION;
+	mono_nullable_init (mono_handle_array_addr_with_size (arr_handle, element_size, pos),
+			    mono_handle_obj(value_handle),
+			    element_class);
+	MONO_FINISH_GC_CRITICAL_REGION;
 }
