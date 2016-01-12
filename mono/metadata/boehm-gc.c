@@ -1873,29 +1873,29 @@ mono_gchandle_free_domain (MonoDomain *domain)
 MONO_HANDLE_TYPE (MonoObject)
 mono_handle_gc_alloc_obj (MonoVTable *vtable, size_t size, MonoError *error)
 {
-	mono_error_init (error);
-	return MONO_HANDLE_NEW (MonoObject, mono_gc_alloc_obj (vtable, size));
+	/* FIXME: in case of OOM, an exception will be thown and we will unwind the native stack */
+	g_error ("not implemented");
 }
 
 MONO_HANDLE_TYPE (MonoArray)
 mono_handle_gc_alloc_vector (MonoVTable *vtable, size_t size, uintptr_t max_length, MonoError *error)
 {
-	mono_error_init (error);
-	return MONO_HANDLE_NEW (MonoArray, mono_gc_alloc_vector (vtable, size, max_length));
+	/* FIXME: in case of OOM, an exception will be thown and we will unwind the native stack */
+	g_error ("not implemented");
 }
 
 MONO_HANDLE_TYPE (MonoArray)
 mono_handle_gc_alloc_array (MonoVTable *vtable, size_t size, uintptr_t max_length, uintptr_t bounds_size, MonoError *error)
 {
-	mono_error_init (error);
-	return MONO_HANDLE_NEW (MonoArray, mono_gc_alloc_array (vtable, size, max_length, bounds_size));
+	/* FIXME: in case of OOM, an exception will be thown and we will unwind the native stack */
+	g_error ("not implemented");
 }
 
 MONO_HANDLE_TYPE (MonoString)
 mono_handle_gc_alloc_string (MonoVTable *vtable, size_t size, gint32 len, MonoError *error)
 {
-	mono_error_init (error);
-	return MONO_HANDLE_NEW (MonoString, mono_gc_alloc_string (vtable, size, len));
+	/* FIXME: in case of OOM, an exception will be thown and we will unwind the native stack */
+	g_error ("not implemented");
 }
 
 #endif /* no Boehm GC */
