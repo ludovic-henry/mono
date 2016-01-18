@@ -2199,6 +2199,7 @@ typedef struct {
 static RuntimeInvokeInfo*
 create_runtime_invoke_info (MonoDomain *domain, MonoMethod *method, gpointer compiled_method, gboolean callee_gsharedvt)
 {
+	MonoError error;
 	MonoMethod *invoke;
 	RuntimeInvokeInfo *info;
 
@@ -2207,7 +2208,8 @@ create_runtime_invoke_info (MonoDomain *domain, MonoMethod *method, gpointer com
 	info->sig = mono_method_signature (method);
 
 	invoke = mono_marshal_get_runtime_invoke (method, FALSE);
-	info->vtable = mono_class_vtable_full (domain, method->klass, TRUE);
+	info->vtable = mono_class_vtable_checked (domain, method->klass, &error);
+	mono_error_raise_exception (&error);
 	g_assert (info->vtable);
 
 	MonoMethodSignature *sig = mono_method_signature (method);
