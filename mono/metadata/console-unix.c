@@ -240,7 +240,7 @@ do_console_cancel_event (void)
 		g_assert (cancel_handler_field);
 	}
 
-	vtable = mono_class_vtable_full (domain, klass, FALSE);
+	vtable = mono_class_vtable (domain, klass);
 	if (vtable == NULL)
 		return;
 	mono_field_static_get_value (vtable, cancel_handler_field, &load_value);
