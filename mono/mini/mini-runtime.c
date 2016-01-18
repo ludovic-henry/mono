@@ -1528,8 +1528,11 @@ mono_resolve_patch_target (MonoMethod *method, MonoDomain *domain, guint8 *code,
 			/* Done by the generated code */
 			;
 		else {
-			if (run_cctors)
-				mono_runtime_class_init (vtable);
+			if (run_cctors) {
+				MonoError error;
+				mono_runtime_class_init_checked (vtable, &error);
+				mono_error_raise_exception (&error);
+			}
 		}
 		target = (char*)mono_vtable_get_static_field_data (vtable) + patch_info->data.field->offset;
 		break;
@@ -1896,15 +1899,15 @@ mono_jit_compile_method_with_opt (MonoMethod *method, guint32 opt, MonoException
 	if (info) {
 		/* We can't use a domain specific method in another domain */
 		if (! ((domain != target_domain) && !info->domain_neutral)) {
+			MonoError error;
 			MonoVTable *vtable;
-			MonoException *tmpEx;
 
 			mono_jit_stats.methods_lookups++;
 			vtable = mono_class_vtable (domain, method->klass);
 			g_assert (vtable);
-			tmpEx = mono_runtime_class_init_full (vtable, ex == NULL);
-			if (tmpEx) {
-				*ex = tmpEx;
+			mono_runtime_class_init_checked (vtable, &error);
+			if (ex && !mono_error_ok (&error)) {
+				*ex = mono_error_convert_to_exception (&error);
 				return NULL;
 			}
 			return mono_create_ftnptr (target_domain, info->code_start);
@@ -1926,9 +1929,13 @@ mono_jit_compile_method_with_opt (MonoMethod *method, guint32 opt, MonoException
 			 * called by init_method ().
 			 */
 			if (!mono_llvm_only) {
+				MonoError error;
+
 				vtable = mono_class_vtable (domain, method->klass);
 				g_assert (vtable);
-				mono_runtime_class_init (vtable);
+
+				mono_runtime_class_init_checked (vtable, &error);
+				mono_error_raise_exception (&error);
 			}
 		}
 	}
@@ -2403,6 +2410,7 @@ mono_llvmonly_runtime_invoke (MonoMethod *method, RuntimeInvokeInfo *info, void 
 static MonoObject*
 mono_jit_runtime_invoke (MonoMethod *method, void *obj, void **params, MonoObject **exc)
 {
+	MonoError error;
 	MonoMethod *invoke, *callee;
 	MonoObject *(*runtime_invoke) (MonoObject *this_obj, void **params, MonoObject **exc, void* compiled_method);
 	MonoDomain *domain = mono_domain_get ();
@@ -2500,12 +2508,13 @@ mono_jit_runtime_invoke (MonoMethod *method, void *obj, void **params, MonoObjec
 	 * We need this here because mono_marshal_get_runtime_invoke can place
 	 * the helper method in System.Object and not the target class.
 	 */
-	if (exc) {
-		*exc = (MonoObject*)mono_runtime_class_init_full (info->vtable, FALSE);
-		if (*exc)
-			return NULL;
-	} else {
-		mono_runtime_class_init (info->vtable);
+	mono_runtime_class_init_checked (info->vtable, &error);
+	if (!mono_error_ok (&error)) {
+		if (!exc)
+			mono_error_raise_exception (&error);
+
+		*exc = (MonoObject*) mono_error_convert_to_exception (&error);
+		return NULL;
 	}
 
 	/* The wrappers expect this to be initialized to NULL */
