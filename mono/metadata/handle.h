@@ -214,6 +214,24 @@ mono_handle_array_nullable_init (MonoDomain *domain, MonoClass *element_class, M
 
 MONO_HANDLE_TYPE_DECL (MonoString);
 
+MONO_HANDLE_TYPE (MonoString)
+mono_handle_string_new (MonoDomain *domain, const gchar *text, MonoError *error);
+
+MONO_HANDLE_TYPE (MonoString)
+mono_handle_string_new_size (MonoDomain *domain, gint32 len, MonoError *error);
+
+MONO_HANDLE_TYPE (MonoString)
+mono_handle_string_new_utf16 (MonoDomain *domain, const guint16 *text, glong len, MonoError *error);
+
+gunichar2*
+mono_handle_string_chars (MONO_HANDLE_TYPE (MonoString) handle);
+
+gint32
+mono_handle_string_length (MONO_HANDLE_TYPE (MonoString) handle);
+
+gchar*
+mono_handle_string_to_utf8 (MONO_HANDLE_TYPE (MonoString) handle, MonoError *error);
+
 G_END_DECLS
 
 #endif /* __MONO_HANDLE_H__ */

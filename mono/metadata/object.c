@@ -7172,3 +7172,166 @@ mono_handle_array_nullable_init (MonoDomain *domain, MonoClass *element_class, M
 
 	MONO_FINISH_GC_CRITICAL_REGION;
 }
+
+/**
+ * mono_string_new:
+ * @text: a pointer to an utf8 string
+ *
+ * Returns: A newly created string object which contains @text.
+ */
+MONO_HANDLE_TYPE (MonoString)
+mono_handle_string_new (MonoDomain *domain, const gchar *text, MonoError *error)
+{
+	GError *gerror = NULL;
+	MONO_HANDLE_TYPE (MonoString) handle;
+	guint16 *u16;
+	glong u16_written;
+
+	mono_error_init (error);
+
+	u16 = g_utf8_to_utf16 (text, strlen (text), NULL, &u16_written, &gerror);
+
+	if (!gerror) {
+		handle = mono_handle_string_new_utf16 (domain, u16, u16_written, error);
+	} else {
+		handle = MONO_HANDLE_NEW (MonoString, NULL);
+		g_error_free (gerror);
+	}
+
+	g_free (u16);
+
+	return handle;
+}
+
+/**
+ * mono_string_new_size:
+ * @text: a pointer to an utf16 string
+ * @len: the length of the string
+ *
+ * Returns: A newly created string object of @len
+ */
+MONO_HANDLE_TYPE (MonoString)
+mono_handle_string_new_size (MonoDomain *domain, gint32 len, MonoError *error)
+{
+	MonoVTable *vtable;
+	size_t size;
+
+	mono_error_init (error);
+
+	/* check for overflow */
+	if (len < 0 || len > ((SIZE_MAX - G_STRUCT_OFFSET (MonoString, chars) - 8) / 2)) {
+		mono_error_set_out_of_memory (error, "Could not allocate string of length %d", len);
+		return MONO_HANDLE_NEW (MonoString, NULL);
+	}
+
+	size = (G_STRUCT_OFFSET (MonoString, chars) + (((size_t)len + 1) * 2));
+	g_assert (size > 0);
+
+	vtable = mono_class_vtable_checked (domain, mono_defaults.string_class, error);
+	if (!mono_error_ok (error))
+		return MONO_HANDLE_NEW (MonoString, NULL);
+
+	return mono_handle_gc_alloc_string (vtable, size, len, error);
+}
+
+/**
+ * mono_string_new_utf16:
+ * @text: a pointer to an utf16 string
+ * @len: the length of the string
+ *
+ * Returns: A newly created string object which contains @text.
+ */
+MONO_HANDLE_TYPE (MonoString)
+mono_handle_string_new_utf16 (MonoDomain *domain, const guint16 *text, glong len, MonoError *error)
+{
+	MONO_HANDLE_TYPE (MonoString) handle;
+
+	handle = mono_handle_string_new_size (domain, len, error);
+	g_assert (!mono_handle_obj_is_null (handle));
+
+	MONO_PREPARE_GC_CRITICAL_REGION;
+	memcpy (mono_handle_string_chars (handle), text, len * 2);
+	MONO_FINISH_GC_CRITICAL_REGION;
+
+	return handle;
+}
+
+/**
+ * mono_string_chars:
+ * @handle: a MonoString handle
+ *
+ * Returns a pointer to the UCS16 characters stored in the MonoString
+ */
+gunichar2*
+mono_handle_string_chars (MONO_HANDLE_TYPE (MonoString) handle)
+{
+	return mono_handle_obj (handle)->chars;
+}
+
+/**
+ * mono_string_length:
+ * @s: MonoString
+ *
+ * Returns the lenght in characters of the string
+ */
+gint32
+mono_handle_string_length (MONO_HANDLE_TYPE (MonoString) handle)
+{
+	return mono_handle_obj (handle)->length;
+}
+
+/**
+ * mono_string_to_utf8_checked:
+ * @handle: a System.String handle
+ * @error: a MonoError.
+ *
+ * Converts a MonoString to its UTF8 representation. May fail; check
+ * @error to determine whether the conversion was successful.
+ * The resulting buffer should be freed with mono_free().
+ */
+gchar*
+mono_handle_string_to_utf8 (MONO_HANDLE_TYPE (MonoString) handle, MonoError *error)
+{
+	gchar *u8_chars;
+	glong u8_length = 0;
+	gunichar2 *str_chars;
+	gint32 str_length;
+
+	mono_error_init (error);
+
+	if (mono_handle_obj_is_null (handle))
+		return NULL;
+
+	MONO_PREPARE_GC_CRITICAL_REGION;
+
+	str_chars = mono_handle_string_chars (handle);
+	str_length = mono_handle_string_length (handle);
+
+	if (str_length == 0) {
+		u8_chars = g_strdup ("");
+	} else {
+		GError *gerror;
+
+		u8_length = 0;
+		gerror = NULL;
+		u8_chars = g_utf16_to_utf8 (str_chars, str_length, NULL, &u8_length, &gerror);
+		if (gerror) {
+			mono_error_set_argument (error, "string", "%s", gerror->message);
+			g_error_free (gerror);
+			u8_chars = NULL;
+		} else {
+			/* g_utf16_to_utf8  may not be able to complete the convertion (e.g. NULL values were found, #335488) */
+			if (u8_length < str_length) {
+				/* allocate the total length and copy the part of the string that has been converted */
+				gchar *u8_2 = (gchar*) g_malloc0 (str_length);
+				memcpy (u8_2, u8_chars, u8_length);
+				g_free (u8_chars);
+				u8_chars = u8_2;
+			}
+		}
+	}
+
+	MONO_FINISH_GC_CRITICAL_REGION;
+
+	return u8_chars;
+}
