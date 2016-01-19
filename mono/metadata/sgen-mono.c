@@ -958,8 +958,11 @@ mono_gc_alloc_mature (MonoVTable *vtable)
 {
 	MonoObject *obj = sgen_alloc_obj_mature (vtable, vtable->klass->instance_size);
 
-	if (obj && G_UNLIKELY (obj->vtable->klass->has_finalize))
-		mono_object_register_finalizer (obj);
+	if (obj && G_UNLIKELY (obj->vtable->klass->has_finalize)) {
+		MonoError error;
+		mono_object_register_finalizer (obj, &error);
+		g_assert (mono_error_ok (&error));
+	}
 
 	if (G_UNLIKELY (alloc_events))
 		mono_profiler_allocation (obj);

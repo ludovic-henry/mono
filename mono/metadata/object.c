@@ -4581,8 +4581,11 @@ mono_object_new_alloc_specific (MonoVTable *vtable)
 
 	MonoObject *o = (MonoObject *)mono_gc_alloc_obj (vtable, vtable->klass->instance_size);
 
-	if (G_UNLIKELY (vtable->klass->has_finalize))
-		mono_object_register_finalizer (o);
+	if (G_UNLIKELY (vtable->klass->has_finalize)) {
+		MonoError error;
+		mono_object_register_finalizer (o, &error);
+		mono_error_raise_exception (&error);
+	}
 
 	return o;
 }
@@ -4680,8 +4683,11 @@ mono_object_clone (MonoObject *obj)
 	/* If the object doesn't contain references this will do a simple memmove. */
 	mono_gc_wbarrier_object_copy (o, obj);
 
-	if (obj->vtable->klass->has_finalize)
-		mono_object_register_finalizer (o);
+	if (obj->vtable->klass->has_finalize) {
+		MonoError error;
+		mono_object_register_finalizer (o, &error);
+		mono_error_raise_exception (&error);
+	}
 	return o;
 }
 
@@ -5214,8 +5220,11 @@ mono_value_box (MonoDomain *domain, MonoClass *klass, gpointer value)
 	}
 #endif
 #endif
-	if (klass->has_finalize)
-		mono_object_register_finalizer (res);
+	if (klass->has_finalize) {
+		MonoError error;
+		mono_object_register_finalizer (res, &error);
+		g_assert (mono_error_ok (&error));
+	}
 	return res;
 }
 
