@@ -1657,6 +1657,9 @@ mono_object_isinst_checked (MonoObject *obj, MonoClass *klass, MonoError *error)
 MonoObject*
 mono_object_isinst_mbyref_checked (MonoObject *obj, MonoClass *klass, MonoError *error);
 
+MonoObject*
+mono_field_get_value_object_checked (MonoDomain *domain, MonoClassField *field, MonoObject *obj, MonoError *error);
+
 #endif /* __MONO_OBJECT_INTERNALS_H__ */
 
 
