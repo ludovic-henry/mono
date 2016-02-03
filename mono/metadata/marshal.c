@@ -2251,27 +2251,26 @@ mono_delegate_begin_invoke (MonoDelegate *delegate, gpointer *params)
 			MonoAsyncResult *ares;
 			MonoObject *exc;
 			MonoArray *out_args;
-			method = delegate->method;
 
-			msg = mono_method_call_message_new (mono_marshal_method_from_wrapper (method), params, NULL, &async_callback, &state, &error);
+			msg = mono_method_call_message_new (mono_marshal_method_from_wrapper (delegate->method), params, NULL, &async_callback, &state, &error);
 			if (mono_error_set_pending_exception (&error))
 				return NULL;
-			ares = mono_async_result_new (mono_domain_get (), NULL, state, NULL, NULL, &error);
+
+			ares = mono_async_result_new (mono_domain_get (), (MonoObject*) delegate, (MonoObject*) async_callback, state, &error);
 			if (mono_error_set_pending_exception (&error))
 				return NULL;
-			MONO_OBJECT_SETREF (ares, async_delegate, (MonoObject *)delegate);
-			MONO_OBJECT_SETREF (ares, async_callback, (MonoObject *)async_callback);
+
 			MONO_OBJECT_SETREF (msg, async_result, ares);
 			msg->call_type = CallType_BeginInvoke;
 
 			exc = NULL;
 			mono_remoting_invoke ((MonoObject *)tp->rp, msg, &exc, &out_args, &error);
-			if (!mono_error_ok (&error)) {
-				mono_error_set_pending_exception (&error);
+			if (mono_error_set_pending_exception (&error))
 				return NULL;
-			}
+
 			if (exc)
 				mono_set_pending_exception ((MonoException *) exc);
+
 			return ares;
 		}
 	}
