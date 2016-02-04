@@ -282,13 +282,13 @@ typedef struct {
 	MonoObject   object;
 	MonoObject  *async_state;
 	MonoObject  *handle;
-	MonoObject  *async_delegate;
+	MonoDelegate *async_delegate;
 	gpointer    *data;
 	MonoObject  *object_data;
 	MonoBoolean  sync_completed;
 	MonoBoolean  completed;
 	MonoBoolean  endinvoke_called;
-	MonoObject  *async_callback;
+	MonoDelegate *async_callback;
 	MonoObject  *execution_context;
 	MonoObject  *original_context;
 	gint64	     add_time;
@@ -368,8 +368,6 @@ typedef struct {
 typedef struct {
 	MonoObject object;
 	MonoMethodMessage *msg;
-	MonoMethod *cb_method;
-	MonoDelegate *cb_target;
 	MonoObject *state;
 	MonoObject *res;
 	MonoArray *out_args;
@@ -642,10 +640,13 @@ MONO_COLD void mono_set_pending_exception (MonoException *exc);
 /* remoting and async support */
 
 MonoAsyncResult *
-mono_async_result_new (MonoDomain *domain, MonoObject* delegate, MonoObject *state, MonoObject *callback);
+mono_async_result_new (MonoDomain *domain, MonoDelegate* delegate, MonoObject *state, MonoDelegate *callback);
 
 void
-ves_icall_System_Runtime_Remoting_Messaging_AsyncResult_Invoke (MonoAsyncResult *ares);
+ves_icall_System_Runtime_Remoting_Messaging_AsyncResult_InvokeRemoting (MonoAsyncResult *async_result);
+
+MonoObject*
+ves_icall_System_Runtime_Remoting_Messaging_MonoMethodMessage_Invoke (MonoMethodMessage *msg, MonoDelegate *target, MonoObject **exc, MonoArray **out_args);
 
 MonoWaitHandle *
 mono_wait_handle_new	    (MonoDomain *domain, HANDLE handle);
