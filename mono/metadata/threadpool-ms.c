@@ -1327,7 +1327,7 @@ mono_threadpool_ms_cleanup (void)
 }
 
 MonoAsyncResult *
-mono_threadpool_ms_begin_invoke (MonoDomain *domain, MonoObject *target, MonoMethod *method, gpointer *params, MonoError *error)
+mono_threadpool_ms_begin_invoke (MonoDomain *domain, MonoDelegate *target, MonoMethod *method, gpointer *params, MonoError *error)
 {
 	static MonoClass *async_call_klass = NULL;
 	MonoMethodMessage *message;
@@ -1343,7 +1343,8 @@ mono_threadpool_ms_begin_invoke (MonoDomain *domain, MonoObject *target, MonoMet
 
 	mono_error_init (error);
 
-	message = mono_method_call_message_new (method, params, mono_get_delegate_invoke (method->klass), (params != NULL) ? (&async_callback) : NULL, (params != NULL) ? (&state) : NULL, error);
+	message = mono_method_call_message_new (method, params, mono_get_delegate_invoke (method->klass),
+		(params != NULL) ? (&async_callback) : NULL, (params != NULL) ? (&state) : NULL, error);
 	return_val_if_nok (error, NULL);
 
 	async_call = (MonoAsyncCall*) mono_object_new_checked (domain, async_call_klass, error);
@@ -1352,15 +1353,10 @@ mono_threadpool_ms_begin_invoke (MonoDomain *domain, MonoObject *target, MonoMet
 	MONO_OBJECT_SETREF (async_call, msg, message);
 	MONO_OBJECT_SETREF (async_call, state, state);
 
-	if (async_callback) {
-		MONO_OBJECT_SETREF (async_call, cb_method, mono_get_delegate_invoke (((MonoObject*) async_callback)->vtable->klass));
-		MONO_OBJECT_SETREF (async_call, cb_target, async_callback);
-	}
-
-	async_result = mono_async_result_new (domain, target, NULL, async_call->state, &error);
+	async_result = mono_async_result_new (domain, target, async_callback, async_call->state, &error);
 	return_val_if_nok (error, NULL);
 
-	MONO_OBJECT_SETREF (async_result, object_data, (MonoObject*) async_call);
+	MONO_OBJECT_SETREF (async_result, async_call, async_call);
 
 	mono_threadpool_ms_enqueue_work_item (domain, (MonoObject*) async_result, error);
 	return_val_if_nok (error, NULL);
@@ -1414,7 +1410,7 @@ mono_threadpool_ms_end_invoke (MonoAsyncResult *ares, MonoArray **out_args, Mono
 		MONO_EXIT_GC_SAFE;
 	}
 
-	ac = (MonoAsyncCall*) ares->object_data;
+	ac = ares->async_call;
 	g_assert (ac);
 
 	*exc = ac->msg->exc; /* FIXME: GC add write barrier */

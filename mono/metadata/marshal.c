@@ -2230,6 +2230,7 @@ mono_delegate_begin_invoke (MonoDelegate *delegate, gpointer *params)
 	MonoMulticastDelegate *mcast_delegate;
 	MonoClass *klass;
 	MonoMethod *method;
+	MonoAsyncResult *ares;
 
 	g_assert (delegate);
 	mcast_delegate = (MonoMulticastDelegate *) delegate;
@@ -2248,7 +2249,6 @@ mono_delegate_begin_invoke (MonoDelegate *delegate, gpointer *params)
 			MonoMethodMessage *msg;
 			MonoDelegate *async_callback;
 			MonoObject *state;
-			MonoAsyncResult *ares;
 			MonoObject *exc;
 			MonoArray *out_args;
 
@@ -2256,7 +2256,7 @@ mono_delegate_begin_invoke (MonoDelegate *delegate, gpointer *params)
 			if (mono_error_set_pending_exception (&error))
 				return NULL;
 
-			ares = mono_async_result_new (mono_domain_get (), (MonoObject*) delegate, (MonoObject*) async_callback, state, &error);
+			ares = mono_async_result_new (mono_domain_get (), delegate, async_callback, state, &error);
 			if (mono_error_set_pending_exception (&error))
 				return NULL;
 
@@ -2283,9 +2283,10 @@ mono_delegate_begin_invoke (MonoDelegate *delegate, gpointer *params)
 		method = mono_get_delegate_invoke (klass);
 	g_assert (method);
 
-	MonoAsyncResult *result = mono_threadpool_ms_begin_invoke (mono_domain_get (), (MonoObject*) delegate, method, params, &error);
+	ares = mono_threadpool_ms_begin_invoke (mono_domain_get (), delegate, method, params, &error);
 	mono_error_set_pending_exception (&error);
-	return result;
+
+	return ares;
 }
 
 #ifndef DISABLE_JIT
@@ -2994,7 +2995,7 @@ mono_delegate_end_invoke (MonoDelegate *delegate, gpointer *params)
 		return NULL;
 	}
 
-	if (ares->async_delegate != (MonoObject*)delegate) {
+	if (ares->async_delegate != delegate) {
 		mono_set_pending_exception (mono_get_exception_invalid_operation (
 			"The IAsyncResult object provided does not match this delegate."));
 		return NULL;
