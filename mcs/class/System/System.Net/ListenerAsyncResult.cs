@@ -103,7 +103,14 @@ namespace System.Net {
 					context.Response.StatusCode = 401;
 					context.Response.Headers ["WWW-Authenticate"] = schemes + " realm=\"" + context.Listener.Realm + "\"";
 					context.Response.OutputStream.Close ();
-					IAsyncResult ares = context.Listener.BeginGetContext (cb, state);
+
+					IAsyncResult ares;
+					try {
+						ares = context.Listener.BeginGetContext (cb, state);
+					} catch (InvalidOperationException) {
+						return;
+					}
+
 					this.forward = (ListenerAsyncResult) ares;
 					lock (forward.locker) {
 						if (handle != null)
