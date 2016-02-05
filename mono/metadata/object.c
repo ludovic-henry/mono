@@ -6675,6 +6675,67 @@ ves_icall_System_Runtime_Remoting_Messaging_AsyncResult_InvokeRemoting (MonoAsyn
 	mono_runtime_delegate_invoke ((MonoObject*) async_result->async_delegate, (void**) &async_result->async_state, NULL);
 }
 
+MonoAsyncResult*
+ves_icall_System_Runtime_Remoting_Messaging_AsyncResult_RemotingBeginInvoke (MonoTransparentProxy *proxy, MonoDelegate *delegate, gpointer params)
+{
+#ifdef DISABLE_REMOTING
+	g_assert_not_reached ();
+#else
+	/* If the target is a proxy, make a direct call. It
+	 * is the proxy's work to make the call asynchronous. */
+
+	MonoMethodMessage *message;
+	MonoDelegate *async_callback;
+	MonoObject *state;
+	MonoAsyncResult *ares;
+	MonoObject *exc = NULL;
+	MonoArray *out_args;
+	MonoMethod *method;
+
+	method = mono_marshal_method_from_wrapper (delegate->method);
+	message = mono_method_call_message_new (method, params, NULL, &async_callback, &state);
+	ares = mono_async_result_new (mono_domain_get (), delegate, state, async_callback);
+
+	MONO_OBJECT_SETREF (message, async_result, ares);
+	message->call_type = CallType_BeginInvoke;
+
+	mono_remoting_invoke ((MonoObject *)proxy->rp, message, &exc, &out_args);
+	if (exc)
+		mono_raise_exception ((MonoException *) exc);
+
+	return ares;
+#endif
+}
+
+void
+ves_icall_System_Runtime_Remoting_Messaging_MonoMethodMessage_ctor (MonoMethodMessage *this_obj, MonoDelegate *delegate, gpointer params, MonoDelegate **async_callback, MonoObject **async_state)
+{
+	MonoError error;
+	MonoClass *klass;
+	MonoMethod *method;
+
+	g_assert (async_callback);
+	g_assert (async_state);
+
+	klass = mono_object_class (delegate);
+	g_assert (klass);
+
+	method = mono_class_get_method_from_name (klass, "BeginInvoke", -1);
+	if (!method)
+		method = mono_get_delegate_invoke (klass);
+	g_assert (method);
+
+	if (params) {
+		mono_method_call_message_init (this_obj, method, params, mono_get_delegate_invoke (method->klass), async_callback, async_state, &error);
+		mono_error_raise_exception (&error);
+	} else {
+		*async_callback = NULL;
+		*async_state = NULL;
+		mono_method_call_message_init (this_obj, method, params, mono_get_delegate_invoke (method->klass), NULL, NULL, &error);
+		mono_error_raise_exception (&error);
+	}
+}
+
 MonoObject*
 ves_icall_System_Runtime_Remoting_Messaging_MonoMethodMessage_InvokeRemoting (MonoMethodMessage *msg, MonoTransparentProxy *target, MonoObject **exc, MonoArray **out_args)
 {
@@ -7018,22 +7079,37 @@ mono_method_call_message_new (MonoMethod *method, gpointer *params, MonoMethod *
 
 	MonoError error;
 
-	MonoDomain *domain = mono_domain_get ();
-	MonoMethodSignature *sig = mono_method_signature (method);
 	MonoMethodMessage *msg;
-	int i, count;
 
-	msg = (MonoMethodMessage *)mono_object_new_checked (domain, mono_defaults.mono_method_message_class, &error); 
+	msg = (MonoMethodMessage *)mono_object_new_checked (mono_domain_get (), mono_defaults.mono_method_message_class, &error); 
 	mono_error_raise_exception (&error); /* FIXME don't raise here */
 
+	mono_method_call_message_init (msg, method, params, invoke, cb, state, &error);
+	mono_error_raise_exception (&error); /* FIXME don't raise here */
+
+	return msg;
+}
+
+void
+mono_method_call_message_init (MonoMethodMessage *msg, MonoMethod *method, gpointer *params, MonoMethod *invoke, MonoDelegate **cb, MonoObject **state, MonoError *error)
+{
+	MonoDomain *domain;
+	MonoMethodSignature *sig;
+	int i, count;
+
+	mono_error_init (error);
+
+	domain = mono_domain_get ();
+	sig = mono_method_signature (method);
+
 	if (invoke) {
-		MonoReflectionMethod *rm = mono_method_get_object_checked (domain, invoke, NULL, &error);
-		mono_error_raise_exception (&error); /* FIXME don't raise here */
+		MonoReflectionMethod *rm = mono_method_get_object_checked (domain, invoke, NULL, error);
+		return_if_nok (error);
 		mono_message_init (domain, msg, rm, NULL);
 		count =  sig->param_count - 2;
 	} else {
-		MonoReflectionMethod *rm = mono_method_get_object_checked (domain, method, NULL, &error);
-		mono_error_raise_exception (&error); /* FIXME don't raise here */
+		MonoReflectionMethod *rm = mono_method_get_object_checked (domain, method, NULL, error);
+		return_if_nok (error);
 		mono_message_init (domain, msg, rm, NULL);
 		count =  sig->param_count;
 	}
@@ -7063,8 +7139,6 @@ mono_method_call_message_new (MonoMethod *method, gpointer *params, MonoMethod *
 		i++;
 		*state = *((MonoObject **)params [i]);
 	}
-
-	return msg;
 }
 
 /**

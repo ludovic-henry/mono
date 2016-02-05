@@ -644,8 +644,14 @@ mono_async_result_new (MonoDomain *domain, MonoDelegate* delegate, MonoObject *s
 void
 ves_icall_System_Runtime_Remoting_Messaging_AsyncResult_InvokeRemoting (MonoAsyncResult *async_result);
 
+MonoAsyncResult*
+ves_icall_System_Runtime_Remoting_Messaging_AsyncResult_RemotingBeginInvoke (MonoTransparentProxy *proxy, MonoDelegate *delegate, gpointer params);
+
 MonoObject*
 ves_icall_System_Runtime_Remoting_Messaging_MonoMethodMessage_InvokeRemoting (MonoMethodMessage *msg, MonoTransparentProxy *target, MonoObject **exc, MonoArray **out_args);
+
+void
+ves_icall_System_Runtime_Remoting_Messaging_MonoMethodMessage_ctor (MonoMethodMessage *this_obj, MonoDelegate *delegate, gpointer params, MonoDelegate **async_callback, MonoObject **async_state);
 
 MonoWaitHandle *
 mono_wait_handle_new	    (MonoDomain *domain, HANDLE handle);
@@ -664,6 +670,9 @@ mono_message_invoke	    (MonoObject *target, MonoMethodMessage *msg,
 MonoMethodMessage *
 mono_method_call_message_new (MonoMethod *method, gpointer *params, MonoMethod *invoke, 
 			      MonoDelegate **cb, MonoObject **state);
+
+void
+mono_method_call_message_init (MonoMethodMessage *msg, MonoMethod *method, gpointer *params, MonoMethod *invoke, MonoDelegate **cb, MonoObject **state, MonoError *error);
 
 void
 mono_method_return_message_restore (MonoMethod *method, gpointer *params, MonoArray *out_args);

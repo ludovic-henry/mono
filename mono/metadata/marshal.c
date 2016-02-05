@@ -126,9 +126,6 @@ mono_array_to_byvalarray (gpointer native_arr, MonoArray *arr, MonoClass *eltype
 static void
 mono_array_to_byte_byvalarray (gpointer native_arr, MonoArray *arr, guint32 elnum);
 
-static MonoAsyncResult *
-mono_delegate_begin_invoke (MonoDelegate *delegate, gpointer *params);
-
 static MonoObject *
 mono_delegate_end_invoke (MonoDelegate *delegate, gpointer *params);
 
@@ -233,7 +230,6 @@ mono_marshal_init (void)
 		register_icall (g_free, "g_free", "void ptr", FALSE);
 		register_icall (mono_object_isinst, "mono_object_isinst", "object object ptr", FALSE);
 		register_icall (mono_struct_delete_old, "mono_struct_delete_old", "void ptr ptr", FALSE);
-		register_icall (mono_delegate_begin_invoke, "mono_delegate_begin_invoke", "object object ptr", FALSE);
 		register_icall (mono_delegate_end_invoke, "mono_delegate_end_invoke", "object object ptr", FALSE);
 		register_icall (mono_compile_method, "mono_compile_method", "ptr ptr", FALSE);
 		register_icall (mono_context_get, "mono_context_get", "object", FALSE);
@@ -2067,63 +2063,6 @@ mono_marshal_emit_thread_force_interrupt_checkpoint (MonoMethodBuilder *mb)
 	emit_thread_force_interrupt_checkpoint (mb);
 }
 
-#endif /* DISABLE_JIT */
-
-static MonoAsyncResult *
-mono_delegate_begin_invoke (MonoDelegate *delegate, gpointer *params)
-{
-	MonoMulticastDelegate *mcast_delegate;
-	MonoClass *klass;
-	MonoMethod *method;
-
-	g_assert (delegate);
-	mcast_delegate = (MonoMulticastDelegate *) delegate;
-	if (mcast_delegate->delegates != NULL)
-		mono_raise_exception (mono_get_exception_argument (NULL, "The delegate must have only one target"));
-
-#ifndef DISABLE_REMOTING
-	if (delegate->target && mono_object_class (delegate->target) == mono_defaults.transparent_proxy_class) {
-
-		MonoTransparentProxy* tp = (MonoTransparentProxy *)delegate->target;
-		if (!mono_class_is_contextbound (tp->remote_class->proxy_class) || tp->rp->context != (MonoObject *) mono_context_get ()) {
-
-			/* If the target is a proxy, make a direct call. Is proxy's work
-			// to make the call asynchronous.
-			*/
-			MonoMethodMessage *msg;
-			MonoDelegate *async_callback;
-			MonoObject *state;
-			MonoAsyncResult *ares;
-			MonoObject *exc = NULL;
-			MonoArray *out_args;
-
-			msg = mono_method_call_message_new (mono_marshal_method_from_wrapper (delegate->method), params, NULL, &async_callback, &state);
-
-			ares = mono_async_result_new (mono_domain_get (), delegate, state, async_callback);
-
-			MONO_OBJECT_SETREF (msg, async_result, ares);
-			msg->call_type = CallType_BeginInvoke;
-
-			mono_remoting_invoke ((MonoObject *)tp->rp, msg, &exc, &out_args);
-			if (exc)
-				mono_raise_exception ((MonoException *) exc);
-			return ares;
-		}
-	}
-#endif
-
-	klass = delegate->object.vtable->klass;
-
-	method = mono_class_get_method_from_name (klass, "BeginInvoke", -1);
-	if (!method)
-		method = mono_get_delegate_invoke (klass);
-	g_assert (method);
-
-	return mono_threadpool_ms_begin_invoke (mono_domain_get (), delegate, method, params);
-}
-
-#ifndef DISABLE_JIT
-
 int
 mono_mb_emit_save_args (MonoMethodBuilder *mb, MonoMethodSignature *sig, gboolean save_this)
 {
@@ -2762,12 +2701,21 @@ mono_marshal_get_delegate_begin_invoke (MonoMethod *method)
 	g_free (name);
 
 #ifndef DISABLE_JIT
+
+	static MonoMethod *asyncresult_dobegininvoke_method = NULL;
+
+	if (!asyncresult_dobegininvoke_method) {
+		asyncresult_dobegininvoke_method = mono_class_get_method_from_name (mono_defaults.asyncresult_class, "DoBeginInvoke", 2);
+		g_assert (asyncresult_dobegininvoke_method);
+	}
+
 	params_var = mono_mb_emit_save_args (mb, sig, FALSE);
 
 	mono_mb_emit_ldarg (mb, 0);
 	mono_mb_emit_ldloc (mb, params_var);
-	mono_mb_emit_icall (mb, mono_delegate_begin_invoke);
+	mono_mb_emit_op (mb, CEE_CALL, asyncresult_dobegininvoke_method);
 	mono_mb_emit_byte (mb, CEE_RET);
+
 #endif
 
 	if (ctx) {

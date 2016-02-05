@@ -44,7 +44,7 @@ namespace System {
 	{
 		#region Sync with the unmanaged MonoAsyncCall structure
 		internal MonoMethodMessage msg;
-		object     state;
+		internal object state;
 		internal object res;
 		internal object[] out_args;
 		#endregion

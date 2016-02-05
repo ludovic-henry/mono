@@ -1424,6 +1424,14 @@ namespace MonoTests.System
 		}
 #endif
 
+		[Test]
+		[ExpectedException (typeof (ArgumentException))]
+		public void MulticastBeginInvoke ()
+		{
+			Action multicast = new Action (() => {}) + new Action (() => {});
+			multicast.BeginInvoke (null, null);
+		}
+
 		static bool Int32D2 (int x, int y)
 		{
 			return (x & y) == y; 

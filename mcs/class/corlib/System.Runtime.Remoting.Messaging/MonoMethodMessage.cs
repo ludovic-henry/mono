@@ -73,6 +73,9 @@ namespace System.Runtime.Remoting.Messaging {
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]
 		internal extern void InitMessage (MonoMethod method, object [] out_args);
 
+		[MethodImplAttribute(MethodImplOptions.InternalCall)]
+		public extern MonoMethodMessage (Delegate del, IntPtr prms, out AsyncCallback async_callback, out object async_state);
+
 		public MonoMethodMessage (MethodBase method, object [] out_args)
 		{
 			if (method != null)

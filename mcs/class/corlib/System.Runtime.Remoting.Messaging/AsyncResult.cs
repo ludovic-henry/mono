@@ -34,6 +34,7 @@ using System;
 using System.Threading;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Runtime.Remoting.Proxies;
 
 namespace System.Runtime.Remoting.Messaging {
 
@@ -172,6 +173,40 @@ public class AsyncResult : IAsyncResult, IMessageSink, IThreadPoolWorkItem {
 		get { return call_message; }
 		set { call_message = value; }
 	}
+
+	internal static AsyncResult DoBeginInvoke (Delegate del, IntPtr prms)
+	{
+		if (!((MulticastDelegate) del).HasSingleTarget)
+			throw new ArgumentException ("The delegate must have only one target");
+
+		if (del.IsTransparentProxy ()) {
+			TransparentProxy proxy = (TransparentProxy) del.Target;
+			if (!proxy.IsContextBound || !proxy.IsCurrentContext)
+				return RemotingBeginInvoke (proxy, del, prms);
+		}
+
+		AsyncCallback async_callback;
+		object async_state;
+		MonoMethodMessage message = new MonoMethodMessage (del, prms, out async_callback, out async_state);
+
+		MonoAsyncCall async_call = new MonoAsyncCall ();
+		async_call.msg = message;
+		async_call.state = async_state;
+
+		AsyncResult async_result = new AsyncResult ();
+		async_result.async_delegate = del;
+		async_result.async_callback = async_callback;
+		async_result.async_state = async_state;
+		async_result.async_call = async_call;
+		async_result.context = ExecutionContext.Capture ();
+
+		ThreadPool.UnsafeQueueCustomWorkItem (async_result, false);
+
+		return async_result;
+	}
+
+	[MethodImplAttribute(MethodImplOptions.InternalCall)]
+	internal extern static AsyncResult RemotingBeginInvoke (TransparentProxy proxy, Delegate del, IntPtr prms);
 
 	void Invoke ()
 	{
