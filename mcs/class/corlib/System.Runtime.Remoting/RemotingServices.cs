@@ -52,8 +52,7 @@ using System.Runtime.Serialization.Formatters;
 namespace System.Runtime.Remoting
 {
 	[System.Runtime.InteropServices.ComVisible (true)]
-	static
-	public class RemotingServices 
+	public static partial class RemotingServices
 	{
 		// Holds the identities of the objects, using uri as index
 		static Hashtable uri_hash = new Hashtable ();		
