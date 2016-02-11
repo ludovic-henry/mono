@@ -1340,7 +1340,7 @@ mono_threadpool_ms_begin_invoke (MonoDomain *domain, MonoDelegate *target, MonoM
 	MONO_OBJECT_SETREF (async_call, state, state);
 
 	async_result = mono_async_result_new (domain, target, async_call->state, async_callback);
-	MONO_OBJECT_SETREF (async_result, object_data, (MonoObject*) async_call);
+	MONO_OBJECT_SETREF (async_result, async_call, async_call);
 
 	mono_threadpool_ms_enqueue_work_item (domain, (MonoObject*) async_result);
 
@@ -1387,7 +1387,7 @@ mono_threadpool_ms_end_invoke (MonoAsyncResult *ares, MonoArray **out_args, Mono
 		MONO_FINISH_BLOCKING;
 	}
 
-	ac = (MonoAsyncCall*) ares->object_data;
+	ac = ares->async_call;
 	g_assert (ac);
 
 	*exc = ac->msg->exc; /* FIXME: GC add write barrier */

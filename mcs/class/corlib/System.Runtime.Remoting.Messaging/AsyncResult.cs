@@ -45,7 +45,7 @@ public class AsyncResult : IAsyncResult, IMessageSink, IThreadPoolWorkItem {
 	object async_state;
 	WaitHandle handle;
 	Delegate async_delegate;
-	object object_data;
+	MonoAsyncCall async_call;
 	bool sync_completed;
 	bool completed;
 	bool endinvoke_called;
@@ -175,7 +175,6 @@ public class AsyncResult : IAsyncResult, IMessageSink, IThreadPoolWorkItem {
 
 	void Invoke ()
 	{
-		MonoAsyncCall async_call = object_data as MonoAsyncCall;
 		if (async_call == null) {
 			/* Remoting case */
 			InvokeRemoting ();

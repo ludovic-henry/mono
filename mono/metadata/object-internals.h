@@ -278,12 +278,14 @@ typedef struct {
 	MonoString *param_name;
 } MonoArgumentException;
 
+typedef struct _MonoAsyncCall MonoAsyncCall;
+
 typedef struct {
 	MonoObject   object;
 	MonoObject  *async_state;
 	MonoObject  *handle;
 	MonoDelegate *async_delegate;
-	MonoObject  *object_data;
+	MonoAsyncCall *async_call;
 	MonoBoolean  sync_completed;
 	MonoBoolean  completed;
 	MonoBoolean  endinvoke_called;
@@ -362,13 +364,13 @@ typedef struct {
 } MonoMethodMessage;
 
 /* Keep in sync with the System.MonoAsyncCall */
-typedef struct {
+struct _MonoAsyncCall {
 	MonoObject object;
 	MonoMethodMessage *msg;
 	MonoObject *state;
 	MonoObject *res;
 	MonoArray *out_args;
-} MonoAsyncCall;
+};
 
 typedef struct {
 	MonoObject obj;
