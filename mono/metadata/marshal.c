@@ -245,6 +245,9 @@ mono_marshal_init (void)
 		register_icall (mono_marshal_isinst_with_cache, "mono_marshal_isinst_with_cache", "object object ptr ptr", FALSE);
 		register_icall (mono_marshal_thread_attach, "mono_marshal_thread_attach", "ptr ptr ptr", TRUE);
 		register_icall (mono_marshal_thread_detach, "mono_marshal_thread_detach", "void ptr ptr", TRUE);
+		register_icall (mono_thread_info_current_unchecked, "mono_thread_info_current_unchecked", "ptr", TRUE);
+		// register_icall (mono_domain_get, "mono_domain_get", "ptr", TRUE);
+		register_icall (mono_thread_info_is_live, "mono_thread_info_is_live", "int32 ptr", TRUE);
 
 		mono_cominterop_init ();
 		mono_remoting_init ();
@@ -7740,8 +7743,6 @@ mono_marshal_thread_attach (MonoDomain *domain, gpointer *dummy)
 		/* thread state (BLOCKING|RUNNING) -> RUNNING */
 		return mono_threads_reset_blocking_start (dummy);
 	}
-
-
 }
 
 /* Called by native->managed wrappers */
@@ -7764,6 +7765,20 @@ mono_marshal_thread_detach (gpointer cookie, gpointer *dummy)
 		else
 			mono_domain_set (orig, TRUE);
 	}
+}
+
+static void
+mono_mb_emit_ldc_ptr (MonoMethodBuilder *mb, gpointer value)
+{
+#if SIZEOF_VOID_P == 4
+		mono_mb_emit_byte (mb, CEE_LDC_I4);
+		mono_mb_emit_i4 (mb, (gint32)(gsize) value);
+#elif SIZEOF_VOID_P == 8
+		mono_mb_emit_byte (mb, CEE_LDC_I8);
+		mono_mb_emit_i8 (mb, (gint64)(gsize) value);
+#else
+#error
+#endif
 }
 
 /*
@@ -7813,7 +7828,7 @@ mono_marshal_emit_managed_wrapper (MonoMethodBuilder *mb, MonoMethodSignature *i
 	MonoMethodSignature *sig, *csig;
 	int i, *tmp_locals;
 	gboolean closed = FALSE;
-	int cookie, dummy;
+	int cookie, orig;
 
 	sig = m->sig;
 	csig = m->csig;
@@ -7843,23 +7858,72 @@ mono_marshal_emit_managed_wrapper (MonoMethodBuilder *mb, MonoMethodSignature *i
 	/* local 4, the local to be used when calling the mono_marshal_thread_attach funcs */
 	/* tons of code hardcode 3 to be the return var */
 	cookie = mono_mb_add_local (mb, &mono_defaults.int_class->byval_arg);
-	/* local 5, the local used to get a stack address for suspend funcs */
-	dummy = mono_mb_add_local (mb, &mono_defaults.int_class->byval_arg);
+	/* local 5, store the origin domain, to switch back to on detach,
+	 * and also the local used to get a stack address for suspend funcs */
+	orig = mono_mb_add_local (mb, &mono_defaults.int_class->byval_arg);
 
 	mono_mb_emit_icon (mb, 0);
 	mono_mb_emit_stloc (mb, 2);
 
-	/* cookie = mono_marshal_threads_attach (mono_domain_get (), &dummy) */
-#if SIZEOF_VOID_P == 4
-	mono_mb_emit_byte (mb, CEE_LDC_I4);
-	mono_mb_emit_i4 (mb, aot ? -1 : (gint32)(gsize) mono_domain_get ());
-#else
-	mono_mb_emit_byte (mb, CEE_LDC_I8);
-	mono_mb_emit_i8 (mb, aot ? -1 : (gint64)(gsize) mono_domain_get ());
-#endif
-	mono_mb_emit_ldloc_addr (mb, dummy);
-	mono_mb_emit_icall (mb, mono_marshal_thread_attach);
-	mono_mb_emit_stloc (mb, cookie);
+	if (aot) {
+		/* cookie = mono_marshal_thread_attach (-1, &orig) */
+		mono_mb_emit_ldc_ptr (mb, (gpointer) -1);
+		mono_mb_emit_ldloc_addr (mb, orig);
+		mono_mb_emit_icall (mb, mono_marshal_thread_attach);
+		mono_mb_emit_stloc (mb, cookie);
+	} else {
+		int pos0, pos1, pos2, pos3;
+
+		/*
+		 * if (mono_thread_info_current_unchecked ()
+		 *     && mono_thread_info_is_live (mono_thread_info_current_unchecked ())
+		 *     && mono_domain_get () == domain) {
+		 *   // fast path
+		 *   orig = domain;
+		 *   cookie = mono_threads_reset_blocking_start (&orig);
+		 * } else {
+		 *   // slow path
+		 *   cookie = mono_marshal_thread_attach (domain, &orig)
+		 * }
+		 */
+
+		/* if (mono_thread_info_current_unchecked () != NULL) */
+		mono_mb_emit_icall (mb, mono_thread_info_current_unchecked);
+		pos0 = mono_mb_emit_branch (mb, CEE_BRFALSE);
+
+		/* if (mono_thread_info_is_live (mono_thread_info_current_unchecked ())) */
+		mono_mb_emit_icall (mb, mono_thread_info_current_unchecked);
+		mono_mb_emit_icall (mb, mono_thread_info_is_live);
+		pos1 = mono_mb_emit_branch (mb, CEE_BRFALSE);
+
+		/* if (mono_domain_get () == domain) */
+		mono_mb_emit_icall (mb, mono_domain_get);
+		mono_mb_emit_ldc_ptr (mb, mono_domain_get ());
+		pos2 = mono_mb_emit_branch (mb, CEE_BNE_UN);
+
+		/* orig = domain */
+		mono_mb_emit_ldc_ptr (mb, mono_domain_get ());
+		mono_mb_emit_stloc (mb, orig);
+
+		/* cookie = mono_threads_reset_blocking_start (&orig) */
+		mono_mb_emit_ldloc_addr (mb, orig);
+		mono_mb_emit_icall (mb, mono_threads_reset_blocking_start);
+		mono_mb_emit_stloc (mb, cookie);
+
+		pos3 = mono_mb_emit_branch (mb, CEE_BR);
+
+		/* slow path */
+		mono_mb_patch_branch (mb, pos0);
+		mono_mb_patch_branch (mb, pos1);
+		mono_mb_patch_branch (mb, pos2);
+
+		mono_mb_emit_ldc_ptr (mb, mono_domain_get ());
+		mono_mb_emit_ldloc_addr (mb, orig);
+		mono_mb_emit_icall (mb, mono_marshal_thread_attach);
+		mono_mb_emit_stloc (mb, cookie);
+
+		mono_mb_patch_branch (mb, pos3);
+	}
 
 	/* we first do all conversions */
 	tmp_locals = (int *)alloca (sizeof (int) * sig->param_count);
@@ -7989,9 +8053,9 @@ mono_marshal_emit_managed_wrapper (MonoMethodBuilder *mb, MonoMethodSignature *i
 		}
 	}
 
-	/* mono_marshal_threads_detach (cookie, &dummy) */
+	/* mono_marshal_thread_detach (cookie, &orig) */
 	mono_mb_emit_ldloc (mb, cookie);
-	mono_mb_emit_ldloc_addr (mb, dummy);
+	mono_mb_emit_ldloc_addr (mb, orig);
 	mono_mb_emit_icall (mb, mono_marshal_thread_detach);
 
 	if (m->retobj_var) {
