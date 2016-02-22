@@ -1146,11 +1146,10 @@ namespace System.Net
 					if (queue.Count > 0 && queue.Peek () == sender) {
 						queue.Dequeue ();
 					} else if (queue.Count > 0) {
-						object [] old = queue.ToArray ();
-						queue.Clear ();
-						for (int i = old.Length - 1; i >= 0; i--) {
-							if (old [i] != sender)
-								queue.Enqueue (old [i]);
+						for (int i = 0, count = queue.Count; i < count; ++i) {
+							object item = queue.Dequeue ();
+							if (item != sender)
+								queue.Enqueue (item);
 						}
 					}
 				}
