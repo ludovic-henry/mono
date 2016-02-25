@@ -1052,6 +1052,7 @@ ReferenceSources/_SslStream.cs
 ../../../external/referencesource/System/net/System/Net/_NestedSingleAsyncResult.cs
 ../../../external/referencesource/System/net/System/Net/_NetRes.cs
 ../../../external/referencesource/System/net/System/Net/_PooledStream.cs
+../../../external/referencesource/System/net/System/Net/_ProxyChain.cs
 ../../../external/referencesource/System/net/System/Net/_RequestLifetimeSetter.cs
 ../../../external/referencesource/System/net/System/Net/_ScatterGatherBuffers.cs
 ../../../external/referencesource/System/net/System/Net/_TimerThread.cs

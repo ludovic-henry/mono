@@ -248,5 +248,22 @@ namespace System.Net
 
 			return new Uri (address);
 		}
+
+		/* referencesource support */
+
+		internal Uri[] GetProxiesAuto(Uri destination, ref int syncStatus)
+		{
+			throw new NotSupportedException ();
+		}
+
+		internal Uri GetProxyAutoFailover(Uri destination)
+		{
+			throw new NotSupportedException ();
+		}
+
+		internal void AbortGetProxiesAuto(ref int syncStatus)
+		{
+			throw new NotSupportedException ();
+		}
 	}
 }
