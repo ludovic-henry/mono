@@ -639,7 +639,6 @@ Mono.Net.Security/SystemCertificateValidator.cs
 ReferenceSources/AssertWrapper.cs
 ReferenceSources/AuthenticationState.cs
 ReferenceSources/BinaryCompatibility.cs
-ReferenceSources/CaseInsensitiveAscii.cs
 ReferenceSources/ConfigurationManagerInternalFactory.cs
 ReferenceSources/EnvironmentHelpers.cs
 ReferenceSources/HttpSysSettings.cs
@@ -656,7 +655,7 @@ ReferenceSources/SR2.cs
 ReferenceSources/SRCategoryAttribute.cs
 ReferenceSources/SystemNetworkCredential.cs
 ReferenceSources/TlsStream.cs
-ReferenceSources/WebHeaderCollectionType.cs
+ReferenceSources/UnsafeNclNativeMethods.cs
 ReferenceSources/Win32Exception.cs
 
 ReferenceSources/SSPIConfiguration.cs
@@ -1042,6 +1041,9 @@ ReferenceSources/_SslStream.cs
 ../../../external/referencesource/System/net/System/Net/_Connection.cs
 ../../../external/referencesource/System/net/System/Net/_ConnectionGroup.cs
 ../../../external/referencesource/System/net/System/Net/_ConnectStream.cs
+../../../external/referencesource/System/net/System/Net/_HeaderInfo.cs
+../../../external/referencesource/System/net/System/Net/_HeaderInfoTable.cs
+../../../external/referencesource/System/net/System/Net/_HTTPDateParse.cs
 ../../../external/referencesource/System/net/System/Net/_IRequestLifetimeTracker.cs
 ../../../external/referencesource/System/net/System/Net/_IStreams.cs
 ../../../external/referencesource/System/net/System/Net/_LazyAsyncResult.cs
@@ -1059,6 +1061,8 @@ ReferenceSources/_SslStream.cs
 ../../../external/referencesource/System/net/System/Net/cookiecontainer.cs
 ../../../external/referencesource/System/net/System/Net/cookieexception.cs
 ../../../external/referencesource/System/net/System/Net/HttpListenerRequestUriBuilder.cs
+../../../external/referencesource/System/net/System/Net/HttpStatusCode.cs
+../../../external/referencesource/System/net/System/Net/HttpVersion.cs
 ../../../external/referencesource/System/net/System/Net/Internal.cs
 ../../../external/referencesource/System/net/System/Net/ServicePointManager.cs
 ../../../external/referencesource/System/net/System/Net/UnicodeDecodingConformance.cs
@@ -1066,13 +1070,11 @@ ReferenceSources/_SslStream.cs
 ../../../external/referencesource/System/net/System/Net/webclient.cs
 ../../../external/referencesource/System/net/System/Net/WebException.cs
 ../../../external/referencesource/System/net/System/Net/WebExceptionStatus.cs
+../../../external/referencesource/System/net/System/Net/WebHeaderCollection.cs
 ../../../external/referencesource/System/net/System/Net/WebPermission.cs
+../../../external/referencesource/System/net/System/Net/WebRequest.cs
 ../../../external/referencesource/System/net/System/Net/WebUtility.cs
 ../../../external/referencesource/System/net/System/Net/WriteStreamClosedEventArgs.cs
-
-../../../external/referencesource/System/net/System/Net/HttpStatusCode.cs
-../../../external/referencesource/System/net/System/Net/HttpVersion.cs
-../../../external/referencesource/System/net/System/Net/WebRequest.cs
 
 ../../../external/referencesource/System/net/System/Net/Cache/RequestCachePolicy.cs
 

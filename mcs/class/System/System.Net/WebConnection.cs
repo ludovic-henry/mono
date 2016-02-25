@@ -286,7 +286,7 @@ namespace System.Net
 				}
 
 				Data.StatusCode = status;
-				Data.Challenge = result.GetValues_internal ("Proxy-Authenticate", false);
+				Data.Challenge = result.GetValues_internal ("Proxy-Authenticate");
 				return false;
 			} else if (status != 200) {
 				string msg = String.Format ("The remote server returned a {0} status code.", status);
@@ -1199,7 +1199,7 @@ namespace System.Net
 			}
 		}
 
-		enum ReadState
+		internal enum ReadState
 		{
 			None,
 			Status,
