@@ -34,6 +34,9 @@ namespace System.Net {
 
 		internal static void PrintWarning(TraceSource traceSource, object obj, string method, string msg) {
 		}
+
+		internal static void PrintError(TraceSource traceSource, string msg) {}
+		internal static void PrintError(TraceSource traceSource, object obj, string method, string msg) {}
 	}
 
 #if MOBILE
