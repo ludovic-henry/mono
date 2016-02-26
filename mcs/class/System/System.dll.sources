@@ -475,8 +475,6 @@ System.Net/WebConnection.cs
 System.Net/WebConnectionData.cs
 System.Net/WebConnectionGroup.cs
 System.Net/WebConnectionStream.cs
-System.Net/WebException.cs
-System.Net/WebExceptionStatus.cs
 System.Net/WebHeaderCollection.cs
 System.Net/WebProxy.cs
 System.Net/WebRequest.cs
@@ -1055,6 +1053,8 @@ ReferenceSources/_SslStream.cs
 ../../../external/referencesource/System/net/System/Net/_TimerThread.cs
 ../../../external/referencesource/System/net/System/Net/HttpStatusCode.cs
 ../../../external/referencesource/System/net/System/Net/HttpVersion.cs
+../../../external/referencesource/System/net/System/Net/WebException.cs
+../../../external/referencesource/System/net/System/Net/WebExceptionStatus.cs
 ../../../external/referencesource/System/net/System/Net/WebHeaderCollection.cs
 ../../../external/referencesource/System/net/System/Net/WebRequest.cs
 
