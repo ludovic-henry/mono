@@ -1,11 +1,18 @@
 
 using System;
 using System.Collections;
+using System.Runtime.CompilerServices;
 
 namespace System.Net
 {
 	internal static class UnsafeNclNativeMethods
 	{
+		[MethodImplAttribute (MethodImplOptions.InternalCall)]
+		internal static extern IntPtr CreateSemaphore(IntPtr lpSemaphoreAttributes, int lInitialCount, int lMaximumCount, IntPtr lpName);
+
+		[MethodImplAttribute (MethodImplOptions.InternalCall)]
+		internal static extern bool ReleaseSemaphore(IntPtr hSemaphore, int lReleaseCount, IntPtr lpPreviousCount);
+
 		internal static unsafe class HttpApi
 		{
 			internal static class HTTP_REQUEST_HEADER_ID

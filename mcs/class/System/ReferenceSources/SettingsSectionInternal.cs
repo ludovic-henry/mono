@@ -15,5 +15,20 @@ namespace System.Net.Configuration {
 #endif
 
 		internal bool HttpListenerUnescapeRequestUrl = true;
+
+		public int MaximumErrorResponseLength {
+			get { return 64; }
+			set { }
+		}
+
+		public int MaximumResponseHeadersLength {
+			get { return 64; }
+			set { }
+		}
+
+		public bool UseUnsafeHeaderParsing {
+			get { return false; }
+			set { }
+		}
 	}
 }

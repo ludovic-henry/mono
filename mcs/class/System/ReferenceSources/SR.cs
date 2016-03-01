@@ -1013,4 +1013,6 @@ public const string InvalidRegion = "The region directive '{0}' contains invalid
 	public const string StandardOutputEncodingNotAllowed = "StandardOutputEncoding is only supported when standard output is redirected.";
 	public const string WaitTillExit = "Process must exit before requested information can be determined.";
 	public const string Win2kRequired = "Feature requires Windows 2000.";
+
+	public const string net_log_cache_age = "Cache Age = {0}, Cache MaxAge = {1}.";
 }

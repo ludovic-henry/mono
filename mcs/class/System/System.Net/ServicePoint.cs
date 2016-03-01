@@ -40,7 +40,7 @@ using System.Threading;
 
 namespace System.Net 
 {
-	public class ServicePoint
+	public partial class ServicePoint
 	{
 		Uri uri;
 		int connectionLimit;

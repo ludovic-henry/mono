@@ -58,39 +58,20 @@ using Mono.Net.Security;
 
 namespace System.Net 
 {
-	[Serializable]
-	public class HttpWebRequest : WebRequest, ISerializable {
-		Uri requestUri;
-		Uri actualUri;
+	public partial class HttpWebRequest : WebRequest, ISerializable {
 		bool hostChanged;
-		bool allowAutoRedirect = true;
-		bool allowBuffering = true;
-		X509CertificateCollection certificates;
-		string connectionGroup;
 		bool haveContentLength;
-		long contentLength = -1;
-		HttpContinueDelegate continueDelegate;
-		CookieContainer cookieContainer;
-		ICredentials credentials;
-		bool haveResponse;		
+		bool haveResponse; // -> HaveResponse
 		bool haveRequest;
 		bool requestSent;
-		WebHeaderCollection webHeaders;
-		bool keepAlive = true;
-		int maxAutoRedirect = 50;
-		string mediaType = String.Empty;
-		string method = "GET";
+		string method = "GET"; // -> _OriginVerb.Name
 		string initialMethod = "GET";
-		bool pipelined = true;
-		bool preAuthenticate;
 		bool usedPreAuth;
-		Version version = HttpVersion.Version11;
+		Version version = HttpVersion.Version11; // -> IsVersionHttp10 ? HttpVersion.Version10 : HttpVersion.Version11
 		bool force_version;
 		Version actualVersion;
-		IWebProxy proxy;
-		bool sendChunked;
+		bool sendChunked; // -> (_Booleans&Booleans.SendChunked) != 0
 		ServicePoint servicePoint;
-		int timeout = 100000;
 		
 		WebConnectionStream writeStream;
 		HttpWebResponse webResponse;
@@ -108,15 +89,11 @@ namespace System.Net
 		object locker = new object ();
 		bool finished_reading;
 		internal WebConnection WebConnection;
-		DecompressionMethods auto_decomp;
-		int maxResponseHeadersLength;
-		static int defaultMaxResponseHeadersLength;
-		int readWriteTimeout = 300000; // ms
+		DecompressionMethods auto_decomp; // -> m_AutomaticDecompression
 		IMonoTlsProvider tlsProvider;
 #if SECURITY_DEP
 		MonoTlsSettings tlsSettings;
 #endif
-		ServerCertValidationCallback certValidationCallback;
 
 		enum NtlmAuthState {
 			None,
@@ -124,7 +101,6 @@ namespace System.Net
 			Response
 		}
 		AuthorizationState auth_state, proxy_auth_state;
-		string host;
 
 		[NonSerialized]
 		internal Action<Stream> ResendContentFactory;
@@ -132,15 +108,12 @@ namespace System.Net
 		// Constructors
 		static HttpWebRequest ()
 		{
-			defaultMaxResponseHeadersLength = 64 * 1024;
 #if !NET_2_1
 			NetConfig config = ConfigurationSettings.GetConfig ("system.net/settings") as NetConfig;
 			if (config != null) {
 				int x = config.MaxResponseHeadersLength;
 				if (x != -1)
 					x *= 64;
-
-				defaultMaxResponseHeadersLength = x;
 			}
 #endif
 		}
@@ -152,10 +125,10 @@ namespace System.Net
 #endif
 		HttpWebRequest (Uri uri) 
 		{
-			this.requestUri = uri;
-			this.actualUri = uri;
-			this.proxy = GlobalProxySelection.Select;
-			this.webHeaders = new WebHeaderCollection (WebHeaderCollectionType.HttpWebRequest);
+			this._OriginUri = uri;
+			this._Uri = uri;
+			this._Proxy = GlobalProxySelection.Select;
+			this._HttpRequestHeaders = new WebHeaderCollection (WebHeaderCollectionType.HttpWebRequest);
 			ThrowOnError = true;
 			ResetAuthorization ();
 		}
@@ -168,34 +141,6 @@ namespace System.Net
 			this.tlsSettings = settings;
 		}
 #endif
-		
-		[Obsolete ("Serialization is obsoleted for this type", false)]
-		protected HttpWebRequest (SerializationInfo serializationInfo, StreamingContext streamingContext) 
-		{
-			SerializationInfo info = serializationInfo;
-
-			requestUri = (Uri) info.GetValue ("requestUri", typeof (Uri));
-			actualUri = (Uri) info.GetValue ("actualUri", typeof (Uri));
-			allowAutoRedirect = info.GetBoolean ("allowAutoRedirect");
-			allowBuffering = info.GetBoolean ("allowBuffering");
-			certificates = (X509CertificateCollection) info.GetValue ("certificates", typeof (X509CertificateCollection));
-			connectionGroup = info.GetString ("connectionGroup");
-			contentLength = info.GetInt64 ("contentLength");
-			webHeaders = (WebHeaderCollection) info.GetValue ("webHeaders", typeof (WebHeaderCollection));
-			keepAlive = info.GetBoolean ("keepAlive");
-			maxAutoRedirect = info.GetInt32 ("maxAutoRedirect");
-			mediaType = info.GetString ("mediaType");
-			method = info.GetString ("method");
-			initialMethod = info.GetString ("initialMethod");
-			pipelined = info.GetBoolean ("pipelined");
-			version = (Version) info.GetValue ("version", typeof (Version));
-			proxy = (IWebProxy) info.GetValue ("proxy", typeof (IWebProxy));
-			sendChunked = info.GetBoolean ("sendChunked");
-			timeout = info.GetInt32 ("timeout");
-			redirects = info.GetInt32 ("redirects");
-			host = info.GetString ("host");
-			ResetAuthorization ();
-		}
 
 		void ResetAuthorization ()
 		{
@@ -205,56 +150,14 @@ namespace System.Net
 		
 		// Properties
 
-		public string Accept {
-			get { return webHeaders ["Accept"]; }
-			set {
-				CheckRequestStarted ();
-				webHeaders.RemoveAndAdd ("Accept", value);
-			}
-		}
-		
 		public Uri Address {
-			get { return actualUri; }
-			internal set { actualUri = value; } // Used by Ftp+proxy
-		}
-		
-		public bool AllowAutoRedirect {
-			get { return allowAutoRedirect; }
-			set { this.allowAutoRedirect = value; }
-		}
-		
-		public bool AllowWriteStreamBuffering {
-			get { return allowBuffering; }
-			set { allowBuffering = value; }
-		}
-		
-		public virtual bool AllowReadStreamBuffering {
-			get { return false; }
-			set {
-				if (value)
-					throw new InvalidOperationException ();
-			}
+			get { return _Uri; }
+			internal set { _Uri = value; } // Used by Ftp+proxy
 		}
 
-		static Exception GetMustImplement ()
-		{
-			return new NotImplementedException ();
-		}
-		
-		public DecompressionMethods AutomaticDecompression
-		{
-			get {
-				return auto_decomp;
-			}
-			set {
-				CheckRequestStarted ();
-				auto_decomp = value;
-			}
-		}
-		
 		internal bool InternalAllowBuffering {
 			get {
-				return allowBuffering && MethodWithBuffer;
+				return AllowWriteStreamBuffering && MethodWithBuffer;
 			}
 		}
 
@@ -275,415 +178,28 @@ namespace System.Net
 			get { return tlsSettings; }
 		}
 #endif
-		
-		public X509CertificateCollection ClientCertificates {
-			get {
-				if (certificates == null)
-					certificates = new X509CertificateCollection ();
-				return certificates;
-			}
-			set {
-				if (value == null)
-					throw new ArgumentNullException ("value");
-				certificates = value;
-			}
-		}
 
-		public string Connection {
-			get { return webHeaders ["Connection"]; }
-			set {
-				CheckRequestStarted ();
-
-				if (string.IsNullOrEmpty (value)) {
-					webHeaders.RemoveInternal ("Connection");
-					return;
-				}
-
-				string val = value.ToLowerInvariant ();
-				if (val.Contains ("keep-alive") || val.Contains ("close"))
-					throw new ArgumentException ("Keep-Alive and Close may not be set with this property");
-
-				if (keepAlive)
-					value = value + ", Keep-Alive";
-				
-				webHeaders.RemoveAndAdd ("Connection", value);
-			}
-		}		
-		
-		public override string ConnectionGroupName { 
-			get { return connectionGroup; }
-			set { connectionGroup = value; }
-		}
-		
-		public override long ContentLength { 
-			get { return contentLength; }
-			set { 
-				CheckRequestStarted ();
-				if (value < 0)
-					throw new ArgumentOutOfRangeException ("value", "Content-Length must be >= 0");
-					
-				contentLength = value;
-				haveContentLength = true;
-			}
-		}
-		
 		internal long InternalContentLength {
-			set { contentLength = value; }
+			set { _ContentLength = value; }
 		}
-			
+
 		internal bool ThrowOnError { get; set; }
-		
-		public override string ContentType { 
-			get { return webHeaders ["Content-Type"]; }
-			set {
-				if (value == null || value.Trim().Length == 0) {
-					webHeaders.RemoveInternal ("Content-Type");
-					return;
-				}
-				webHeaders.RemoveAndAdd ("Content-Type", value);
-			}
-		}
-		
-		public HttpContinueDelegate ContinueDelegate {
-			get { return continueDelegate; }
-			set { continueDelegate = value; }
-		}
-		
-		virtual
-		public CookieContainer CookieContainer {
-			get { return cookieContainer; }
-			set { cookieContainer = value; }
-		}
-		
-		public override ICredentials Credentials { 
-			get { return credentials; }
-			set { credentials = value; }
-		}
-		public DateTime Date {
-			get {
-				string date = webHeaders ["Date"];
-				if (date == null)
-					return DateTime.MinValue;
-				return DateTime.ParseExact (date, "r", CultureInfo.InvariantCulture).ToLocalTime ();
-			}
-			set {
-				if (value.Equals (DateTime.MinValue))
-					webHeaders.RemoveInternal ("Date");
-				else
-					webHeaders.RemoveAndAdd ("Date", value.ToUniversalTime ().ToString ("r", CultureInfo.InvariantCulture));
-			}
-		}
 
 #if !NET_2_1
 		[MonoTODO]
 		public static new RequestCachePolicy DefaultCachePolicy
 		{
 			get {
-				throw GetMustImplement ();
+				throw new NotImplementedException ();
 			}
 			set {
-				throw GetMustImplement ();
+				throw new NotImplementedException ();
 			}
 		}
 #endif
-		
-		[MonoTODO]
-		public static int DefaultMaximumErrorResponseLength
-		{
-			get {
-				throw GetMustImplement ();
-			}
-			set {
-				throw GetMustImplement ();
-			}
-		}
-		
-		public string Expect {
-			get { return webHeaders ["Expect"]; }
-			set {
-				CheckRequestStarted ();
-				string val = value;
-				if (val != null)
-					val = val.Trim ().ToLower ();
-
-				if (val == null || val.Length == 0) {
-					webHeaders.RemoveInternal ("Expect");
-					return;
-				}
-
-				if (val == "100-continue")
-					throw new ArgumentException ("100-Continue cannot be set with this property.",
-								     "value");
-				webHeaders.RemoveAndAdd ("Expect", value);
-			}
-		}
-		
-		virtual
-		public bool HaveResponse {
-			get { return haveResponse; }
-		}
-		
-		public override WebHeaderCollection Headers { 
-			get { return webHeaders; }
-			set {
-				CheckRequestStarted ();
-				WebHeaderCollection newHeaders = new WebHeaderCollection (WebHeaderCollectionType.HttpWebRequest);
-				int count = value.Count;
-				for (int i = 0; i < count; i++) 
-					newHeaders.Add (value.GetKey (i), value.Get (i));
-
-				webHeaders = newHeaders;
-			}
-		}
-		
-		public
-		string Host {
-			get {
-				if (host == null)
-					return actualUri.Authority;
-				return host;
-			}
-			set {
-				if (value == null)
-					throw new ArgumentNullException ("value");
-
-				if (!CheckValidHost (actualUri.Scheme, value))
-					throw new ArgumentException ("Invalid host: " + value);
-
-				host = value;
-			}
-		}
-
-		static bool CheckValidHost (string scheme, string val)
-		{
-			if (val.Length == 0)
-				return false;
-
-			if (val [0] == '.')
-				return false;
-
-			int idx = val.IndexOf ('/');
-			if (idx >= 0)
-				return false;
-
-			IPAddress ipaddr;
-			if (IPAddress.TryParse (val, out ipaddr))
-				return true;
-
-			string u = scheme + "://" + val + "/";
-			return Uri.IsWellFormedUriString (u, UriKind.Absolute);
-		}
-
-		public DateTime IfModifiedSince {
-			get { 
-				string str = webHeaders ["If-Modified-Since"];
-				if (str == null)
-					return DateTime.Now;
-				try {
-					return MonoHttpDate.Parse (str);
-				} catch (Exception) {
-					return DateTime.Now;
-				}
-			}
-			set {
-				CheckRequestStarted ();
-				// rfc-1123 pattern
-				webHeaders.SetInternal ("If-Modified-Since", 
-					value.ToUniversalTime ().ToString ("r", null));
-				// TODO: check last param when using different locale
-			}
-		}
-
-		public bool KeepAlive {		
-			get {
-				return keepAlive;
-			}
-			set {
-				keepAlive = value;
-			}
-		}
-		
-		public int MaximumAutomaticRedirections {
-			get { return maxAutoRedirect; }
-			set {
-				if (value <= 0)
-					throw new ArgumentException ("Must be > 0", "value");
-
-				maxAutoRedirect = value;
-			}			
-		}
-
-		[MonoTODO ("Use this")]
-		public int MaximumResponseHeadersLength {
-			get { return maxResponseHeadersLength; }
-			set { maxResponseHeadersLength = value; }
-		}
-
-		[MonoTODO ("Use this")]
-		public static int DefaultMaximumResponseHeadersLength {
-			get { return defaultMaxResponseHeadersLength; }
-			set { defaultMaxResponseHeadersLength = value; }
-		}
-
-		public	int ReadWriteTimeout {
-			get { return readWriteTimeout; }
-			set {
-				if (requestSent)
-					throw new InvalidOperationException ("The request has already been sent.");
-
-				if (value < -1)
-					throw new ArgumentOutOfRangeException ("value", "Must be >= -1");
-
-				readWriteTimeout = value;
-			}
-		}
-		
-		[MonoTODO]
-		public int ContinueTimeout {
-			get { throw new NotImplementedException (); }
-			set { throw new NotImplementedException (); }
-		}
-		
-		public string MediaType {
-			get { return mediaType; }
-			set { 
-				mediaType = value;
-			}
-		}
-		
-		public override string Method { 
-			get { return this.method; }
-			set { 
-				if (value == null || value.Trim () == "")
-					throw new ArgumentException ("not a valid method");
-
-				method = value.ToUpperInvariant ();
-				if (method != "HEAD" && method != "GET" && method != "POST" && method != "PUT" &&
-					method != "DELETE" && method != "CONNECT" && method != "TRACE" &&
-					method != "MKCOL") {
-					method = value;
-				}
-			}
-		}
-		
-		public bool Pipelined {
-			get { return pipelined; }
-			set { pipelined = value; }
-		}		
-		
-		public override bool PreAuthenticate { 
-			get { return preAuthenticate; }
-			set { preAuthenticate = value; }
-		}
-		
-		public Version ProtocolVersion {
-			get { return version; }
-			set { 
-				if (value != HttpVersion.Version10 && value != HttpVersion.Version11)
-					throw new ArgumentException ("value");
-
-				force_version = true;
-				version = value; 
-			}
-		}
-		
-		public override IWebProxy Proxy { 
-			get { return proxy; }
-			set { 
-				CheckRequestStarted ();
-				proxy = value;
-				servicePoint = null; // we may need a new one
-				GetServicePoint ();
-			}
-		}
-		
-		public string Referer {
-			get { return webHeaders ["Referer"]; }
-			set {
-				CheckRequestStarted ();
-				if (value == null || value.Trim().Length == 0) {
-					webHeaders.RemoveInternal ("Referer");
-					return;
-				}
-				webHeaders.SetInternal ("Referer", value);
-			}
-		}
-
-		public override Uri RequestUri { 
-			get { return requestUri; }
-		}
-		
-		public bool SendChunked {
-			get { return sendChunked; }
-			set {
-				CheckRequestStarted ();
-				sendChunked = value;
-			}
-		}
-		
-		public ServicePoint ServicePoint {
-			get { return GetServicePoint (); }
-		}
 
 		internal ServicePoint ServicePointNoLock {
 			get { return servicePoint; }
-		}
-		public virtual bool SupportsCookieContainer { 
-			get {
-				// The managed implementation supports the cookie container
-				// it is only Silverlight that returns false here
-				return true;
-			}
-		}
-		public override int Timeout { 
-			get { return timeout; }
-			set {
-				if (value < -1)
-					throw new ArgumentOutOfRangeException ("value");
-
-				timeout = value;
-			}
-		}
-		
-		public string TransferEncoding {
-			get { return webHeaders ["Transfer-Encoding"]; }
-			set {
-				CheckRequestStarted ();
-				string val = value;
-				if (val != null)
-					val = val.Trim ().ToLower ();
-
-				if (val == null || val.Length == 0) {
-					webHeaders.RemoveInternal ("Transfer-Encoding");
-					return;
-				}
-
-				if (val == "chunked")
-					throw new ArgumentException ("Chunked encoding must be set with the SendChunked property");
-
-				if (!sendChunked)
-					throw new ArgumentException ("SendChunked must be True", "value");
-
-				webHeaders.RemoveAndAdd ("Transfer-Encoding", value);
-			}
-		}
-
-		public override bool UseDefaultCredentials
-		{
-			get { return CredentialCache.DefaultCredentials == Credentials; }
-			set { Credentials = value ? CredentialCache.DefaultCredentials : null; }
-		}
-		
-		public string UserAgent {
-			get { return webHeaders ["User-Agent"]; }
-			set { webHeaders.SetInternal ("User-Agent", value); }
-		}
-
-		bool unsafe_auth_blah;
-		public bool UnsafeAuthenticatedConnectionSharing
-		{
-			get { return unsafe_auth_blah; }
-			set { unsafe_auth_blah = value; }
 		}
 
 		internal bool GotRequestStream {
@@ -696,30 +212,11 @@ namespace System.Net
 		}
 		
 		internal Uri AuthUri {
-			get { return actualUri; }
+			get { return _Uri; }
 		}
 		
 		internal bool ProxyQuery {
 			get { return servicePoint.UsesProxy && !servicePoint.UseConnect; }
-		}
-
-		internal ServerCertValidationCallback ServerCertValidationCallback {
-			get { return certValidationCallback; }
-		}
-
-		public RemoteCertificateValidationCallback ServerCertificateValidationCallback {
-			get {
-				if (certValidationCallback == null)
-					return null;
-				return certValidationCallback.ValidationCallback;
-			}
-			set
-			{
-				if (value == null)
-					certValidationCallback = null;
-				else
-					certValidationCallback = new ServerCertValidationCallback (value);
-			}
 		}
 
 		// Methods
@@ -728,91 +225,12 @@ namespace System.Net
 		{
 			lock (locker) {
 				if (hostChanged || servicePoint == null) {
-					servicePoint = ServicePointManager.FindServicePoint (actualUri, proxy);
+					servicePoint = ServicePointManager.FindServicePoint (_Uri, _Proxy);
 					hostChanged = false;
 				}
 			}
 
 			return servicePoint;
-		}
-		
-		public void AddRange (int range)
-		{
-			AddRange ("bytes", (long) range);
-		}
-		
-		public void AddRange (int from, int to)
-		{
-			AddRange ("bytes", (long) from, (long) to);
-		}
-		
-		public void AddRange (string rangeSpecifier, int range)
-		{
-			AddRange (rangeSpecifier, (long) range);
-		}
-		
-		public void AddRange (string rangeSpecifier, int from, int to)
-		{
-			AddRange (rangeSpecifier, (long) from, (long) to);
-		}
-		public
-		void AddRange (long range)
-		{
-			AddRange ("bytes", (long) range);
-		}
-
-		public
-		void AddRange (long from, long to)
-		{
-			AddRange ("bytes", from, to);
-		}
-
-		public
-		void AddRange (string rangeSpecifier, long range)
-		{
-			if (rangeSpecifier == null)
-				throw new ArgumentNullException ("rangeSpecifier");
-			if (!WebHeaderCollection.IsHeaderValue (rangeSpecifier))
-				throw new ArgumentException ("Invalid range specifier", "rangeSpecifier");
-
-			string r = webHeaders ["Range"];
-			if (r == null)
-				r = rangeSpecifier + "=";
-			else {
-				string old_specifier = r.Substring (0, r.IndexOf ('='));
-				if (String.Compare (old_specifier, rangeSpecifier, StringComparison.OrdinalIgnoreCase) != 0)
-					throw new InvalidOperationException ("A different range specifier is already in use");
-				r += ",";
-			}
-
-			string n = range.ToString (CultureInfo.InvariantCulture);
-			if (range < 0)
-				r = r + "0" + n;
-			else
-				r = r + n + "-";
-			webHeaders.RemoveAndAdd ("Range", r);
-		}
-
-		public
-		void AddRange (string rangeSpecifier, long from, long to)
-		{
-			if (rangeSpecifier == null)
-				throw new ArgumentNullException ("rangeSpecifier");
-			if (!WebHeaderCollection.IsHeaderValue (rangeSpecifier))
-				throw new ArgumentException ("Invalid range specifier", "rangeSpecifier");
-			if (from > to || from < 0)
-				throw new ArgumentOutOfRangeException ("from");
-			if (to < 0)
-				throw new ArgumentOutOfRangeException ("to");
-
-			string r = webHeaders ["Range"];
-			if (r == null)
-				r = rangeSpecifier + "=";
-			else
-				r += ",";
-
-			r = String.Format ("{0}{1}-{2}", r, from, to);
-			webHeaders.RemoveAndAdd ("Range", r);
 		}
 
 		
@@ -826,7 +244,7 @@ namespace System.Net
 			if (method == null || !send)
 				throw new ProtocolViolationException ("Cannot send data when method is: " + method);
 
-			if (contentLength == -1 && !sendChunked && !allowBuffering && KeepAlive)
+			if (_ContentLength == -1 && !sendChunked && !AllowWriteStreamBuffering && KeepAlive)
 				throw new ProtocolViolationException ("Content-Length not set");
 
 			string transferEncoding = TransferEncoding;
@@ -859,7 +277,7 @@ namespace System.Net
 					requestSent = true;
 					redirects = 0;
 					servicePoint = GetServicePoint ();
-					abortHandler = servicePoint.SendRequest (this, connectionGroup);
+					abortHandler = servicePoint.SendRequest (this, _ConnectionGroupName);
 				}
 				return result;
 			}
@@ -892,7 +310,7 @@ namespace System.Net
 				asyncWrite = (WebAsyncResult) asyncResult;
 			}
 
-			if (!asyncResult.IsCompleted && !asyncResult.AsyncWaitHandle.WaitOne (timeout, false)) {
+			if (!asyncResult.IsCompleted && !asyncResult.AsyncWaitHandle.WaitOne (_Timeout, false)) {
 				Abort ();
 				throw new WebException ("The request timed out", WebExceptionStatus.Timeout);
 			}
@@ -904,17 +322,17 @@ namespace System.Net
 		{
 			if (writeStream == null || writeStream.RequestWritten || !InternalAllowBuffering)
 				return false;
-			if (contentLength < 0 && writeStream.CanWrite == true && writeStream.WriteBufferLength < 0)
+			if (_ContentLength < 0 && writeStream.CanWrite == true && writeStream.WriteBufferLength < 0)
 				return false;
 
-			if (contentLength < 0 && writeStream.WriteBufferLength >= 0)
+			if (_ContentLength < 0 && writeStream.WriteBufferLength >= 0)
 				InternalContentLength = writeStream.WriteBufferLength;
 
 			// This will write the POST/PUT if the write stream already has the expected
 			// amount of bytes in it (ContentLength) (bug #77753) or if the write stream
 			// contains data and it has been closed already (xamarin bug #1512).
 
-			if (writeStream.WriteBufferLength == contentLength || (contentLength == -1 && writeStream.CanWrite == false))
+			if (writeStream.WriteBufferLength == _ContentLength || (_ContentLength == -1 && writeStream.CanWrite == false))
 				return writeStream.WriteRequestAsync (result);
 
 			return false;
@@ -977,7 +395,7 @@ namespace System.Net
 					requestSent = true;
 					redirects = 0;
 					servicePoint = GetServicePoint ();
-					abortHandler = servicePoint.SendRequest (this, connectionGroup);
+					abortHandler = servicePoint.SendRequest (this, _ConnectionGroupName);
 				} catch (Exception ex) {
 					aread.SetCompleted (synch, ex);
 					aread.DoCallback ();
@@ -996,7 +414,7 @@ namespace System.Net
 			if (result == null)
 				throw new ArgumentException ("Invalid IAsyncResult", "asyncResult");
 
-			if (!result.WaitUntilComplete (timeout, false)) {
+			if (!result.WaitUntilComplete (_Timeout, false)) {
 				Abort ();
 				throw new WebException("The request timed out", WebExceptionStatus.Timeout);
 			}
@@ -1082,40 +500,7 @@ namespace System.Net
 				} catch {}
 			}
 		}		
-		
-		void ISerializable.GetObjectData (SerializationInfo serializationInfo,
-		   				  StreamingContext streamingContext)
-		{
-			GetObjectData (serializationInfo, streamingContext);
-		}
 
-		protected override void GetObjectData (SerializationInfo serializationInfo,
-			StreamingContext streamingContext)
-		{
-			SerializationInfo info = serializationInfo;
-
-			info.AddValue ("requestUri", requestUri, typeof (Uri));
-			info.AddValue ("actualUri", actualUri, typeof (Uri));
-			info.AddValue ("allowAutoRedirect", allowAutoRedirect);
-			info.AddValue ("allowBuffering", allowBuffering);
-			info.AddValue ("certificates", certificates, typeof (X509CertificateCollection));
-			info.AddValue ("connectionGroup", connectionGroup);
-			info.AddValue ("contentLength", contentLength);
-			info.AddValue ("webHeaders", webHeaders, typeof (WebHeaderCollection));
-			info.AddValue ("keepAlive", keepAlive);
-			info.AddValue ("maxAutoRedirect", maxAutoRedirect);
-			info.AddValue ("mediaType", mediaType);
-			info.AddValue ("method", method);
-			info.AddValue ("initialMethod", initialMethod);
-			info.AddValue ("pipelined", pipelined);
-			info.AddValue ("version", version, typeof (Version));
-			info.AddValue ("proxy", proxy, typeof (IWebProxy));
-			info.AddValue ("sendChunked", sendChunked);
-			info.AddValue ("timeout", timeout);
-			info.AddValue ("redirects", redirects);
-			info.AddValue ("host", host);
-		}
-		
 		void CheckRequestStarted () 
 		{
 			if (requestSent)
@@ -1124,14 +509,14 @@ namespace System.Net
 
 		internal void DoContinueDelegate (int statusCode, WebHeaderCollection headers)
 		{
-			if (continueDelegate != null)
-				continueDelegate (statusCode, headers);
+			if (_ContinueDelegate != null)
+				_ContinueDelegate (statusCode, headers);
 		}
 
 		void RewriteRedirectToGet ()
 		{
 			method = "GET";
-			webHeaders.RemoveInternal ("Transfer-Encoding");
+			_HttpRequestHeaders.RemoveInternal ("Transfer-Encoding");
 			sendChunked = false;
 		}
 		
@@ -1165,14 +550,14 @@ namespace System.Net
 				break;
 			}
 
-			if (method != "GET" && !InternalAllowBuffering && (writeStream.WriteBufferLength > 0 || contentLength > 0))
+			if (method != "GET" && !InternalAllowBuffering && (writeStream.WriteBufferLength > 0 || _ContentLength > 0))
 				e = new WebException ("The request requires buffering data to succeed.", null, WebExceptionStatus.ProtocolError, webResponse);
 
 			if (e != null)
 				throw e;
 
 			if (AllowWriteStreamBuffering || method == "GET")
-				contentLength = -1;
+				_ContentLength = -1;
 
 			uriString = webResponse.Headers ["Location"];
 
@@ -1180,16 +565,16 @@ namespace System.Net
 				throw new WebException ("No Location header found for " + (int) code,
 							WebExceptionStatus.ProtocolError);
 
-			Uri prev = actualUri;
+			Uri prev = _Uri;
 			try {
-				actualUri = new Uri (actualUri, uriString);
+				_Uri = new Uri (_Uri, uriString);
 			} catch (Exception) {
 				throw new WebException (String.Format ("Invalid URL ({0}) for {1}",
 									uriString, (int) code),
 									WebExceptionStatus.ProtocolError);
 			}
 
-			hostChanged = (actualUri.Scheme != prev.Scheme || Host != prev.Authority);
+			hostChanged = (_Uri.Scheme != prev.Scheme || Host != prev.Authority);
 			return true;
 		}
 
@@ -1198,57 +583,57 @@ namespace System.Net
 			bool continue100 = false;
 			if (sendChunked) {
 				continue100 = true;
-				webHeaders.RemoveAndAdd ("Transfer-Encoding", "chunked");
-				webHeaders.RemoveInternal ("Content-Length");
-			} else if (contentLength != -1) {
+				_HttpRequestHeaders.RemoveAndAdd ("Transfer-Encoding", "chunked");
+				_HttpRequestHeaders.RemoveInternal ("Content-Length");
+			} else if (_ContentLength != -1) {
 				if (auth_state.NtlmAuthState == NtlmAuthState.Challenge || proxy_auth_state.NtlmAuthState == NtlmAuthState.Challenge) {
 					// We don't send any body with the NTLM Challenge request.
-					if (haveContentLength || gotRequestStream || contentLength > 0)
-						webHeaders.SetInternal ("Content-Length", "0");
+					if (haveContentLength || gotRequestStream || _ContentLength > 0)
+						_HttpRequestHeaders.SetInternal ("Content-Length", "0");
 					else
-						webHeaders.RemoveInternal ("Content-Length");
+						_HttpRequestHeaders.RemoveInternal ("Content-Length");
 				} else {
-					if (contentLength > 0)
+					if (_ContentLength > 0)
 						continue100 = true;
 
-					if (haveContentLength || gotRequestStream || contentLength > 0)
-						webHeaders.SetInternal ("Content-Length", contentLength.ToString ());
+					if (haveContentLength || gotRequestStream || _ContentLength > 0)
+						_HttpRequestHeaders.SetInternal ("Content-Length", _ContentLength.ToString ());
 				}
-				webHeaders.RemoveInternal ("Transfer-Encoding");
+				_HttpRequestHeaders.RemoveInternal ("Transfer-Encoding");
 			} else {
-				webHeaders.RemoveInternal ("Content-Length");
+				_HttpRequestHeaders.RemoveInternal ("Content-Length");
 			}
 
 			if (actualVersion == HttpVersion.Version11 && continue100 &&
 			    servicePoint.SendContinue) { // RFC2616 8.2.3
-				webHeaders.RemoveAndAdd ("Expect" , "100-continue");
+				_HttpRequestHeaders.RemoveAndAdd ("Expect" , "100-continue");
 				expectContinue = true;
 			} else {
-				webHeaders.RemoveInternal ("Expect");
+				_HttpRequestHeaders.RemoveInternal ("Expect");
 				expectContinue = false;
 			}
 
 			bool proxy_query = ProxyQuery;
 			string connectionHeader = (proxy_query) ? "Proxy-Connection" : "Connection";
-			webHeaders.RemoveInternal ((!proxy_query) ? "Proxy-Connection" : "Connection");
+			_HttpRequestHeaders.RemoveInternal ((!proxy_query) ? "Proxy-Connection" : "Connection");
 			Version proto_version = servicePoint.ProtocolVersion;
 			bool spoint10 = (proto_version == null || proto_version == HttpVersion.Version10);
 
-			if (keepAlive && (version == HttpVersion.Version10 || spoint10)) {
-				if (webHeaders[connectionHeader] == null
-				    || webHeaders[connectionHeader].IndexOf ("keep-alive", StringComparison.OrdinalIgnoreCase) == -1)
-					webHeaders.RemoveAndAdd (connectionHeader, "keep-alive");
-			} else if (!keepAlive && version == HttpVersion.Version11) {
-				webHeaders.RemoveAndAdd (connectionHeader, "close");
+			if (m_KeepAlive && (version == HttpVersion.Version10 || spoint10)) {
+				if (_HttpRequestHeaders[connectionHeader] == null
+				    || _HttpRequestHeaders[connectionHeader].IndexOf ("keep-alive", StringComparison.OrdinalIgnoreCase) == -1)
+					_HttpRequestHeaders.RemoveAndAdd (connectionHeader, "keep-alive");
+			} else if (!m_KeepAlive && version == HttpVersion.Version11) {
+				_HttpRequestHeaders.RemoveAndAdd (connectionHeader, "close");
 			}
 
-			webHeaders.SetInternal ("Host", Host);
-			if (cookieContainer != null) {
-				string cookieHeader = cookieContainer.GetCookieHeader (actualUri);
+			_HttpRequestHeaders.SetInternal ("Host", Host);
+			if (_CookieContainer != null) {
+				string cookieHeader = _CookieContainer.GetCookieHeader (_Uri);
 				if (cookieHeader != "")
-					webHeaders.RemoveAndAdd ("Cookie", cookieHeader);
+					_HttpRequestHeaders.RemoveAndAdd ("Cookie", cookieHeader);
 				else
-					webHeaders.RemoveInternal ("Cookie");
+					_HttpRequestHeaders.RemoveInternal ("Cookie");
 			}
 
 			string accept_encoding = null;
@@ -1257,26 +642,26 @@ namespace System.Net
 			if ((auto_decomp & DecompressionMethods.Deflate) != 0)
 				accept_encoding = accept_encoding != null ? "gzip, deflate" : "deflate";
 			if (accept_encoding != null)
-				webHeaders.RemoveAndAdd ("Accept-Encoding", accept_encoding);
+				_HttpRequestHeaders.RemoveAndAdd ("Accept-Encoding", accept_encoding);
 
-			if (!usedPreAuth && preAuthenticate)
+			if (!usedPreAuth && m_PreAuthenticate)
 				DoPreAuthenticate ();
 
-			return webHeaders.ToString ();
+			return _HttpRequestHeaders.ToString ();
 		}
 
 		void DoPreAuthenticate ()
 		{
-			bool isProxy = (proxy != null && !proxy.IsBypassed (actualUri));
-			ICredentials creds = (!isProxy || credentials != null) ? credentials : proxy.Credentials;
+			bool isProxy = (_Proxy != null && !_Proxy.IsBypassed (_Uri));
+			ICredentials creds = (!isProxy || _AuthInfo != null) ? _AuthInfo : _Proxy.Credentials;
 			Authorization auth = AuthenticationManager.PreAuthenticate (this, creds);
 			if (auth == null)
 				return;
 
-			webHeaders.RemoveInternal ("Proxy-Authorization");
-			webHeaders.RemoveInternal ("Authorization");
-			string authHeader = (isProxy && credentials == null) ? "Proxy-Authorization" : "Authorization";
-			webHeaders [authHeader] = auth.Message;
+			_HttpRequestHeaders.RemoveInternal ("Proxy-Authorization");
+			_HttpRequestHeaders.RemoveInternal ("Authorization");
+			string authHeader = (isProxy && _AuthInfo == null) ? "Proxy-Authorization" : "Authorization";
+			_HttpRequestHeaders [authHeader] = auth.Message;
 			usedPreAuth = true;
 		}
 		
@@ -1309,11 +694,11 @@ namespace System.Net
 			StringBuilder req = new StringBuilder ();
 			string query;
 			if (!ProxyQuery) {
-				query = actualUri.PathAndQuery;
+				query = _Uri.PathAndQuery;
 			} else {
-				query = String.Format ("{0}://{1}{2}",  actualUri.Scheme,
+				query = String.Format ("{0}://{1}{2}",  _Uri.Scheme,
 									Host,
-									actualUri.PathAndQuery);
+									_Uri.PathAndQuery);
 			}
 			
 			if (!force_version && servicePoint.ProtocolVersion != null && servicePoint.ProtocolVersion < version) {
@@ -1336,8 +721,8 @@ namespace System.Net
 			
 			writeStream = stream;
 			if (bodyBuffer != null) {
-				webHeaders.RemoveInternal ("Transfer-Encoding");
-				contentLength = bodyBufferLength;
+				_HttpRequestHeaders.RemoveInternal ("Transfer-Encoding");
+				_ContentLength = bodyBufferLength;
 				writeStream.SendChunked = false;
 			}
 
@@ -1438,7 +823,7 @@ namespace System.Net
 				// The request has not been completely sent and we got here!
 				// We should probably just close and cause an error in any case,
 				saved_exc = new WebException (data.StatusDescription, null, WebExceptionStatus.ProtocolError, webResponse); 
-				if (allowBuffering || sendChunked || writeStream.totalWritten >= contentLength) {
+				if (AllowWriteStreamBuffering || sendChunked || writeStream.totalWritten >= _ContentLength) {
 					webResponse.ReadAll ();
 				} else {
 					writeStream.IgnoreIOErrors = true;
@@ -1456,10 +841,10 @@ namespace System.Net
 			if (wce != null) {
 				WebConnection cnc = wce.Connection;
 				cnc.PriorityRequest = this;
-				ICredentials creds = !isProxy ? credentials : proxy.Credentials;
+				ICredentials creds = !isProxy ? _AuthInfo : _Proxy.Credentials;
 				if (creds != null) {
-					cnc.NtlmCredential = creds.GetCredential (requestUri, "NTLM");
-					cnc.UnsafeAuthenticatedConnectionSharing = unsafe_auth_blah;
+					cnc.NtlmCredential = creds.GetCredential (_OriginUri, "NTLM");
+					cnc.UnsafeAuthenticatedConnectionSharing = UnsafeAuthenticatedConnectionSharing;
 				}
 			}
 			r.Reset ();
@@ -1481,7 +866,7 @@ namespace System.Net
 
 			WebException wexc = null;
 			try {
-				webResponse = new HttpWebResponse (actualUri, method, data, cookieContainer);
+				webResponse = new HttpWebResponse (_Uri, method, data, _CookieContainer);
 			} catch (Exception e) {
 				wexc = new WebException (e.Message, e, WebExceptionStatus.ProtocolError, null); 
 				if (data.stream != null)
@@ -1513,7 +898,7 @@ namespace System.Net
 					return;
 				}
 
-				bool isProxy = ProxyQuery && !proxy.IsBypassed (actualUri);
+				bool isProxy = ProxyQuery && !_Proxy.IsBypassed (_Uri);
 
 				bool redirected;
 				try {
@@ -1539,7 +924,7 @@ namespace System.Net
 					} else {
 						if (sendChunked) {
 							sendChunked = false;
-							webHeaders.RemoveInternal ("Transfer-Encoding");
+							_HttpRequestHeaders.RemoveInternal ("Transfer-Encoding");
 						}
 
 						if (webResponse != null) {
@@ -1552,7 +937,7 @@ namespace System.Net
 						webResponse = null;
 						r.Reset ();
 						servicePoint = GetServicePoint ();
-						abortHandler = servicePoint.SendRequest (this, connectionGroup);
+						abortHandler = servicePoint.SendRequest (this, _ConnectionGroupName);
 					}
 				} catch (WebException wexc2) {
 					if (forced) {
@@ -1606,21 +991,21 @@ namespace System.Net
 			public bool CheckAuthorization (WebResponse response, HttpStatusCode code)
 			{
 				isCompleted = false;
-				if (code == HttpStatusCode.Unauthorized && request.credentials == null)
+				if (code == HttpStatusCode.Unauthorized && request._AuthInfo == null)
 					return false;
 
 				// FIXME: This should never happen!
 				if (isProxy != (code == HttpStatusCode.ProxyAuthenticationRequired))
 					return false;
 
-				if (isProxy && (request.proxy == null || request.proxy.Credentials == null))
+				if (isProxy && (request._Proxy == null || request._Proxy.Credentials == null))
 					return false;
 
 				string [] authHeaders = response.Headers.GetValues_internal (isProxy ? "Proxy-Authenticate" : "WWW-Authenticate");
 				if (authHeaders == null || authHeaders.Length == 0)
 					return false;
 
-				ICredentials creds = (!isProxy) ? request.credentials : request.proxy.Credentials;
+				ICredentials creds = (!isProxy) ? request._AuthInfo : request._Proxy.Credentials;
 				Authorization auth = null;
 				foreach (string authHeader in authHeaders) {
 					auth = AuthenticationManager.Authenticate (authHeader, request, creds);
@@ -1629,7 +1014,7 @@ namespace System.Net
 				}
 				if (auth == null)
 					return false;
-				request.webHeaders [isProxy ? "Proxy-Authorization" : "Authorization"] = auth.Message;
+				request._HttpRequestHeaders [isProxy ? "Proxy-Authorization" : "Authorization"] = auth.Message;
 				isCompleted = auth.Complete;
 				bool is_ntlm = (auth.Module.AuthenticationType == "NTLM");
 				if (is_ntlm)
@@ -1641,7 +1026,7 @@ namespace System.Net
 			{
 				isCompleted = false;
 				ntlm_auth_state = NtlmAuthState.None;
-				request.webHeaders.RemoveInternal (isProxy ? "Proxy-Authorization" : "Authorization");
+				request._HttpRequestHeaders.RemoveInternal (isProxy ? "Proxy-Authorization" : "Authorization");
 			}
 
 			public override string ToString ()
@@ -1671,7 +1056,7 @@ namespace System.Net
 			HttpStatusCode code = 0;
 			if (throwMe == null && webResponse != null) {
 				code = webResponse.StatusCode;
-				if ((!auth_state.IsCompleted && code == HttpStatusCode.Unauthorized && credentials != null) ||
+				if ((!auth_state.IsCompleted && code == HttpStatusCode.Unauthorized && _AuthInfo != null) ||
 					(ProxyQuery && !proxy_auth_state.IsCompleted && code == HttpStatusCode.ProxyAuthenticationRequired)) {
 					if (!usedPreAuth && CheckAuthorization (webResponse, code)) {
 						// Keep the written body, so it can be rewritten in the retry
@@ -1723,11 +1108,11 @@ namespace System.Net
 								    (int) code, webResponse.StatusDescription);
 					throwMe = new WebException (err, null, protoError, webResponse);
 					webResponse.ReadAll ();
-				} else if ((int) code == 304 && allowAutoRedirect) {
+				} else if ((int) code == 304 && AllowAutoRedirect) {
 					string err = String.Format ("The remote server returned an error: ({0}) {1}.",
 								    (int) code, webResponse.StatusDescription);
 					throwMe = new WebException (err, null, protoError, webResponse);
-				} else if ((int) code >= 300 && allowAutoRedirect && redirects >= maxAutoRedirect) {
+				} else if ((int) code >= 300 && AllowAutoRedirect && redirects >= _MaximumAllowedRedirections) {
 					throwMe = new WebException ("Max. redirections exceeded.", null,
 								    protoError, webResponse);
 					webResponse.ReadAll ();
@@ -1738,13 +1123,13 @@ namespace System.Net
 			if (throwMe == null) {
 				bool b = false;
 				int c = (int) code;
-				if (allowAutoRedirect && c >= 300) {
+				if (AllowAutoRedirect && c >= 300) {
 					b = Redirect (result, code, webResponse);
 					if (InternalAllowBuffering && writeStream.WriteBufferLength > 0) {
 						bodyBuffer = writeStream.WriteBuffer;
 						bodyBufferLength = writeStream.WriteBufferLength;
 					}
-					if (b && !unsafe_auth_blah) {
+					if (b && !UnsafeAuthenticatedConnectionSharing) {
 						auth_state.Reset ();
 						proxy_auth_state.Reset ();
 					}

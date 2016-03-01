@@ -1773,6 +1773,11 @@ namespace System {
 			return Parser.GetComponents (this, components, format);
 		}
 
+		internal string GetParts(UriComponents uriParts, UriFormat formatAs)
+		{
+			return GetComponents (uriParts, formatAs);
+		}
+
 		public bool IsBaseOf (Uri uri)
 		{
 			if (uri == null)

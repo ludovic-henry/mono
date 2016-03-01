@@ -82,24 +82,7 @@ namespace System.Net
 
 		// Properties
 
-		[MonoTODO ("Implement the caching system. Currently always returns a policy with the NoCacheNoStore level")]
-		public virtual RequestCachePolicy CachePolicy
-		{
-			get { return DefaultCachePolicy; }
-			set {
-			}
-		}
-		
-		public static RequestCachePolicy DefaultCachePolicy {
-			get {
-				return defaultCachePolicy ?? (defaultCachePolicy = new HttpRequestCachePolicy (HttpRequestCacheLevel.NoCacheNoStore));
-			}
-			set {
-				throw new NotImplementedException ("This method must be implemented in derived classes");
-			}
-		}
-
-//		volatile static IWebProxy proxy;
+		// volatile static IWebProxy proxy;
 		static readonly object lockobj = new object ();
 		
 		public static IWebProxy DefaultWebProxy {

@@ -43,8 +43,7 @@ using System.Text;
 
 namespace System.Net 
 {
-	[Serializable]
-	public class HttpWebResponse : WebResponse, ISerializable, IDisposable {
+	public partial class HttpWebResponse : WebResponse, ISerializable, IDisposable {
 		Uri uri;
 		WebHeaderCollection webHeaders;
 		CookieCollection cookieCollection;

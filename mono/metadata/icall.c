@@ -7619,6 +7619,18 @@ ves_icall_System_Runtime_InteropServices_Marshal_PrelinkAll (MonoReflectionType 
 	}
 }
 
+ICALL_EXPORT gpointer
+ves_icall_System_Net_UnsafeNclNativeMethods_CreateSemaphore (gpointer attributes, gint32 initial_count, gint32 maximum_count, gpointer name)
+{
+	return CreateSemaphore ((WapiSecurityAttributes*) attributes, initial_count, maximum_count, (gunichar2*) name);
+}
+
+ICALL_EXPORT MonoBoolean
+ves_icall_System_Net_UnsafeNclNativeMethods_ReleaseSemaphore (gpointer handle, gint32 release_count, gint32* previous_count)
+{
+	return ReleaseSemaphore (handle, release_count, previous_count);
+}
+
 /* These parameters are "readonly" in corlib/System/NumberFormatter.cs */
 ICALL_EXPORT void
 ves_icall_System_NumberFormatter_GetFormatterTables (guint64 const **mantissas,

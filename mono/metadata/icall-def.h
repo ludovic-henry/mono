@@ -450,6 +450,10 @@ ICALL_TYPE(SOCKEX, "System.Net.Sockets.SocketException", SOCKEX_1)
 ICALL(SOCKEX_1, "WSAGetLastError_internal", ves_icall_System_Net_Sockets_SocketException_WSAGetLastError_internal)
 #endif /* !DISABLE_SOCKETS */
 
+ICALL_TYPE(UNSAFENATIVEMETHOD, "System.Net.UnsafeNclNativeMethods", UNSAFENATIVEMETHOD_1)
+ICALL(UNSAFENATIVEMETHOD_1, "CreateSemaphore", ves_icall_System_Net_UnsafeNclNativeMethods_CreateSemaphore)
+ICALL(UNSAFENATIVEMETHOD_2, "ReleaseSemaphore", ves_icall_System_Net_UnsafeNclNativeMethods_ReleaseSemaphore)
+
 ICALL_TYPE(NUMBER, "System.Number", NUMBER_1)
 ICALL(NUMBER_1, "NumberBufferToDecimal", mono_decimal_from_number)
 ICALL(NUMBER_2, "NumberBufferToDouble", mono_double_from_number)

@@ -370,6 +370,11 @@ namespace System.Net
 			return sp;
 		}
 
+		internal static ServicePoint FindServicePoint(Uri address, IWebProxy proxy, out ProxyChain chain, ref HttpAbortDelegate abortDelegate, ref int abortState)
+		{
+			throw new NotImplementedException ();
+		}
+
 		internal static void CloseConnectionGroup (string connectionGroupName)
 		{
 			lock (servicePoints) {
