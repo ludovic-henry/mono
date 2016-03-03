@@ -78,7 +78,6 @@ namespace System.Net
 		WebAsyncResult asyncWrite;
 		WebAsyncResult asyncRead;
 		EventHandler abortHandler;
-		int aborted;
 		bool gotRequestStream;
 		int redirects;
 		bool expectContinue;
@@ -185,19 +184,6 @@ namespace System.Net
 
 		internal bool ThrowOnError { get; set; }
 
-#if !NET_2_1
-		[MonoTODO]
-		public static new RequestCachePolicy DefaultCachePolicy
-		{
-			get {
-				throw new NotImplementedException ();
-			}
-			set {
-				throw new NotImplementedException ();
-			}
-		}
-#endif
-
 		internal ServicePoint ServicePointNoLock {
 			get { return servicePoint; }
 		}
@@ -231,91 +217,6 @@ namespace System.Net
 			}
 
 			return servicePoint;
-		}
-
-		
-		public override IAsyncResult BeginGetRequestStream (AsyncCallback callback, object state) 
-		{
-			if (Aborted)
-				throw new WebException ("The request was canceled.", WebExceptionStatus.RequestCanceled);
-
-			bool send = !(method == "GET" || method == "CONNECT" || method == "HEAD" ||
-					method == "TRACE");
-			if (method == null || !send)
-				throw new ProtocolViolationException ("Cannot send data when method is: " + method);
-
-			if (_ContentLength == -1 && !sendChunked && !AllowWriteStreamBuffering && KeepAlive)
-				throw new ProtocolViolationException ("Content-Length not set");
-
-			string transferEncoding = TransferEncoding;
-			if (!sendChunked && transferEncoding != null && transferEncoding.Trim () != "")
-				throw new ProtocolViolationException ("SendChunked should be true.");
-
-			lock (locker)
-			{
-				if (getResponseCalled)
-					throw new InvalidOperationException ("The operation cannot be performed once the request has been submitted.");
-
-				if (asyncWrite != null) {
-					throw new InvalidOperationException ("Cannot re-call start of asynchronous " +
-								"method while a previous call is still in progress.");
-				}
-	
-				asyncWrite = new WebAsyncResult (this, callback, state);
-				initialMethod = method;
-				if (haveRequest) {
-					if (writeStream != null) {
-						asyncWrite.SetCompleted (true, writeStream);
-						asyncWrite.DoCallback ();
-						return asyncWrite;
-					}
-				}
-				
-				gotRequestStream = true;
-				WebAsyncResult result = asyncWrite;
-				if (!requestSent) {
-					requestSent = true;
-					redirects = 0;
-					servicePoint = GetServicePoint ();
-					abortHandler = servicePoint.SendRequest (this, _ConnectionGroupName);
-				}
-				return result;
-			}
-		}
-
-		public override Stream EndGetRequestStream (IAsyncResult asyncResult)
-		{
-			if (asyncResult == null)
-				throw new ArgumentNullException ("asyncResult");
-
-			WebAsyncResult result = asyncResult as WebAsyncResult;
-			if (result == null)
-				throw new ArgumentException ("Invalid IAsyncResult");
-
-			asyncWrite = result;
-			result.WaitUntilComplete ();
-
-			Exception e = result.Exception;
-			if (e != null)
-				throw e;
-
-			return result.WriteStream;
-		}
-		
-		public override Stream GetRequestStream()
-		{
-			IAsyncResult asyncResult = asyncWrite;
-			if (asyncResult == null) {
-				asyncResult = BeginGetRequestStream (null, null);
-				asyncWrite = (WebAsyncResult) asyncResult;
-			}
-
-			if (!asyncResult.IsCompleted && !asyncResult.AsyncWaitHandle.WaitOne (_Timeout, false)) {
-				Abort ();
-				throw new WebException ("The request timed out", WebExceptionStatus.Timeout);
-			}
-
-			return EndGetRequestStream (asyncResult);
 		}
 
 		bool CheckIfForceWrite (SimpleAsyncResult result)
@@ -424,12 +325,6 @@ namespace System.Net
 
 			return result.Response;
 		}
-		
-		public Stream EndGetRequestStream (IAsyncResult asyncResult, out TransportContext transportContext)
-		{
-			transportContext = null;
-			return EndGetRequestStream (asyncResult);
-		}
 
 		public override WebResponse GetResponse()
 		{
@@ -441,65 +336,6 @@ namespace System.Net
 			get { return finished_reading; }
 			set { finished_reading = value; }
 		}
-
-		internal bool Aborted {
-			get { return Interlocked.CompareExchange (ref aborted, 0, 0) == 1; }
-		}
-
-		public override void Abort ()
-		{
-			if (Interlocked.CompareExchange (ref aborted, 1, 0) == 1)
-				return;
-
-			if (haveResponse && finished_reading)
-				return;
-
-			haveResponse = true;
-			if (abortHandler != null) {
-				try {
-					abortHandler (this, EventArgs.Empty);
-				} catch (Exception) {}
-				abortHandler = null;
-			}
-
-			if (asyncWrite != null) {
-				WebAsyncResult r = asyncWrite;
-				if (!r.IsCompleted) {
-					try {
-						WebException wexc = new WebException ("Aborted.", WebExceptionStatus.RequestCanceled); 
-						r.SetCompleted (false, wexc);
-						r.DoCallback ();
-					} catch {}
-				}
-				asyncWrite = null;
-			}			
-
-			if (asyncRead != null) {
-				WebAsyncResult r = asyncRead;
-				if (!r.IsCompleted) {
-					try {
-						WebException wexc = new WebException ("Aborted.", WebExceptionStatus.RequestCanceled); 
-						r.SetCompleted (false, wexc);
-						r.DoCallback ();
-					} catch {}
-				}
-				asyncRead = null;
-			}			
-
-			if (writeStream != null) {
-				try {
-					writeStream.Close ();
-					writeStream = null;
-				} catch {}
-			}
-
-			if (webResponse != null) {
-				try {
-					webResponse.Close ();
-					webResponse = null;
-				} catch {}
-			}
-		}		
 
 		void CheckRequestStarted () 
 		{

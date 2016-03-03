@@ -1,4 +1,8 @@
-namespace System.Net.Configuration {
+
+using System.Net.Security;
+
+namespace System.Net.Configuration
+{
 	sealed class SettingsSectionInternal
 	{
 		static readonly SettingsSectionInternal instance = new SettingsSectionInternal ();
@@ -16,19 +20,18 @@ namespace System.Net.Configuration {
 
 		internal bool HttpListenerUnescapeRequestUrl = true;
 
-		public int MaximumErrorResponseLength {
-			get { return 64; }
-			set { }
-		}
+		public int MaximumErrorResponseLength { get; set; } = 64;
+		public int MaximumResponseHeadersLength { get; set; } = 64;
+		public bool UseUnsafeHeaderParsing { get; set; } = false;
 
-		public int MaximumResponseHeadersLength {
-			get { return 64; }
-			set { }
-		}
+		internal bool CheckCertificateName { get; } = true;
+		internal bool CheckCertificateRevocationList { get; set; } = false;
+		internal int DnsRefreshTimeout { get; set; } = 120000;
+		internal bool EnableDnsRoundRobin { get; set; } = false;
+		internal bool Expect100Continue { get; set; } = true;
+		internal bool UseNagleAlgorithm { get; set; } = true;
 
-		public bool UseUnsafeHeaderParsing {
-			get { return false; }
-			set { }
-		}
+		internal EncryptionPolicy EncryptionPolicy { get; } = EncryptionPolicy.RequireEncryption;
+		internal int MaximumUnauthorizedUploadLength { get; } = -1;
 	}
 }

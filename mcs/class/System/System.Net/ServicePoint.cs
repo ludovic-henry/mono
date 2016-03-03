@@ -76,110 +76,6 @@ namespace System.Net
 		}
 		
 		// Properties
-		
-		public Uri Address {
-			get { return uri; }
-		}
-
-		static Exception GetMustImplement ()
-		{
-			return new NotImplementedException ();
-		}
-
-		public BindIPEndPoint BindIPEndPointDelegate
-		{
-			get { return endPointCallback; }
-			set { endPointCallback = value; }
-		}
-		
-		public X509Certificate Certificate {
-			get { return certificate; }
-		}
-		
-		public X509Certificate ClientCertificate {
-			get { return clientCertificate; }
-		}
-
-		[MonoTODO]
-		public int ConnectionLeaseTimeout
-		{
-			get {
-				throw GetMustImplement ();
-			}
-			set {
-				throw GetMustImplement ();
-			}
-		}
-		
-		public int ConnectionLimit {
-			get { return connectionLimit; }
-			set {
-				if (value <= 0)
-					throw new ArgumentOutOfRangeException ();
-
-				connectionLimit = value;
-			}
-		}
-		
-		public string ConnectionName {
-			get { return uri.Scheme; }
-		}
-
-		public int CurrentConnections {
-			get {
-				return currentConnections;
-			}
-		}
-
-		public DateTime IdleSince {
-			get {
-				return idleSince.ToLocalTime ();
-			}
-		}
-
-		public int MaxIdleTime {
-			get { return maxIdleTime; }
-			set { 
-				if (value < Timeout.Infinite || value > Int32.MaxValue)
-					throw new ArgumentOutOfRangeException ();
-
-				lock (this) {
-					maxIdleTime = value;
-					if (idleTimer != null)
-						idleTimer.Change (maxIdleTime, maxIdleTime);
-				}
-			}
-		}
-		
-		public virtual Version ProtocolVersion {
-			get { return protocolVersion; }
-		}
-
-		[MonoTODO]
-		public int ReceiveBufferSize
-		{
-			get {
-				throw GetMustImplement ();
-			}
-			set {
-				throw GetMustImplement ();
-			}
-		}
-		
-		public bool SupportsPipelining {
-			get { return HttpVersion.Version11.Equals (protocolVersion); }
-		}
-
-
-		public bool Expect100Continue {
-			get { return SendContinue; }
-			set { SendContinue = value; }
-		}
-
-		public bool UseNagleAlgorithm {
-			get { return useNagle; }
-			set { useNagle = value; }
-		}
 
 		internal bool SendContinue {
 			get { return sendContinue &&
@@ -187,20 +83,6 @@ namespace System.Net
 			set { sendContinue = value; }
 		}
 		// Methods
-
-		public void SetTcpKeepAlive (bool enabled, int keepAliveTime, int keepAliveInterval)
-		{
-			if (enabled) {
-				if (keepAliveTime <= 0)
-					throw new ArgumentOutOfRangeException ("keepAliveTime", "Must be greater than 0");
-				if (keepAliveInterval <= 0)
-					throw new ArgumentOutOfRangeException ("keepAliveInterval", "Must be greater than 0");
-			}
-
-			tcp_keepalive = enabled;
-			tcp_keepalive_time = keepAliveTime;
-			tcp_keepalive_interval = keepAliveInterval;
-		}
 
 		internal void KeepAliveSetup (Socket socket)
 		{
@@ -214,7 +96,7 @@ namespace System.Net
 			socket.IOControl (IOControlCode.KeepAliveValues, bytes, null);
 		}
 
-		static void PutBytes (byte [] bytes, uint v, int offset)
+		void PutBytes (byte [] bytes, uint v, int offset)
 		{
 			if (BitConverter.IsLittleEndian) {
 				bytes [offset] = (byte) (v & 0x000000ff);
@@ -340,15 +222,6 @@ namespace System.Net
 			CheckAvailableForRecycling (out dummy);
 		}
 
-		private bool HasTimedOut
-		{
-			get {
-				int timeout = ServicePointManager.DnsRefreshTimeout;
-				return timeout != Timeout.Infinite &&
-					(lastDnsResolve + TimeSpan.FromMilliseconds (timeout)) < DateTime.UtcNow;
-			}
-		}
-
 		internal IPHostEntry HostEntry
 		{
 			get {
@@ -392,41 +265,6 @@ namespace System.Net
 			}
 			
 			return cnc.SendRequest (request);
-		}
-		public bool CloseConnectionGroup (string connectionGroupName)
-		{
-			WebConnectionGroup cncGroup = null;
-
-			lock (this) {
-				cncGroup = GetConnectionGroup (connectionGroupName);
-				if (cncGroup != null) {
-					RemoveConnectionGroup (cncGroup);
-				}
-			}
-
-			// WebConnectionGroup.Close() must *not* be called inside the lock
-			if (cncGroup != null) {
-				cncGroup.Close ();
-				return true;
-			}
-
-			return false;
-		}
-
-		internal void SetServerCertificate (X509Certificate server)
-		{
-			var cloned = server != null ? new X509Certificate (server) : null;
-			var old = Interlocked.Exchange (ref certificate, cloned);
-			if (old != null)
-				old.Dispose ();
-		}
-
-		internal void SetClientCertificate (X509Certificate clientCertificate)
-		{
-			var cloned = clientCertificate != null ? new X509Certificate (clientCertificate) : null;
-			var old = Interlocked.Exchange (ref clientCertificate, cloned);
-			if (old != null)
-				old.Dispose ();
 		}
 
 		internal bool CallEndPointDelegate (Socket sock, IPEndPoint remote)
