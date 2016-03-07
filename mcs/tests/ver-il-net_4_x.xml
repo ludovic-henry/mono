@@ -62865,6 +62865,7 @@
       </method>
     </type>
   </test>
+<!--
   <test name="test-async-19.cs">
     <type name="C">
       <method name="Void Test(System.Threading.ManualResetEvent)" attrs="145">
@@ -62902,6 +62903,7 @@
       </method>
     </type>
   </test>
+-->
   <test name="test-async-20.cs">
     <type name="Base">
       <method name="Void .ctor()" attrs="6278">
