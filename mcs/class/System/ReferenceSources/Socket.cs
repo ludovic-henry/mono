@@ -100,5 +100,15 @@ namespace System.Net.Sockets
 			if (!silent && error != 0)
 				throw new SocketException (error);
 		}
+
+		internal void InternalConnect(EndPoint remoteEP)
+		{
+			Connect (remoteEP);
+		}
+
+		internal void InternalBind(EndPoint localEP)
+		{
+			Bind (localEP);
+		}
 	}
 }

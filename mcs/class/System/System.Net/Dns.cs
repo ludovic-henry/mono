@@ -466,6 +466,18 @@ namespace System.Net {
 		{
 			return Task<IPHostEntry>.Factory.FromAsync (BeginGetHostEntry, EndGetHostEntry, hostNameOrAddress, null);
 		}
+
+		/* imported from referencesource */
+		internal static bool TryInternalResolve(string hostName, out IPHostEntry result)
+		{
+			try {
+				result = Resolve (hostName);
+				return true;
+			} catch (Exception e) {
+				result = null;
+				return false;
+			}
+		}
 	}
 }
 

@@ -1015,4 +1015,6 @@ public const string InvalidRegion = "The region directive '{0}' contains invalid
 	public const string Win2kRequired = "Feature requires Windows 2000.";
 
 	public const string net_log_cache_age = "Cache Age = {0}, Cache MaxAge = {1}.";
+	public const string net_log_set_socketoption_reuseport = "net_log_set_socketoption_reuseport";
+	public const string net_log_set_socketoption_reuseport_not_supported = "net_log_set_socketoption_reuseport_not_supported";
 }
