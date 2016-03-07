@@ -12,7 +12,7 @@ class Driver
 	/* Expected exit code: 1 */
 	static void Main (string[] args)
 	{
-		if (Environment.GetEnvironmentVariable ("TEST_UNHANDLED_EXCEPTION_HANDLER") != null)
+		if (Environment.GetEnvironmentVariable ("TEST_UNHANDLED_EXCEPTION_HANDLER") == "1")
 			AppDomain.CurrentDomain.UnhandledException += (s, e) => {};
 
 		ManualResetEvent mre = new ManualResetEvent (false);

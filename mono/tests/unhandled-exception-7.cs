@@ -31,14 +31,14 @@ class Driver
 	/* expected exit code: 255 */
 	static void Main (string[] args)
 	{
-		if (Environment.GetEnvironmentVariable ("TEST_UNHANDLED_EXCEPTION_HANDLER") != null)
+		if (Environment.GetEnvironmentVariable ("TEST_UNHANDLED_EXCEPTION_HANDLER") == "1")
 			AppDomain.CurrentDomain.UnhandledException += (s, e) => {};
 
 		ManualResetEvent mre = new ManualResetEvent (false);
 
 		var ad = AppDomain.CreateDomain ("ad");
 
-		if (Environment.GetEnvironmentVariable ("TEST_UNHANDLED_EXCEPTION_HANDLER") != null)
+		if (Environment.GetEnvironmentVariable ("TEST_UNHANDLED_EXCEPTION_HANDLER") == "1")
 			ad.UnhandledException += (s, e) => {};
 
 		var cd = (CrossDomain) ad.CreateInstanceAndUnwrap (typeof(CrossDomain).Assembly.FullName, "CrossDomain");
