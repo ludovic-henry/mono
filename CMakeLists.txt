@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.1)
 project(mono)
 
 include(ExternalProject)
@@ -1654,6 +1654,7 @@ if(ENABLE_LLVM)
 endif()
 
 set(MONO_LLVM_LOADED ${ENABLE_LOADEDLLVM})
+set(LLVM_LOADED ${ENABLE_LOADEDLLVM})
 set(ENABLE_LLVM_RUNTIME ${ENABLE_LLVM})
 
 set(TARGET "unknown")

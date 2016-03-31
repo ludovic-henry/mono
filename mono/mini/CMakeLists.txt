@@ -30,27 +30,17 @@ set(MONO_SGEN_SOURCES main-sgen.c)
 
 # We build this after libmono was built so it contains the date when the final link was done
 if(SUPPORT_BOEHM)
-  if(DISABLE_EXECUTABLES)
-    set(DEPENDS mini-static monoruntime)
-  else()
-    set(DEPENDS mini-static monoruntime-static)
-  endif()
   add_custom_command(
     OUTPUT buildver-boehm.h
     COMMAND ${CMAKE_COMMAND} -DFILE="${CMAKE_CURRENT_BINARY_DIR}/buildver-boehm.h" -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateBuildVersionHeader.cmake"
-    DEPENDS ${DEPENDS}
+    DEPENDS mini monoruntime monoboehm
   )
 endif()
 
-if(DISABLE_EXECUTABLES)
-  set(DEPENDS mini-static monoruntimesgen monosgen)
-else()
-  set(DEPENDS mini-static monoruntimesgen-static monosgen-static)
-endif()
 add_custom_command(
   OUTPUT buildver-sgen.h
   COMMAND ${CMAKE_COMMAND} -DFILE="${CMAKE_CURRENT_BINARY_DIR}/buildver-sgen.h" -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateBuildVersionHeader.cmake"
-  DEPENDS ${DEPENDS}
+  DEPENDS mini monoruntimesgen monosgen
 )
 
 if(DTRACE_G_REQUIRED)
@@ -136,7 +126,7 @@ set(GENMDESC_SOURCES
   ../metadata/opcodes.c
 )
 add_executable(genmdesc ${GENMDESC_SOURCES})
-target_link_libraries(genmdesc monoutils)
+target_link_libraries(genmdesc monoutils-static)
 
 # Don't link this against libmonoruntime to speed up rebuilds
 #set(genmdesc_LDADD = \
@@ -431,29 +421,20 @@ endif()
 #$(PLATFORM_CFLAGS) $(ARCH_CFLAGS) $(SHARED_CFLAGS)
 #AM_CXXFLAGS = $(LLVM_CXXFLAGS) $(GLIB_CFLAGS)
 
-add_library(mini SHARED ${COMMON_SOURCES} ${LLVM_SOURCES} ${LLVM_RUNTIME_SOURCES} ${ARCH_SOURCES} ${OS_SOURCES} ${GENMDESC_HEADER_FILE})
-target_link_libraries(mini PUBLIC monoutils)
-target_link_libraries(mini PRIVATE monoruntime)
+add_library(mini_objects OBJECT ${COMMON_SOURCES} ${LLVM_SOURCES} ${LLVM_RUNTIME_SOURCES} ${ARCH_SOURCES} ${OS_SOURCES} ${GENMDESC_HEADER_FILE})
+add_library(mini INTERFACE)
+target_sources(mini INTERFACE $<TARGET_OBJECTS:mini_objects>)
+target_link_libraries(mini INTERFACE monoutils)
 
-# This library is shared between mono and mono-sgen, since the code in mini/ doesn't contain
-# compile time dependencies on boehm/sgen.
-#
-add_library(mini-static STATIC ${COMMON_SOURCES} ${LLVM_SOURCES} ${LLVM_RUNTIME_SOURCES} ${ARCH_SOURCES} ${OS_SOURCES})
-target_link_libraries(mini-static monoutils)
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/empty.c" "")
 
-# add_library() needs at least one source file
-add_custom_command(
-  OUTPUT empty.c
-  COMMAND ${CMAKE_COMMAND} -E touch empty.c
-)
-
-add_library(monoboehm SHARED empty.c)
+add_library(monoboehm SHARED "${CMAKE_CURRENT_BINARY_DIR}/empty.c")
 target_link_libraries(monoboehm mini monoruntime ${LLVMMONOF} ${LIBMONOLDFLAGS})
-add_library(monoboehm-static STATIC empty.c)
+add_library(monoboehm-static STATIC "${CMAKE_CURRENT_BINARY_DIR}/empty.c")
 target_link_libraries(monoboehm-static mini monoruntime ${LLVMMONOF})
-add_library(monosgen SHARED empty.c)
+add_library(monosgen SHARED "${CMAKE_CURRENT_BINARY_DIR}/empty.c")
 target_link_libraries(monosgen mini monoruntimesgen ${LLVMMONOF} ${LIBMONOLDFLAGS})
-add_library(monosgen-static STATIC empty.c)
+add_library(monosgen-static STATIC "${CMAKE_CURRENT_BINARY_DIR}/empty.c")
 target_link_libraries(monosgen-static mini monoruntimesgen ${LLVMMONOF})
 
 if(NACL_CODEGEN)
@@ -477,9 +458,6 @@ add_custom_command(
   COMMAND ${GENMDESC_PRG} "${CMAKE_CURRENT_BINARY_DIR}/${GENMDESC_HEADER_FILE}" ${GENMDESC_SYMBOL_NAME} "${CMAKE_CURRENT_SOURCE_DIR}/${GENMDESC_MD_FILE}"
   DEPENDS genmdesc ${GENMDESC_MD_FILE}
 )
-
-#cpu-amd64.h: cpu-amd64.md genmdesc$(EXEEXT)
-#$(GENMDESC_PRG) cpu-amd64.h amd64_desc $(srcdir)/cpu-amd64.md
 
 # Generate version.h
 if(IS_DIRECTORY "${CMAKE_SOURCE_DIR}/.git")

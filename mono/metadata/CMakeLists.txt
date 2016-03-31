@@ -45,13 +45,10 @@ include_directories(
   ${GLIB_INCLUDE_DIRECTORIES}
 )
 
-#
-# This library is used to localize the usage of MONO_BINDIR etc. to just one source file, thus enabling
-# ccache to work even if the value of these defines change. We need to use a convenience library since automake
-# doesn't support per file cflags.
-#
-add_library(monoruntime-config STATIC mono-config-dirs.h mono-config-dirs.c)
-target_compile_definitions(monoruntime-config PUBLIC -DMONO_BINDIR="${bindir}" -DMONO_ASSEMBLIES="${assembliesdir}" -DMONO_CFG_DIR="${confdir}")
+set(CONFIG_SOURCES mono-config-dirs.h mono-config-dirs.c)
+set_source_files_properties(${CONFIG_SOURCES}
+  PROPERTIES COMPILE_DEFINITIONS "MONO_BINDIR=\"${bindir}\";MONO_ASSEMBLIES=\"${assembliesdir}\";MONO_CFG_DIR=\"${confdir}\""
+)
 
 set(NULL_SOURCES  console-null.c)
 
@@ -211,33 +208,23 @@ set(SGEN_SOURCES
   sgen-client-mono.h
 )
 
-add_library(monoruntime SHARED ${COMMON_SOURCES} ${GC_DEPENDENT_SOURCES} ${NULL_GC_SOURCES} ${BOEHM_SOURCES})
-target_compile_definitions(monoruntime PRIVATE ${BOEHM_DEFINES})
-target_link_libraries(monoruntime monoruntime-config monoutils wapi eglib monogc-static)
-
-add_library(monoruntime-static STATIC ${COMMON_SOURCES} ${GC_DEPENDENT_SOURCES} ${NULL_GC_SOURCES} ${BOEHM_SOURCES})
-target_compile_definitions(monoruntime-static PRIVATE ${BOEHM_DEFINES})
-target_link_libraries(monoruntime-static monoruntime-config monoutils wapi eglib monogc-static)
-
+add_library(monoruntime_objects OBJECT ${CONFIG_SOURCES} ${COMMON_SOURCES} ${GC_DEPENDENT_SOURCES} ${NULL_GC_SOURCES} ${BOEHM_SOURCES})
+target_compile_definitions(monoruntime_objects PRIVATE ${BOEHM_DEFINES})
+add_library(monoruntime INTERFACE)
+target_sources(monoruntime INTERFACE $<TARGET_OBJECTS:monoruntime_objects>)
+target_link_libraries(monoruntime INTERFACE monoutils wapi eglib monogc)
 if(PLATFORM_DARWIN)
-  target_link_libraries(monoruntime "-framework CoreFoundation" "-framework Foundation")
-  target_link_libraries(monoruntime-static "-framework CoreFoundation" "-framework Foundation")
+  target_link_libraries(monoruntime INTERFACE "-framework CoreFoundation" "-framework Foundation")
 endif()
 
 if(SUPPORT_SGEN)
-  if(DISABLE_EXECUTABLES OR SHARED_MONO)
-    add_library(monoruntimesgen SHARED ${COMMON_SOURCES} ${GC_DEPENDENT_SOURCES} ${SGEN_SOURCES})
-    target_compile_definitions(monoruntimesgen PRIVATE ${SGEN_DEFINES})
-    target_link_libraries(monoruntimesgen monoruntime-config monoutils wapi eglib monosgensgen)
-    if(PLATFORM_DARWIN)
-      target_link_libraries(monoruntimesgen "-framework CoreFoundation" "-framework Foundation")
-    endif()
-  endif()
-  add_library(monoruntimesgen-static STATIC ${COMMON_SOURCES} ${GC_DEPENDENT_SOURCES} ${SGEN_SOURCES})
-  target_compile_definitions(monoruntimesgen-static PRIVATE ${SGEN_DEFINES})
-  target_link_libraries(monoruntimesgen-static monoruntime-config monoutils wapi eglib monosgensgen)
+  add_library(monoruntimesgen_objects OBJECT ${CONFIG_SOURCES} ${COMMON_SOURCES} ${GC_DEPENDENT_SOURCES} ${SGEN_SOURCES})
+  target_compile_definitions(monoruntimesgen_objects PRIVATE ${SGEN_DEFINES})
+  add_library(monoruntimesgen INTERFACE)
+  target_sources(monoruntimesgen INTERFACE $<TARGET_OBJECTS:monoruntimesgen_objects>)
+  target_link_libraries(monoruntimesgen INTERFACE monoutils wapi eglib monosgensgen)
   if(PLATFORM_DARWIN)
-    target_link_libraries(monoruntimesgen-static "-framework CoreFoundation" "-framework Foundation")
+    target_link_libraries(monoruntimesgen INTERFACE "-framework CoreFoundation" "-framework Foundation")
   endif()
 endif()
 
@@ -256,8 +243,5 @@ endif()
 
 if(SHARED_MONO AND SUPPORT_BOEHM)
   add_executable(pedump pedump.c)
-  target_link_libraries(pedump monoruntime-static)
-  if(PLATFORM_DARWIN)
-    target_link_libraries(pedump "-framework CoreFoundation" "-framework Foundation")
-  endif()
+  target_link_libraries(pedump monoruntime)
 endif()

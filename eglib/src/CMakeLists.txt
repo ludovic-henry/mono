@@ -62,12 +62,11 @@ include_directories(.)
 
 add_definitions(-Wall -D_FORTIFY_SOURCE=2)
 
+add_library(eglib_objects OBJECT ${SOURCES})
+add_library(eglib INTERFACE)
+target_sources(eglib INTERFACE $<TARGET_OBJECTS:eglib_objects>)
 if(HOST_WIN32)
-  set(LIBS ${LIBS} m ${LIBICONV} psapi)
-else()
-  if(PLATFORM_ANDROID)
-    set(LIBS ${LIBS} log)
-  endif()
+  target_link_libraries(eglib INTERFACE m ${LIBICONV} psapi)
+elseif(PLATFORM_ANDROID)
+  target_link_libraries(eglib INTERFACE log)
 endif()
-
-add_library(eglib STATIC ${SOURCES})

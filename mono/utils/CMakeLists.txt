@@ -219,8 +219,17 @@ if(TARGET_S390X)
   list(APPEND SOURCES mono-hwcap-s390x.c mono-hwcap-s390x.h)
 endif()
 
-add_library(monoutils STATIC ${SOURCES})
-target_link_libraries(monoutils eglib)
+add_library(monoutils_objects OBJECT ${SOURCES})
+add_library(monoutils INTERFACE)
+target_sources(monoutils INTERFACE $<TARGET_OBJECTS:monoutils_objects>)
+target_link_libraries(monoutils INTERFACE eglib)
+
+# Also create a static library which is used when linking genmdesc in ../mini/. If we link it against monoutils we will
+# end up with unresolved symbols since all object files will be linked eagerly even though genmdesc only uses symbols
+# in a few of them. With a static lib only object files with referenced symbols will be linked in.
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/empty.c" "")
+add_library(monoutils-static STATIC "${CMAKE_CURRENT_BINARY_DIR}/empty.c")
+target_link_libraries(monoutils-static PRIVATE monoutils)
 
 #libmonoutilsincludedir = $(includedir)/mono-$(API_VER)/mono/utils
 
