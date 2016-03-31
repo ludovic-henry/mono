@@ -40,7 +40,6 @@ if(SUPPORT_BOEHM)
     COMMAND ${CMAKE_COMMAND} -DFILE="${CMAKE_CURRENT_BINARY_DIR}/buildver-boehm.h" -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateBuildVersionHeader.cmake"
     DEPENDS ${DEPENDS}
   )
-  add_custom_target(generate_buildver_boehm_h DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/buildver-boehm.h)
 endif()
 
 if(DISABLE_EXECUTABLES)
@@ -53,7 +52,6 @@ add_custom_command(
   COMMAND ${CMAKE_COMMAND} -DFILE="${CMAKE_CURRENT_BINARY_DIR}/buildver-sgen.h" -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateBuildVersionHeader.cmake"
   DEPENDS ${DEPENDS}
 )
-add_custom_target(generate_buildver_sgen_h DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/buildver-sgen.h)
 
 if(DTRACE_G_REQUIRED)
   # TODO: Support DTRACE_G_REQUIRED
@@ -84,14 +82,12 @@ if(NOT LOADED_LLVM)
 endif()
 
 if(SUPPORT_BOEHM)
-  add_executable(mono-boehm ${MONO_BOEHM_SOURCES})
+  add_executable(mono-boehm ${MONO_BOEHM_SOURCES} buildver-boehm.h)
   target_link_libraries(mono-boehm ${MONO_LIB} ${MONOBINLDFLAGS} ${MONOBIN_PLATFORM_LDFLAGS} ${LLVMMONOF})
-  add_dependencies(mono-boehm generate_buildver_boehm_h)
 endif()
 
-add_executable(mono-sgen ${MONO_SGEN_SOURCES})
+add_executable(mono-sgen ${MONO_SGEN_SOURCES} buildver-sgen.h)
 target_link_libraries(mono-sgen ${MONO_SGEN_LIB} ${MONOBINLDFLAGS} ${MONOBIN_PLATFORM_LDFLAGS} ${LLVMMONOF})
-add_dependencies(mono-sgen generate_buildver_sgen_h)
 
 if(BITCODE)
   set(LIBMONOLDFLAGS ${LIBMONOLDFLAGS} -no-undefined)
@@ -253,7 +249,7 @@ set(COMMON_SOURCES
   method-to-ir.c
   decompose.c
   mini.h
-  version.h
+  ${CMAKE_CURRENT_BINARY_DIR}/version.h
   optflags-def.h
   jit-icalls.h
   jit-icalls.c
@@ -336,32 +332,34 @@ endif()
 
 if(X86)
   set(ARCH_SOURCES ${X86_SOURCES})
-  set(ARCH_BUILT cpu-x86.h)
+  set(GENMDESC_ARCH x86)
   set(ARCH_DEFINE __i386__)
 endif()
 
 if(AMD64)
   set(ARCH_SOURCES ${AMD64_SOURCES})
-  set(ARCH_BUILT cpu-amd64.h)
+  set(GENMDESC_ARCH amd64)
   set(ARCH_DEFINE __x86_64__)
   set(ARCH_FULLAOT_EXCLUDE "--exclude DYNCALL")
 endif()
 
 if(POWERPC)
   set(ARCH_SOURCES ${PPC_SOURCES})
-  set(ARCH_BUILT cpu-ppc.h)
+  set(GENMDESC_ARCH ppc)
   set(ARCH_DEFINE __ppc__)
+  set(GENMDESC_SYMBOL_NAME ppcg4)
 endif()
 
 if(POWERPC64)
   set(ARCH_SOURCES ${PPC_SOURCES})
-  set(ARCH_BUILT cpu-ppc64.h)
+  set(GENMDESC_ARCH ppc64)
   set(ARCH_DEFINE __ppc64__)
+  set(GENMDESC_SYMBOL_NAME "${GENMDESC_ARCH}_cpu_desc")
 endif()
 
 if(MIPS)
   set(ARCH_SOURCES ${MIPS_SOURCES})
-  set(ARCH_BUILT cpu-mips.h)
+  set(GENMDESC_ARCH mips)
   set(ARCH_DEFINE __mips__)
 endif()
 
@@ -369,39 +367,46 @@ if(ARM)
   # pick up arm_dpimacros.h
   include_directories(../arch/arm)
   set(ARCH_SOURCES ${ARM_SOURCES})
-  set(ARCH_BUILT cpu-arm.h)
+  set(GENMDESC_ARCH arm)
   set(ARCH_DEFINE __arm__)
+  set(GENMDESC_SYMBOL_NAME "${GENMDESC_ARCH}_cpu_desc")
 endif()
 
 if(ARM64)
   set(ARCH_SOURCES ${ARM64_SOURCES})
-  set(ARCH_BUILT cpu-arm64.h)
+  set(GENMDESC_ARCH arm64)
   set(ARCH_DEFINE __aarch64__)
+  set(GENMDESC_SYMBOL_NAME "${GENMDESC_ARCH}_cpu_desc")
 endif()
 
-if(SPARC)
+if(SPARC OR SPARC64)
   set(ARCH_SOURCES ${SPARC_SOURCES})
-  set(ARCH_BUILT cpu-sparc.h)
-  set(ARCH_DEFINE __sparc__)
-endif()
-
-if(SPARC64)
-  set(ARCH_SOURCES ${SPARC_SOURCES})
-  set(ARCH_BUILT cpu-sparc.h)
+  set(GENMDESC_ARCH sparc)
   set(ARCH_DEFINE __sparc__)
 endif()
 
 if(S390X)
   set(ARCH_SOURCES ${S390X_SOURCES})
-  set(ARCH_BUILT cpu-s390x.h)
+  set(GENMDESC_ARCH s390x)
   set(ARCH_DEFINE __s390__)
+  set(GENMDESC_SYMBOL_NAME "${GENMDESC_ARCH}_cpu_desc")
 endif()
 
 if(IA64)
   set(ARCH_SOURCES ${IA64_SOURCES})
-  set(ARCH_BUILT cpu-ia64.h)
+  set(GENMDESC_ARCH ia64)
   set(ARCH_DEFINE __ia64__)
 endif()
+if(NOT GENMDESC_HEADER_FILE)
+  set(GENMDESC_HEADER_FILE "cpu-${GENMDESC_ARCH}.h")
+endif()
+if(NOT GENMDESC_SYMBOL_NAME)
+  set(GENMDESC_SYMBOL_NAME "${GENMDESC_ARCH}_desc")
+endif()
+if(NOT GENMDESC_MD_FILE)
+  set(GENMDESC_MD_FILE "cpu-${GENMDESC_ARCH}.md")
+endif()
+
 
 if(HOST_WIN32)
   set(OS_SOURCES ${WINDOWS_SOURCES})
@@ -426,7 +431,7 @@ endif()
 #$(PLATFORM_CFLAGS) $(ARCH_CFLAGS) $(SHARED_CFLAGS)
 #AM_CXXFLAGS = $(LLVM_CXXFLAGS) $(GLIB_CFLAGS)
 
-add_library(mini SHARED ${COMMON_SOURCES} ${LLVM_SOURCES} ${LLVM_RUNTIME_SOURCES} ${ARCH_SOURCES} ${OS_SOURCES})
+add_library(mini SHARED ${COMMON_SOURCES} ${LLVM_SOURCES} ${LLVM_RUNTIME_SOURCES} ${ARCH_SOURCES} ${OS_SOURCES} ${GENMDESC_HEADER_FILE})
 target_link_libraries(mini PUBLIC monoutils)
 target_link_libraries(mini PRIVATE monoruntime)
 
@@ -450,3 +455,57 @@ add_library(monosgen SHARED empty.c)
 target_link_libraries(monosgen mini monoruntimesgen ${LLVMMONOF} ${LIBMONOLDFLAGS})
 add_library(monosgen-static STATIC empty.c)
 target_link_libraries(monosgen-static mini monoruntimesgen ${LLVMMONOF})
+
+if(NACL_CODEGEN)
+  set(GENMDESC_OPTS --nacl)
+endif()
+
+# we don't always use the perl impl because it's an additional
+# build dependency for the poor windows users
+# ${ARCH_DEFINE} is the preprocessor symbol that enables all the opcodes
+# for the specific platform in mini-ops.h
+if(CROSS_COMPILING)
+  set(GENMDESC_PRG perl ${CMAKE_CURRENT_SOURCE_DIR}/genmdesc.pl ${ARCH_DEFINE} ${CMAKE_CURRENT_SOURCE_DIR} ${GENMDESC_OPTS})
+elseif(NACL_CODEGEN)
+  set(GENMDESC_PRG perl ${CMAKE_CURRENT_SOURCE_DIR}/genmdesc.pl ${ARCH_DEFINE} ${CMAKE_CURRENT_SOURCE_DIR} $(GENMDESC_OPTS))
+else()
+  set(GENMDESC_PRG ${CMAKE_CURRENT_BINARY_DIR}/genmdesc ${GENMDESC_OPTS})
+endif()
+
+add_custom_command(
+  OUTPUT ${GENMDESC_HEADER_FILE}
+  COMMAND ${GENMDESC_PRG} "${CMAKE_CURRENT_BINARY_DIR}/${GENMDESC_HEADER_FILE}" ${GENMDESC_SYMBOL_NAME} "${CMAKE_CURRENT_SOURCE_DIR}/${GENMDESC_MD_FILE}"
+  DEPENDS genmdesc ${GENMDESC_MD_FILE}
+)
+
+#cpu-amd64.h: cpu-amd64.md genmdesc$(EXEEXT)
+#$(GENMDESC_PRG) cpu-amd64.h amd64_desc $(srcdir)/cpu-amd64.md
+
+# Generate version.h
+if(IS_DIRECTORY "${CMAKE_SOURCE_DIR}/.git")
+  execute_process(
+    COMMAND git log -1 --format=%h
+    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+    RESULT_VARIABLE EXITCODE
+    OUTPUT_VARIABLE GIT_COMMIT)
+  if(EXITCODE EQUAL 0)
+    string(STRIP ${GIT_COMMIT} GIT_COMMIT)
+    execute_process(
+      COMMAND git symbolic-ref --short HEAD
+      WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+      RESULT_VARIABLE SUCCESS
+      OUTPUT_VARIABLE GIT_BRANCH)
+    if(EXITCODE EQUAL 0)
+      # We're on a branch
+      string(STRIP ${GIT_BRANCH} GIT_BRANCH)
+      file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/version.h" "#define FULL_VERSION \"${GIT_BRANCH}/${GIT_COMMIT}\"")
+    else()
+      # We're in detached state
+      file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/version.h" "#define FULL_VERSION \"explicit/${GIT_COMMIT}\"")
+    endif()
+  else()
+    message(FATAL_ERROR "Failed to determine current git commit. git exited with ${EXITCODE}")
+  endif()
+else()
+  file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/version.h" "#define FULL_VERSION \"tarball\"")
+endif()
