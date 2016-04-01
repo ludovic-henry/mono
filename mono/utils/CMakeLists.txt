@@ -221,8 +221,8 @@ endif()
 
 add_library(monoutils_objects OBJECT ${SOURCES})
 add_library(monoutils INTERFACE)
-target_sources(monoutils INTERFACE $<TARGET_OBJECTS:monoutils_objects>)
-target_link_libraries(monoutils INTERFACE eglib)
+target_sources(monoutils INTERFACE $<TARGET_OBJECTS:monoutils_objects> $<TARGET_OBJECTS:monoutils_objects>)
+target_link_object_libraries(monoutils eglib)
 
 # Also create a static library which is used when linking genmdesc in ../mini/. If we link it against monoutils we will
 # end up with unresolved symbols since all object files will be linked eagerly even though genmdesc only uses symbols

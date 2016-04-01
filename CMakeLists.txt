@@ -11,6 +11,30 @@ include(CheckTypeSize)
 include(CheckStructHasMember)
 include(CheckSymbolExists)
 
+# Works around a cmake bug in target_link_libraries() when linking INTERFACE libraries with transitive dependencies on
+# other INTERFACE libraries.
+function(target_link_object_libraries TARGET)
+  get_target_property(TYPE ${TARGET} TYPE)
+  if(NOT ${TYPE} STREQUAL "INTERFACE_LIBRARY")
+    message(FATAL_ERROR "TARGET ${TARGET} must be an INTERFACE library")
+  endif()
+
+  foreach(LIB ${ARGN})
+    get_target_property(TYPE ${TARGET} TYPE)
+    if(NOT ${TYPE} STREQUAL "INTERFACE_LIBRARY")
+      message(FATAL_ERROR "Argument ${LIB} must be an INTERFACE library")
+    endif()
+    target_sources(${TARGET} INTERFACE $<TARGET_PROPERTY:${LIB},INTERFACE_SOURCES>)
+
+    get_target_property(LINK_LIBS ${LIB} INTERFACE_LINK_LIBRARIES)
+    if(NOT ${LINK_LIBS} STREQUAL "LINK_LIBS-NOTFOUND")
+      foreach(LINK_LIB ${LINK_LIBS})
+        target_link_libraries(${TARGET} INTERFACE ${LINK_LIB})
+      endforeach()
+    endif()
+  endforeach()
+endfunction()
+
 # Like check_include_files() but sets the HAVE_* variables automatically. The var name is formed from the include
 # file path, e.g. sys/event.h -> HAVE_SYS_EVENT_H.
 macro(check_include_files_ext)

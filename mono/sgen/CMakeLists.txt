@@ -66,8 +66,8 @@ set(SOURCES
 #  target_compile_definitions(monosgen PRIVATE ${SGEN_DEFINES})
 #endif()
 
-# NOTE: Renamed to monosgensgen to avoid conflict with the monosgen target defined in mini/
-add_library(monosgensgen_objects OBJECT ${SOURCES})
-target_compile_definitions(monosgensgen_objects PRIVATE ${SGEN_DEFINES})
-add_library(monosgensgen INTERFACE)
-target_sources(monosgensgen INTERFACE $<TARGET_OBJECTS:monosgensgen_objects>)
+# NOTE: Renamed to monogcsgen to avoid conflict with the monosgen target defined in mini/
+add_library(monogcsgen_objects OBJECT ${SOURCES})
+target_compile_definitions(monogcsgen_objects PRIVATE ${SGEN_DEFINES})
+add_library(monogcsgen INTERFACE)
+target_sources(monogcsgen INTERFACE $<TARGET_OBJECTS:monogcsgen_objects>)

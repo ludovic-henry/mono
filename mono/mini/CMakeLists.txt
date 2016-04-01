@@ -33,7 +33,7 @@ if(SUPPORT_BOEHM)
   add_custom_command(
     OUTPUT buildver-boehm.h
     COMMAND ${CMAKE_COMMAND} -DFILE="${CMAKE_CURRENT_BINARY_DIR}/buildver-boehm.h" -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateBuildVersionHeader.cmake"
-    DEPENDS mini monoruntime monoboehm
+    DEPENDS mini monoruntimeboehm monoboehm
   )
 endif()
 
@@ -108,10 +108,10 @@ endif()
 # Create monow.exe, linked for the 'windows' subsystem
 if(HOST_WIN32)
   if(SUPPORT_BOEHM)
-    add_executable(monow ${MONO_BOEHM_SOURCES})
+    add_executable(monow ${MONO_BOEHM_SOURCES} buildver-boehm.h)
     target_link_libraries(monow ${MONO_LIB} ${MONOBINLDFLAGS} ${MONOBIN_PLATFORM_LDFLAGS} ${LLVMMONOF} -mwindows)
   else()
-    add_executable(monow ${MONO_SGEN_SOURCES})
+    add_executable(monow ${MONO_SGEN_SOURCES} buildver-sgen.h)
     target_link_libraries(monow ${MONO_SGEN_LIB} ${MONOBINLDFLAGS} ${MONOBIN_PLATFORM_LDFLAGS} ${LLVMMONOF} -mwindows)
   endif()
 endif()
@@ -424,14 +424,14 @@ endif()
 add_library(mini_objects OBJECT ${COMMON_SOURCES} ${LLVM_SOURCES} ${LLVM_RUNTIME_SOURCES} ${ARCH_SOURCES} ${OS_SOURCES} ${GENMDESC_HEADER_FILE})
 add_library(mini INTERFACE)
 target_sources(mini INTERFACE $<TARGET_OBJECTS:mini_objects>)
-target_link_libraries(mini INTERFACE monoutils)
+target_link_object_libraries(mini monoutils)
 
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/empty.c" "")
 
 add_library(monoboehm SHARED "${CMAKE_CURRENT_BINARY_DIR}/empty.c")
-target_link_libraries(monoboehm mini monoruntime ${LLVMMONOF} ${LIBMONOLDFLAGS})
+target_link_libraries(monoboehm mini monoruntimeboehm ${LLVMMONOF} ${LIBMONOLDFLAGS})
 add_library(monoboehm-static STATIC "${CMAKE_CURRENT_BINARY_DIR}/empty.c")
-target_link_libraries(monoboehm-static mini monoruntime ${LLVMMONOF})
+target_link_libraries(monoboehm-static mini monoruntimeboehm ${LLVMMONOF})
 add_library(monosgen SHARED "${CMAKE_CURRENT_BINARY_DIR}/empty.c")
 target_link_libraries(monosgen mini monoruntimesgen ${LLVMMONOF} ${LIBMONOLDFLAGS})
 add_library(monosgen-static STATIC "${CMAKE_CURRENT_BINARY_DIR}/empty.c")
