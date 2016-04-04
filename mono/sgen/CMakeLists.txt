@@ -34,7 +34,6 @@ set(SOURCES
   sgen-los.c
   sgen-major-copy-object.h
   sgen-marksweep-drain-gray-stack.h
-  sgen-marksweep-scan-object-concurrent.h
   sgen-marksweep.c
   sgen-memory-governor.c
   sgen-memory-governor.h
@@ -46,6 +45,8 @@ set(SOURCES
   sgen-pinning.h
   sgen-pointer-queue.c
   sgen-pointer-queue.h
+  sgen-array-list.h
+  sgen-array-list.c
   sgen-protocol-def.h
   sgen-protocol.c
   sgen-protocol.h

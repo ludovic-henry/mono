@@ -292,6 +292,7 @@ set(COMMON_SOURCES
   xdebug.c
   mini-llvm.h
   mini-llvm-cpp.h
+  llvm-jit.h
   alias-analysis.c
   mini-cross-helpers.c
   arch-stubs.c
