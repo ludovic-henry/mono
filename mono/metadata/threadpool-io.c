@@ -14,9 +14,7 @@
 
 #include <glib.h>
 
-#if defined(HOST_WIN32)
-#include <windows.h>
-#else
+#if !defined(HOST_WIN32)
 #include <errno.h>
 #include <fcntl.h>
 #endif

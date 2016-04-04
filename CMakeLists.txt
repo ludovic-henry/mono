@@ -27,7 +27,7 @@ function(target_link_object_libraries TARGET)
     target_sources(${TARGET} INTERFACE $<TARGET_PROPERTY:${LIB},INTERFACE_SOURCES>)
 
     get_target_property(LINK_LIBS ${LIB} INTERFACE_LINK_LIBRARIES)
-    if(NOT ${LINK_LIBS} STREQUAL "LINK_LIBS-NOTFOUND")
+    if(NOT "${LINK_LIBS}" STREQUAL "LINK_LIBS-NOTFOUND")
       foreach(LINK_LIB ${LINK_LIBS})
         target_link_libraries(${TARGET} INTERFACE ${LINK_LIB})
       endforeach()
@@ -148,7 +148,7 @@ endmacro()
 
 # Sets up ${PREFIX}_CPU and other variables given a processor.
 macro(set_cpu PROCESSOR PREFIX)
-  if(${PROCESSOR} MATCHES "(x86_64|amd64)")
+  if(${PROCESSOR} MATCHES "(x86_64|amd64|AMD64)")
     set("${PREFIX}_CPU" "x86_64")
     set("${PREFIX}_X86_64" YES)
     set("${PREFIX}_AMD64" YES)
@@ -187,15 +187,31 @@ message(STATUS "CMAKE_CXX_COMPILER = ${CMAKE_CXX_COMPILER}")
 # run. We use the autotools naming. So if we are cross-compiling a mono on a Linux system which will run on OS X and
 # output iOS binaries the build platform is Linux, the host platform is OS X and the target platform is iOS.
 
+if(MSVC)
+  # We cannot rely on CMAKE_SYSTEM_PROCESSOR on Windows with MSVC
+  check_symbol_exists("_M_AMD64" "" MSVC_X64)
+  if(MSVC_X64)
+    set_cpu("amd64" "BUILD")
+    set_cpu("amd64" "HOST")
+    set_cpu("amd64" "TARGET")
+  else()
+    set_cpu("x86" "BUILD")
+    set_cpu("x86" "HOST")
+    set_cpu("x86" "TARGET")
+  endif()
+else()
+  set_cpu(${CMAKE_HOST_SYSTEM_PROCESSOR} "BUILD")
+  set_cpu(${CMAKE_SYSTEM_PROCESSOR} "HOST")
+  # TODO: Support "three-way cross-compilation"
+  set_cpu(${CMAKE_SYSTEM_PROCESSOR} "TARGET")
+endif()
+
 set_os(${CMAKE_HOST_SYSTEM_NAME} "BUILD")
-set_cpu(${CMAKE_HOST_SYSTEM_PROCESSOR} "BUILD")
 set_triple(${BUILD_OS} ${BUILD_CPU} BUILD_TRIPLE)
 set_os(${CMAKE_SYSTEM_NAME} "HOST")
-set_cpu(${CMAKE_SYSTEM_PROCESSOR} "HOST")
 set_triple(${HOST_OS} ${HOST_CPU} HOST_TRIPLE)
 # TODO: Support "three-way cross-compilation"
 set_os(${CMAKE_SYSTEM_NAME} "TARGET")
-set_cpu(${CMAKE_SYSTEM_PROCESSOR} "TARGET")
 set_triple(${TARGET_OS} ${TARGET_CPU} TARGET_TRIPLE)
 
 message(STATUS "BUILD_OS = ${BUILD_OS}")
@@ -232,7 +248,9 @@ set(CPPFLAGS_FOR_EGLIB ${CPPFLAGS})
 set(CFLAGS_FOR_EGLIB ${CFLAGS})
 
 # libgc uses some deprecated APIs
-set(LIBGC_COMPILE_OPTIONS ${LIBGC_COMPILE_OPTIONS} -Wno-deprecated-declarations)
+if(NOT MSVC)
+  set(LIBGC_COMPILE_OPTIONS ${LIBGC_COMPILE_OPTIONS} -Wno-deprecated-declarations)
+endif()
 
 #
 # These are the flags that need to be stored in the mono.pc file for
@@ -264,8 +282,9 @@ if(HOST_WINDOWS)
   set(PLATFORM_NO_SYMLINKS YES)
   # mono_cv_clang=no
   # Windows Vista or later is required
-  set(CPPFLAGS "${CPPFLAGS} -DWINVER=0x0600 -D_WIN32_WINNT=0x0600 -D_WIN32_IE=0x0501 -D_UNICODE -DUNICODE -DWIN32_THREADS -DFD_SETSIZE=1024")
-  set(LDFLAGS "${LDFLAGS} -lmswsock -lws2_32 -lole32 -loleaut32 -lpsapi -lversion -ladvapi32 -lwinmm -lkernel32 -liphlpapi")
+  set(CPPFLAGS "${CPPFLAGS} -DWINVER=0x0600 -D_WIN32_WINNT=0x0600 -D_WIN32_IE=0x0501 -D_UNICODE -DUNICODE -DWIN32_THREADS -DFD_SETSIZE=1024 -D_CRT_NONSTDC_NO_DEPRECATE -D_CRT_SECURE_NO_WARNINGS")
+#  set(LDFLAGS "${LDFLAGS} -lmswsock -lws2_32 -lole32 -loleaut32 -lpsapi -lversion -ladvapi32 -lwinmm -lkernel32 -liphlpapi")
+  set(LIBGC_COMPILE_DEFINITIONS ${LIBGC_COMPILE_DEFINITIONS} -D_CRT_SECURE_NO_WARNINGS)
   set(LIBMONO_CFLAGS "-mms-bitfields -mwindows")
   set(LIBMONO_LDFLAGS "-mms-bitfields -mwindows")
   set(LIBDL "")
@@ -545,16 +564,18 @@ endif()
 
 set(ENABLE_MCS_BUILD YES CACHE BOOL "Enable the build of the mcs directory")
 
-set(ENABLE_XEN_OPT YES CACHE BOOL "Enable Xen-specific behaviour (defaults to yes)")
-if(ENABLE_XEN_OPT AND NOT CMAKE_C_COMPILER_ID MATCHES "Clang")
-  set(MONO_XEN_OPT YES)
-  set(CMAKE_REQUIRED_FLAGS "-mno-tls-direct-seg-refs")
-  check_c_snippet_compiles("" "" CHECK_MNO_TLS_DIRECT_SEG_REFS)
-  unset(CMAKE_REQUIRED_FLAGS)
-  if(CHECK_MNO_TLS_DIRECT_SEG_REFS)
-    set(CFLAGS "${CFLAGS} -mno-tls-direct-seg-refs")
-    # Pass it to libgc as well
-    set(LIBGC_COMPILE_OPTIONS ${LIBGC_COMPILE_OPTIONS} -mno-tls-direct-seg-refs)
+if(NOT MSVC)
+  set(ENABLE_XEN_OPT YES CACHE BOOL "Enable Xen-specific behaviour (defaults to yes)")
+  if(ENABLE_XEN_OPT AND NOT CMAKE_C_COMPILER_ID MATCHES "Clang")
+    set(MONO_XEN_OPT YES)
+    set(CMAKE_REQUIRED_FLAGS "-mno-tls-direct-seg-refs")
+    check_c_snippet_compiles("" "" CHECK_MNO_TLS_DIRECT_SEG_REFS)
+    unset(CMAKE_REQUIRED_FLAGS)
+    if(CHECK_MNO_TLS_DIRECT_SEG_REFS)
+      set(CFLAGS "${CFLAGS} -mno-tls-direct-seg-refs")
+      # Pass it to libgc as well
+      set(LIBGC_COMPILE_OPTIONS ${LIBGC_COMPILE_OPTIONS} -mno-tls-direct-seg-refs)
+    endif()
   endif()
 endif()
 
@@ -641,10 +662,10 @@ set(LIBGC_DIR "")
 if(ENABLE_BOEHM)
   set(LIBGC_DIR "libgc")
   set(LIBGC_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/libgc/include")
-  set(BOEHM_DEFINES "-DHAVE_BOEHM_GC")
+  set(BOEHM_DEFINES -DHAVE_BOEHM_GC)
 
   if(TARGET_WINDOWS)
-    set(BOEHM_DEFINES "${BOEHM_DEFINES} -DGC_NOT_DLL")
+    set(BOEHM_DEFINES ${BOEHM_DEFINES} -DGC_NOT_DLL)
     set(LIBGC_COMPILE_DEFINITIONS ${LIBGC_COMPILE_DEFINITIONS} -DGC_BUILD -DGC_NOT_DLL)
   endif()
 
@@ -679,6 +700,10 @@ check_c_source_compiles("\
   struct s {
     int  length;
     char data [0];
+  };
+  struct t {
+    struct s s;
+    int  foo;
   };
   int main() { return 0; }
 " CHECK_LENGTH_OF_ZERO_LENGTH_ARRAYS)
@@ -1301,34 +1326,22 @@ else()
 
   set(JDK_HEADERS_FOUND NO)
 
-  check_library_exists(ws2_32 main "" HAVE_LIBWS2_32)
-  if(HAVE_LIBWS2_32)
-    set(LIBS ${LIBS} ws2_32)
-  endif()
-  check_library_exists(psapi main "" HAVE_LIBPSAPI)
-  if(HAVE_LIBPSAPI)
-    set(LIBS ${LIBS} psapi)
-  endif()
-  check_library_exists(ole32 main "" HAVE_LIBOLE32)
-  if(HAVE_LIBOLE32)
-    set(LIBS ${LIBS} ole32)
-  endif()
-  check_library_exists(winmm main "" HAVE_LIBWINMM)
-  if(HAVE_LIBWINMM)
-    set(LIBS ${LIBS} winmm)
-  endif()
-  check_library_exists(oleaut32 main "" HAVE_LIBOLEAUT32)
-  if(HAVE_LIBOLEAUT32)
-    set(LIBS ${LIBS} oleaut32)
-  endif()
-  check_library_exists(advapi32 main "" HAVE_LIBADVAPI32)
-  if(HAVE_LIBADVAPI32)
-    set(LIBS ${LIBS} advapi32)
-  endif()
-  check_library_exists(version main "" HAVE_LIBVERSION)
-  if(HAVE_LIBVERSION)
-    set(LIBS ${LIBS} version)
-  endif()
+  set(HAVE_LIBWS2_32 YES)
+  set(LIBS ${LIBS} ws2_32)
+  set(HAVE_LIBPSAPI YES)
+  set(LIBS ${LIBS} psapi)
+  set(HAVE_LIBOLE32 YES)
+  set(LIBS ${LIBS} ole32)
+  set(HAVE_LIBWINMM YES)
+  set(LIBS ${LIBS} winmm)
+  set(HAVE_LIBOLEAUT32 YES)
+  set(LIBS ${LIBS} oleaut32)
+  set(HAVE_LIBADVAPI32 YES)
+  set(LIBS ${LIBS} advapi32)
+  set(HAVE_LIBVERSION YES)
+  set(LIBS ${LIBS} version)
+  set(HAVE_LIBMSWSOCK YES)
+  set(LIBS ${LIBS} mswsock)
 
   # *********************************
   # *** Check for struct ip_mreqn ***
@@ -1342,35 +1355,13 @@ else()
   endif()
   unset(CMAKE_EXTRA_INCLUDE_FILES)
 
-  # **********************************
-  # *** Check for getaddrinfo ***
-  # **********************************
-  check_functions_exists_ext("getaddrinfo")
-
-  # **********************************
-  # *** Check for gethostbyname ***
-  # **********************************
-  check_functions_exists_ext("gethostbyname")
-
-  # **********************************
-  # *** Check for getprotobyname ***
-  # **********************************
-  check_functions_exists_ext("getprotobyname")
-
-  # **********************************
-  # *** Check for getnameinfo ***
-  # **********************************
-  check_functions_exists_ext("getnameinfo")
-
-  # **********************************
-  # *** Check for inet_ntop ***
-  # **********************************
-  check_functions_exists_ext("inet_ntop")
-
-  # **********************************
-  # *** Check for inet_pton ***
-  # **********************************
-  check_functions_exists_ext("inet_pton")
+  set(HAVE_GETADDRINFO YES)
+  set(HAVE_GETHOSTBYNAME YES)
+  set(HAVE_GETPROTOBYNAME YES)
+  set(HAVE_GETNAMEINFO YES)
+  set(HAVE_GETADDRINFO YES)
+  set(HAVE_INET_NTOP YES)
+  set(HAVE_INET_PTON YES)
 
   check_symbol_exists(InterlockedExchange64 windows.h HAVE_DECL_INTERLOCKEDEXCHANGE64)
   check_symbol_exists(InterlockedCompareExchange64 windows.h HAVE_DECL_INTERLOCKEDCOMPAREEXCHANGE64)
@@ -1378,7 +1369,7 @@ else()
   check_symbol_exists(InterlockedIncrement64 windows.h HAVE_DECL_INTERLOCKEDINCREMENT64)
   check_symbol_exists(InterlockedAdd windows.h HAVE_DECL_INTERLOCKEDADD)
   check_symbol_exists(InterlockedAdd64 windows.h HAVE_DECL_INTERLOCKEDADD64)
-  check_symbol_exists(__readfsdword windows.h HAVE_DECL___READFSDWORD)
+  check_c_snippet_compiles("unsigned long w = __readfsdword(0);" "windows.h" HAVE_DECL___READFSDWORD)
 endif()
 
 # socklen_t check
@@ -2127,8 +2118,13 @@ endif()
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DHAVE_CONFIG_H ${CFLAGS} ${CPPFLAGS}")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DHAVE_CONFIG_H ${CXXFLAGS} ${CPPFLAGS}")
 foreach(LIB ${LIBS})
-  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -l${LIB}")
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -l${LIB}")
+  if(MSVC)
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${LIB}.lib")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${LIB}.lib")
+  else()
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -l${LIB}")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -l${LIB}")
+  endif()
 endforeach()
 
 message(STATUS "CMAKE_C_FLAGS = ${CMAKE_C_FLAGS}")

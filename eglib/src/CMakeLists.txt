@@ -17,7 +17,7 @@ if(NEED_VASPRINTF)
 endif()
 
 if(HOST_WIN32)
-  set(OS_FILES ${win_files})
+  set(OS_FILES ${WIN_FILES})
 else()
   set(OS_FILES ${UNIX_FILES})
 endif()
@@ -56,17 +56,21 @@ set(SOURCES
   ${VASPRINTF_FILES}
 )
 
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/eglib-config.h.in ${CMAKE_CURRENT_BINARY_DIR}/eglib-config.h)
+if(NOT HOST_WIN32)
+  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/eglib-config.h.in ${CMAKE_CURRENT_BINARY_DIR}/eglib-config.h)
+endif()
 
-include_directories(.)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 
-add_definitions(-Wall -D_FORTIFY_SOURCE=2)
+if(MSVC)
+  add_definitions("/W4")
+else()
+  add_definitions(-Wall -D_FORTIFY_SOURCE=2)
+endif()
 
 add_library(eglib_objects OBJECT ${SOURCES})
 add_library(eglib INTERFACE)
 target_sources(eglib INTERFACE $<TARGET_OBJECTS:eglib_objects>)
-if(HOST_WIN32)
-  target_link_libraries(eglib INTERFACE m ${LIBICONV} psapi)
-elseif(PLATFORM_ANDROID)
+if(PLATFORM_ANDROID)
   target_link_libraries(eglib INTERFACE log)
 endif()

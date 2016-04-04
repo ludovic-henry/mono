@@ -178,7 +178,7 @@ signed_word * log_size_ptr;
     					      GC_PTR obj)
 # else
     static int GC_register_disappearing_link_inner(dl_hashtbl, link, obj)
-	struct dl_hashtbl_s *dl_hashtbl
+    struct dl_hashtbl_s *dl_hashtbl;
     GC_PTR * link;
     GC_PTR obj;
 # endif

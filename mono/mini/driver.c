@@ -76,6 +76,8 @@ static void mini_usage (void);
 #include <mono/metadata/cil-coff.h>
 /* This turns off command line globbing under win32 */
 int _CRT_glob = 0;
+/* For execvp() */
+#include <process.h>
 #endif
 
 typedef void (*OptFunc) (const char *p);
