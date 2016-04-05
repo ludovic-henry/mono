@@ -168,6 +168,8 @@ macro(set_triple OS CPU OUT_VAR)
   string(TOLOWER "${CPU}-unknown-${OS}" ${OUT_VAR})
 endmacro()
 
+message(STATUS "CMAKE_GENERATOR = ${CMAKE_GENERATOR}")
+message(STATUS "CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
 message(STATUS "CMAKE_SYSTEM = ${CMAKE_SYSTEM}")
 message(STATUS "CMAKE_SYSTEM_NAME = ${CMAKE_SYSTEM_NAME}")
 message(STATUS "CMAKE_SYSTEM_VERSION = ${CMAKE_SYSTEM_VERSION}")
@@ -537,14 +539,20 @@ set(GLIB_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/eglib/src" "${CMAKE_BINARY_DIR
 
 # Enable support for fast thread-local storage
 # Some systems have broken support, so we allow to disable it.
-set(WITH_TLS "__thread" CACHE STRING "Select Thread Local Storage implementation. One of [__thread, pthread]. (defaults to __thread)")
+if(NOT MSVC)
+  set(WITH_TLS "__thread" CACHE STRING "Select Thread Local Storage implementation. One of [__thread, pthread]. (defaults to __thread)")
+endif()
 
 # Enable support for using sigaltstack for SIGSEGV and stack overflow handling
 # This does not work on some platforms (bug #55253)
 set(WITH_SIGALTSTACK YES CACHE BOOL "Enable/disable support for sigaltstack (defaults to yes)")
 
 set(STATIC_MONO YES CACHE BOOL "Link mono statically to libmono (faster) (defaults to yes)")
-set(SHARED_MONO YES CACHE BOOL "Build a shared libmono library (defaults to yes)")
+if(MSVC)
+  set(SHARED_MONO NO)
+else()
+  set(SHARED_MONO YES CACHE BOOL "Build a shared libmono library (defaults to yes)")
+endif()
 # Same as --with-shared_mono=no
 set(DISABLE_LIBRARIES NO CACHE BOOL "Disable the build of libmono")
 
@@ -556,11 +564,6 @@ endif()
 #case $host in
 #*nacl* ) with_shared_mono=yes;;
 #esac
-
-if(HOST_WINDOWS)
-  # Boehm GC requires the runtime to be in its own dll
-  set(STATIC_MONO NO)
-endif()
 
 set(ENABLE_MCS_BUILD YES CACHE BOOL "Enable the build of the mcs directory")
 
@@ -647,7 +650,9 @@ check_c_source_compiles("
 #
 # Boehm GC configuration
 #
-set(ENABLE_BOEHM YES CACHE BOOL "Enable the Boehm GC")
+if(NOT MSVC)
+  set(ENABLE_BOEHM YES CACHE BOOL "Enable the Boehm GC")
+endif()
 set(SUPPORT_BOEHM ${ENABLE_BOEHM})
 if(PARALLEL_MARK)
   set(ENABLE_PARALLEL_MARK YES CACHE BOOL "Enables Boehm GC Parallel Marking")
@@ -2144,6 +2149,10 @@ endforeach()
 
 message(STATUS "CMAKE_C_FLAGS = ${CMAKE_C_FLAGS}")
 message(STATUS "CMAKE_CXX_FLAGS = ${CMAKE_CXX_FLAGS}")
+message(STATUS "CMAKE_C_FLAGS_DEBUG = ${CMAKE_C_FLAGS_DEBUG}")
+message(STATUS "CMAKE_CXX_FLAGS_DEBUG = ${CMAKE_CXX_FLAGS_DEBUG}")
+message(STATUS "CMAKE_C_FLAGS_RELEASE = ${CMAKE_C_FLAGS_RELEASE}")
+message(STATUS "CMAKE_CXX_FLAGS_RELEASE = ${CMAKE_CXX_FLAGS_RELEASE}")
 message(STATUS "CMAKE_SHARED_LINKER_FLAGS = ${CMAKE_SHARED_LINKER_FLAGS}")
 message(STATUS "CMAKE_EXE_LINKER_FLAGS = ${CMAKE_EXE_LINKER_FLAGS}")
 

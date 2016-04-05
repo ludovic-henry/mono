@@ -208,13 +208,15 @@ set(SGEN_SOURCES
   sgen-client-mono.h
 )
 
-add_library(monoruntimeboehm_objects OBJECT ${CONFIG_SOURCES} ${COMMON_SOURCES} ${GC_DEPENDENT_SOURCES} ${NULL_GC_SOURCES} ${BOEHM_SOURCES})
-target_compile_definitions(monoruntimeboehm_objects PRIVATE ${BOEHM_DEFINES})
-add_library(monoruntimeboehm INTERFACE)
-target_sources(monoruntimeboehm INTERFACE $<TARGET_OBJECTS:monoruntimeboehm_objects>)
-target_link_object_libraries(monoruntimeboehm monoutils wapi eglib monogcboehm)
-if(PLATFORM_DARWIN)
-  target_link_libraries(monoruntimeboehm INTERFACE "-framework CoreFoundation" "-framework Foundation")
+if(SUPPORT_BOEHM)
+  add_library(monoruntimeboehm_objects OBJECT ${CONFIG_SOURCES} ${COMMON_SOURCES} ${GC_DEPENDENT_SOURCES} ${NULL_GC_SOURCES} ${BOEHM_SOURCES})
+  target_compile_definitions(monoruntimeboehm_objects PRIVATE ${BOEHM_DEFINES})
+  add_library(monoruntimeboehm INTERFACE)
+  target_sources(monoruntimeboehm INTERFACE $<TARGET_OBJECTS:monoruntimeboehm_objects>)
+  target_link_object_libraries(monoruntimeboehm monoutils wapi eglib monogcboehm)
+  if(PLATFORM_DARWIN)
+    target_link_libraries(monoruntimeboehm INTERFACE "-framework CoreFoundation" "-framework Foundation")
+  endif()
 endif()
 
 if(SUPPORT_SGEN)

@@ -35,15 +35,17 @@ if(SUPPORT_BOEHM)
   add_custom_command(
     OUTPUT buildver-boehm.h
     COMMAND ${CMAKE_COMMAND} -DFILE="${CMAKE_CURRENT_BINARY_DIR}/buildver-boehm.h" -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateBuildVersionHeader.cmake"
-    DEPENDS mini monoruntimeboehm monoboehm
+    DEPENDS mini monoruntimeboehm monoboehm-static
   )
 endif()
 
-add_custom_command(
-  OUTPUT buildver-sgen.h
-  COMMAND ${CMAKE_COMMAND} -DFILE="${CMAKE_CURRENT_BINARY_DIR}/buildver-sgen.h" -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateBuildVersionHeader.cmake"
-  DEPENDS mini monoruntimesgen monosgen
-)
+if(SUPPORT_SGEN)
+  add_custom_command(
+    OUTPUT buildver-sgen.h
+    COMMAND ${CMAKE_COMMAND} -DFILE="${CMAKE_CURRENT_BINARY_DIR}/buildver-sgen.h" -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateBuildVersionHeader.cmake"
+    DEPENDS mini monoruntimesgen monosgen-static
+  )
+endif()
 
 if(DTRACE_G_REQUIRED)
   # TODO: Support DTRACE_G_REQUIRED
@@ -78,8 +80,10 @@ if(SUPPORT_BOEHM)
   target_link_libraries(mono-boehm ${MONO_LIB} ${MONOBINLDFLAGS} ${MONOBIN_PLATFORM_LDFLAGS} ${LLVMMONOF})
 endif()
 
-add_executable(mono-sgen ${MONO_SGEN_SOURCES} buildver-sgen.h)
-target_link_libraries(mono-sgen ${MONO_SGEN_LIB} ${MONOBINLDFLAGS} ${MONOBIN_PLATFORM_LDFLAGS} ${LLVMMONOF})
+if(SUPPORT_SGEN)
+  add_executable(mono-sgen ${MONO_SGEN_SOURCES} buildver-sgen.h)
+  target_link_libraries(mono-sgen ${MONO_SGEN_LIB} ${MONOBINLDFLAGS} ${MONOBIN_PLATFORM_LDFLAGS} ${LLVMMONOF})
+endif()
 
 if(BITCODE)
   set(LIBMONOLDFLAGS ${LIBMONOLDFLAGS} -no-undefined)
@@ -112,11 +116,11 @@ if(HOST_WIN32)
   if(SUPPORT_BOEHM)
     add_executable(monow ${MONO_BOEHM_SOURCES} buildver-boehm.h)
     target_link_libraries(monow ${MONO_LIB} ${MONOBINLDFLAGS} ${MONOBIN_PLATFORM_LDFLAGS} ${LLVMMONOF})
-  else()
+  elseif(SUPPORT_SGEN)
     add_executable(monow ${MONO_SGEN_SOURCES} buildver-sgen.h)
     target_link_libraries(monow ${MONO_SGEN_LIB} ${MONOBINLDFLAGS} ${MONOBIN_PLATFORM_LDFLAGS} ${LLVMMONOF})
   endif()
-  if(NOT MSVC)
+  if(TARGET monow AND NOT MSVC)
     target_link_libraries(monow -mwindows)
   endif()
 endif()
@@ -434,14 +438,22 @@ target_link_object_libraries(mini monoutils)
 
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/empty.c" "")
 
-add_library(monoboehm SHARED "${CMAKE_CURRENT_BINARY_DIR}/empty.c")
-target_link_libraries(monoboehm mini monoruntimeboehm ${LLVMMONOF} ${LIBMONOLDFLAGS})
-add_library(monoboehm-static STATIC "${CMAKE_CURRENT_BINARY_DIR}/empty.c")
-target_link_libraries(monoboehm-static mini monoruntimeboehm ${LLVMMONOF})
-add_library(monosgen SHARED "${CMAKE_CURRENT_BINARY_DIR}/empty.c")
-target_link_libraries(monosgen mini monoruntimesgen ${LLVMMONOF} ${LIBMONOLDFLAGS})
-add_library(monosgen-static STATIC "${CMAKE_CURRENT_BINARY_DIR}/empty.c")
-target_link_libraries(monosgen-static mini monoruntimesgen ${LLVMMONOF})
+if(SUPPORT_BOEHM)
+  if(SHARED_MONO)
+    add_library(monoboehm SHARED "${CMAKE_CURRENT_BINARY_DIR}/empty.c")
+    target_link_libraries(monoboehm mini monoruntimeboehm ${LLVMMONOF} ${LIBMONOLDFLAGS})
+  endif()
+  add_library(monoboehm-static STATIC "${CMAKE_CURRENT_BINARY_DIR}/empty.c")
+  target_link_libraries(monoboehm-static mini monoruntimeboehm ${LLVMMONOF})
+endif()
+if(SUPPORT_SGEN)
+  if(SHARED_MONO)
+    add_library(monosgen SHARED "${CMAKE_CURRENT_BINARY_DIR}/empty.c")
+    target_link_libraries(monosgen mini monoruntimesgen ${LLVMMONOF} ${LIBMONOLDFLAGS})
+  endif()
+  add_library(monosgen-static STATIC "${CMAKE_CURRENT_BINARY_DIR}/empty.c")
+  target_link_libraries(monosgen-static mini monoruntimesgen ${LLVMMONOF})
+endif()
 
 if(NACL_CODEGEN)
   set(GENMDESC_OPTS --nacl)
