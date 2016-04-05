@@ -436,7 +436,9 @@ add_library(mini INTERFACE)
 target_sources(mini INTERFACE $<TARGET_OBJECTS:mini_objects>)
 target_link_object_libraries(mini monoutils)
 
-file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/empty.c" "")
+if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/empty.c")
+  file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/empty.c" "")
+endif()
 
 if(SUPPORT_BOEHM)
   if(SHARED_MONO)
