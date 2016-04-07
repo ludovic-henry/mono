@@ -54,7 +54,7 @@ namespace System.Net
 		Stream nstream;
 		internal Socket socket;
 		object socketLock = new object ();
-		IWebConnectionState state;
+		WebConnectionState state;
 		WebExceptionStatus status;
 		WaitCallback initConn;
 		bool keepAlive;
@@ -95,7 +95,7 @@ namespace System.Net
 			get { return chunkStream; }
 		}
 
-		public WebConnection (IWebConnectionState wcs, ServicePoint sPoint)
+		public WebConnection (WebConnectionState wcs, ServicePoint sPoint)
 		{
 			this.state = wcs;
 			this.sPoint = sPoint;

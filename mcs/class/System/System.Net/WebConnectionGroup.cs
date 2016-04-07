@@ -44,7 +44,7 @@ namespace System.Net
 	{
 		ServicePoint sPoint;
 		string name;
-		LinkedList<ConnectionState> connections;
+		LinkedList<WebConnectionState> connections;
 		Queue queue;
 		bool closing;
 
@@ -52,7 +52,7 @@ namespace System.Net
 		{
 			this.sPoint = sPoint;
 			this.name = name;
-			connections = new LinkedList<ConnectionState> ();
+			connections = new LinkedList<WebConnectionState> ();
 			queue = new Queue ();
 		}
 
@@ -131,7 +131,7 @@ namespace System.Net
 			}
 		}
 
-		ConnectionState FindIdleConnection ()
+		WebConnectionState FindIdleConnection ()
 		{
 			foreach (var cnc in connections) {
 				if (cnc.Busy)
@@ -156,7 +156,7 @@ namespace System.Net
 
 			if (sPoint.ConnectionLimit > connections.Count || connections.Count == 0) {
 				created = true;
-				cnc = new ConnectionState (this);
+				cnc = new WebConnectionState (this);
 				connections.AddFirst (cnc);
 				return cnc.Connection;
 			}
@@ -234,59 +234,62 @@ namespace System.Net
 			goto again;
 		}
 
-		class ConnectionState : IWebConnectionState {
-			public WebConnection Connection {
-				get;
-				private set;
-			}
+		internal ServicePoint ServicePoint {
+			get { return sPoint; }
+		}
+	}
 
-			public WebConnectionGroup Group {
-				get;
-				private set;
-			}
+	class WebConnectionState {
+		public WebConnection Connection {
+			get;
+			private set;
+		}
 
-			public ServicePoint ServicePoint {
-				get { return Group.sPoint; }
-			}
+		public WebConnectionGroup Group {
+			get;
+			private set;
+		}
 
-			bool busy;
-			DateTime idleSince;
+		public ServicePoint ServicePoint {
+			get { return Group.ServicePoint; }
+		}
 
-			public bool Busy {
-				get { return busy; }
-			}
+		bool busy;
+		DateTime idleSince;
 
-			public DateTime IdleSince {
-				get { return idleSince; }
-			}
+		public bool Busy {
+			get { return busy; }
+		}
 
-			public bool TrySetBusy ()
-			{
-				lock (ServicePoint) {
-					if (busy)
-						return false;
-					busy = true;
-					idleSince = DateTime.UtcNow + TimeSpan.FromDays (3650);
-					return true;
-				}
-			}
+		public DateTime IdleSince {
+			get { return idleSince; }
+		}
 
-			public void SetIdle ()
-			{
-				lock (ServicePoint) {
-					busy = false;
-					idleSince = DateTime.UtcNow;
-				}
-			}
-
-			public ConnectionState (WebConnectionGroup group)
-			{
-				Group = group;
-				idleSince = DateTime.UtcNow;
-				Connection = new WebConnection (this, group.sPoint);
+		public bool TrySetBusy ()
+		{
+			lock (ServicePoint) {
+				if (busy)
+					return false;
+				busy = true;
+				idleSince = DateTime.UtcNow + TimeSpan.FromDays (3650);
+				return true;
 			}
 		}
-		
+
+		public void SetIdle ()
+		{
+			lock (ServicePoint) {
+				busy = false;
+				idleSince = DateTime.UtcNow;
+			}
+		}
+
+		public WebConnectionState (WebConnectionGroup group)
+		{
+			Group = group;
+			idleSince = DateTime.UtcNow;
+			Connection = new WebConnection (this, group.ServicePoint);
+		}
 	}
 }
 
