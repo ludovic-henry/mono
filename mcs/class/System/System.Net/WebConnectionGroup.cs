@@ -45,7 +45,7 @@ namespace System.Net
 		ServicePoint sPoint;
 		string name;
 		LinkedList<WebConnection> connections;
-		Queue queue;
+		Queue<HttpWebRequest> RequestQueue;
 		bool closing;
 
 		public WebConnectionGroup (ServicePoint sPoint, string name)
@@ -53,7 +53,7 @@ namespace System.Net
 			this.sPoint = sPoint;
 			this.name = name;
 			connections = new LinkedList<WebConnection> ();
-			queue = new Queue ();
+			RequestQueue = new Queue<HttpWebRequest> ();
 		}
 
 		public event EventHandler ConnectionClosed;
@@ -68,7 +68,7 @@ namespace System.Net
 		{
 			List<WebConnection> connectionsToClose = null;
 
-			//TODO: what do we do with the queue? Empty it out and abort the requests?
+			//TODO: what do we do with the RequestQueue? Empty it out and abort the requests?
 			//TODO: abort requests or wait for them to finish
 			lock (sPoint) {
 				closing = true;
@@ -156,7 +156,7 @@ namespace System.Net
 
 			if (sPoint.ConnectionLimit > connections.Count || connections.Count == 0) {
 				created = true;
-				cnc = new WebConnection (this);
+				cnc = new WebConnection (this, RequestQueue);
 				connections.AddFirst (cnc);
 				return cnc;
 			}
@@ -170,10 +170,6 @@ namespace System.Net
 
 		public string Name {
 			get { return name; }
-		}
-
-		internal Queue Queue {
-			get { return queue; }
 		}
 
 		internal bool TryRecycle (TimeSpan maxIdleTime, ref DateTime idleSince)

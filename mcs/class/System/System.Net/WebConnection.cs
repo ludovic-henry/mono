@@ -30,6 +30,7 @@
 
 using System.IO;
 using System.Collections;
+using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
@@ -62,7 +63,6 @@ namespace System.Net
 		internal WebConnectionData Data;
 		bool chunkedRead;
 		ChunkStream chunkStream;
-		readonly Queue queue;
 		bool reused;
 		int position;
 		HttpWebRequest priority_request;		
@@ -110,7 +110,11 @@ namespace System.Net
 			private set;
 		}
 
-		public WebConnection (WebConnectionGroup group)
+		Queue<HttpWebRequest> RequestQueue {
+			get;
+		}
+
+		public WebConnection (WebConnectionGroup group, Queue<HttpWebRequest> queue)
 		{
 			Group = group;
 			ServicePoint = group.ServicePoint;
@@ -118,7 +122,7 @@ namespace System.Net
 
 			buffer = new byte [4096];
 			Data = new WebConnectionData ();
-			queue = group.Queue;
+			RequestQueue = queue;
 			abortHelper = new AbortHelper ();
 			abortHelper.Connection = this;
 			abortHandler = new EventHandler (abortHelper.Abort);
@@ -756,14 +760,14 @@ namespace System.Net
 					status = WebExceptionStatus.Success;
 					ThreadPool.QueueUserWorkItem (r => { try { InitConnection (r); } catch {} }, request);
 				} else {
-					lock (queue) {
+					lock (RequestQueue) {
 #if MONOTOUCH
 						if (!warned_about_queue) {
 							warned_about_queue = true;
 							Console.WriteLine ("WARNING: An HttpWebRequest was added to the ConnectionGroup queue because the connection limit was reached.");
 						}
 #endif
-						queue.Enqueue (request);
+						RequestQueue.Enqueue (request);
 					}
 				}
 			}
@@ -773,9 +777,9 @@ namespace System.Net
 		
 		void SendNext ()
 		{
-			lock (queue) {
-				if (queue.Count > 0) {
-					SendRequest ((HttpWebRequest) queue.Dequeue ());
+			lock (RequestQueue) {
+				if (RequestQueue.Count > 0) {
+					SendRequest (RequestQueue.Dequeue ());
 				}
 			}
 		}
@@ -1139,14 +1143,14 @@ namespace System.Net
 		void Abort (object sender, EventArgs args)
 		{
 			lock (this) {
-				lock (queue) {
+				lock (RequestQueue) {
 					HttpWebRequest req = (HttpWebRequest) sender;
 					if (Data.request == req || Data.request == null) {
 						if (!req.FinishedReading) {
 							status = WebExceptionStatus.RequestCanceled;
 							Close (false);
-							if (queue.Count > 0) {
-								Data.request = (HttpWebRequest) queue.Dequeue ();
+							if (RequestQueue.Count > 0) {
+								Data.request = RequestQueue.Dequeue ();
 								SendRequest (Data.request);
 							}
 						}
@@ -1155,13 +1159,13 @@ namespace System.Net
 
 					req.FinishedReading = true;
 					req.SetResponseError (WebExceptionStatus.RequestCanceled, null, "User aborted");
-					if (queue.Count > 0 && queue.Peek () == sender) {
-						queue.Dequeue ();
-					} else if (queue.Count > 0) {
-						for (int i = 0, count = queue.Count; i < count; ++i) {
-							object item = queue.Dequeue ();
+					if (RequestQueue.Count > 0 && RequestQueue.Peek () == sender) {
+						RequestQueue.Dequeue ();
+					} else if (RequestQueue.Count > 0) {
+						for (int i = 0, count = RequestQueue.Count; i < count; ++i) {
+							HttpWebRequest item = RequestQueue.Dequeue ();
 							if (item != sender)
-								queue.Enqueue (item);
+								RequestQueue.Enqueue (item);
 						}
 					}
 				}
