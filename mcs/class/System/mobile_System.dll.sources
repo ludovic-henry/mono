@@ -246,7 +246,6 @@ System.Net/TransportContext.cs
 System.Net/TransportType.cs
 System.Net/WebAsyncResult.cs
 System.Net/WebConnection.cs
-System.Net/WebConnectionData.cs
 System.Net/WebConnectionGroup.cs
 System.Net/WebConnectionStream.cs
 System.Net/WebException.cs

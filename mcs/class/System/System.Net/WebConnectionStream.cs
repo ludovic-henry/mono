@@ -68,24 +68,22 @@ namespace System.Net
 		AsyncCallback cb_wrapper; // Calls to ReadCallbackWrapper or WriteCallbacWrapper
 		internal bool IgnoreIOErrors;
 
-		public WebConnectionStream (WebConnection cnc, WebConnectionData data)
+		public WebConnectionStream (WebConnection cnc, HttpWebRequest request, WebHeaderCollection headers)
 		{          
-			if (data == null)
-				throw new InvalidOperationException ("data was not initialized");
-			if (data.Headers == null)
+			if (headers == null)
 				throw new InvalidOperationException ("data.Headers was not initialized");
-			if (data.request == null)
+			if (request == null)
 				throw new InvalidOperationException ("data.request was not initialized");
 			isRead = true;
 			cb_wrapper = new AsyncCallback (ReadCallbackWrapper);
 			pending = new ManualResetEvent (true);
-			this.request = data.request;
+			this.request = request;
 			read_timeout = request.ReadWriteTimeout;
 			write_timeout = read_timeout;
 			this.cnc = cnc;
-			string contentType = data.Headers ["Transfer-Encoding"];
+			string contentType = headers ["Transfer-Encoding"];
 			bool chunkedRead = (contentType != null && contentType.IndexOf ("chunked", StringComparison.OrdinalIgnoreCase) != -1);
-			string clength = data.Headers ["Content-Length"];
+			string clength = headers ["Content-Length"];
 			if (!chunkedRead && clength != null && clength != "") {
 				try {
 					contentLength = Int32.Parse (clength);
@@ -122,7 +120,7 @@ namespace System.Net
 
 		bool CheckAuthHeader (string headerName)
 		{
-			var authHeader = cnc.Data.Headers [headerName];
+			var authHeader = cnc.DataHeaders [headerName];
 			return (authHeader != null && authHeader.IndexOf ("NTLM", StringComparison.Ordinal) != -1);
 		}
 
@@ -723,7 +721,7 @@ namespace System.Net
 					return;
 				}
 
-				if (cnc.Data.StatusCode != 0 && cnc.Data.StatusCode != 100) {
+				if (cnc.DataStatusCode != 0 && cnc.DataStatusCode != 100) {
 					result.SetCompleted (inner.CompletedSynchronously);
 					return;
 				}

@@ -60,7 +60,7 @@ namespace System.Net
 		static AsyncCallback readDoneDelegate = new AsyncCallback (ReadDone);
 		EventHandler abortHandler;
 		AbortHelper abortHelper;
-		internal WebConnectionData Data;
+		WebConnectionData Data;
 		bool chunkedRead;
 		ChunkStream chunkStream;
 		bool reused;
@@ -112,6 +112,14 @@ namespace System.Net
 
 		Queue<HttpWebRequest> RequestQueue {
 			get;
+		}
+
+		public int DataStatusCode {
+			get { return Data.StatusCode; }
+		}
+
+		public WebHeaderCollection DataHeaders {
+			get { return Data.Headers; }
 		}
 
 		public WebConnection (WebConnectionGroup group, Queue<HttpWebRequest> queue)
@@ -537,7 +545,7 @@ namespace System.Net
 
 			cnc.position = 0;
 
-			WebConnectionStream stream = new WebConnectionStream (cnc, data);
+			WebConnectionStream stream = new WebConnectionStream (cnc, data.request, data.Headers);
 			bool expect_content = ExpectContent (data.StatusCode, data.request.Method);
 			string tencoding = null;
 			if (expect_content)
@@ -575,7 +583,7 @@ namespace System.Net
 			if (!expect_content)
 				stream.ForceCompletion ();
 
-			data.request.SetResponseData (data);
+			data.request.SetResponseData (data.Headers, data.Version, data.StatusCode, data.StatusDescription, data.stream, data.request);
 		}
 
 		static bool ExpectContent (int statusCode, string method)
@@ -1224,6 +1232,41 @@ namespace System.Net
 			lock (ServicePoint) {
 				Busy = false;
 				IdleSince = DateTime.UtcNow;
+			}
+		}
+
+		class WebConnectionData
+		{
+			public HttpWebRequest request;
+			public int StatusCode;
+			public string StatusDescription;
+			public WebHeaderCollection Headers;
+			public Version Version;
+			public Version ProxyVersion;
+			public Stream stream;
+			public string[] Challenge;
+			ReadState _readState;
+
+			public WebConnectionData ()
+			{
+			}
+
+			public WebConnectionData (HttpWebRequest request)
+			{
+				this.request = request;
+			}
+
+			public ReadState ReadState {
+				get {
+					return _readState;
+				}
+				set {
+					lock (this) {
+						if ((_readState == ReadState.Aborted) && (value != ReadState.Aborted))
+							throw new WebException ("Aborted", WebExceptionStatus.RequestCanceled);
+						_readState = value;
+					}
+				}
 			}
 		}
 	}

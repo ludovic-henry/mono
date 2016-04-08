@@ -61,15 +61,15 @@ namespace System.Net
 		
 		// Constructors
 		
-		internal HttpWebResponse (Uri uri, string method, WebConnectionData data, CookieContainer container)
+		internal HttpWebResponse (Uri uri, string method, WebHeaderCollection headers, Version version, int statusCode, string statusDescription, Stream stream, HttpWebRequest request, CookieContainer container)
 		{
 			this.uri = uri;
 			this.method = method;
-			webHeaders = data.Headers;
-			version = data.Version;
-			statusCode = (HttpStatusCode) data.StatusCode;
-			statusDescription = data.StatusDescription;
-			stream = data.stream;
+			this.webHeaders = headers;
+			this.version = version;
+			this.statusCode = (HttpStatusCode) statusCode;
+			this.statusDescription = statusDescription;
+			this.stream = stream;
 			contentLength = -1;
 
 			try {
@@ -86,10 +86,10 @@ namespace System.Net
 			}
 
 			string content_encoding = webHeaders ["Content-Encoding"];
-			if (content_encoding == "gzip" && (data.request.AutomaticDecompression & DecompressionMethods.GZip) != 0)
-				stream = new GZipStream (stream, CompressionMode.Decompress);
-			else if (content_encoding == "deflate" && (data.request.AutomaticDecompression & DecompressionMethods.Deflate) != 0)
-				stream = new DeflateStream (stream, CompressionMode.Decompress);
+			if (content_encoding == "gzip" && (request.AutomaticDecompression & DecompressionMethods.GZip) != 0)
+				this.stream = new GZipStream (this.stream, CompressionMode.Decompress);
+			else if (content_encoding == "deflate" && (request.AutomaticDecompression & DecompressionMethods.Deflate) != 0)
+				this.stream = new DeflateStream (this.stream, CompressionMode.Decompress);
 		}
 
 		[Obsolete ("Serialization is obsoleted for this type", false)]

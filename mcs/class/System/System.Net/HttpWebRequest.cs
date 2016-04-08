@@ -1427,17 +1427,17 @@ namespace System.Net
 			}
 		}
 
-		void CheckSendError (WebConnectionData data)
+		void CheckSendError (int statusCode, string statusDescription)
 		{
 			// Got here, but no one called GetResponse
-			int status = data.StatusCode;
+			int status = statusCode;
 			if (status < 400 || status == 401 || status == 407)
 				return;
 
 			if (writeStream != null && asyncRead == null && !writeStream.CompleteRequestWritten) {
 				// The request has not been completely sent and we got here!
 				// We should probably just close and cause an error in any case,
-				saved_exc = new WebException (data.StatusDescription, null, WebExceptionStatus.ProtocolError, webResponse); 
+				saved_exc = new WebException (statusDescription, null, WebExceptionStatus.ProtocolError, webResponse); 
 				if (allowBuffering || sendChunked || writeStream.totalWritten >= contentLength) {
 					webResponse.ReadAll ();
 				} else {
@@ -1470,26 +1470,26 @@ namespace System.Net
 			return true;
 		}
 
-		internal void SetResponseData (WebConnectionData data)
+		internal void SetResponseData (WebHeaderCollection headers, Version version, int statusCode, string statusDescription, Stream stream, HttpWebRequest request)
 		{
 			lock (locker) {
 			if (Aborted) {
-				if (data.stream != null)
-					data.stream.Close ();
+				if (stream != null)
+					stream.Close ();
 				return;
 			}
 
 			WebException wexc = null;
 			try {
-				webResponse = new HttpWebResponse (actualUri, method, data, cookieContainer);
+				webResponse = new HttpWebResponse (actualUri, method, headers, version, statusCode, statusDescription, stream, request, cookieContainer);
 			} catch (Exception e) {
 				wexc = new WebException (e.Message, e, WebExceptionStatus.ProtocolError, null); 
-				if (data.stream != null)
-					data.stream.Close ();
+				if (stream != null)
+					stream.Close ();
 			}
 
 			if (wexc == null && (method == "POST" || method == "PUT")) {
-				CheckSendError (data);
+				CheckSendError (statusCode, statusDescription);
 				if (saved_exc != null)
 					wexc = (WebException) saved_exc;
 			}
