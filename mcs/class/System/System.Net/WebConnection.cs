@@ -456,8 +456,8 @@ namespace System.Net
 			}
 
 			HttpWebRequest req = null;
-			if (Data != null && Data.request != null)
-				req = Data.request;
+			if (Data != null && Data.Request != null)
+				req = Data.Request;
 
 			Close (true);
 			if (req != null) {
@@ -533,8 +533,8 @@ namespace System.Net
 
 			position = 0;
 
-			WebConnectionStream stream = new WebConnectionStream (this, data.request, data.Headers);
-			bool expect_content = ExpectContent (data.StatusCode, data.request.Method);
+			WebConnectionStream stream = new WebConnectionStream (this, data.Request, data.Headers);
+			bool expect_content = ExpectContent (data.StatusCode, data.Request.Method);
 			string tencoding = null;
 			if (expect_content)
 				tencoding = data.Headers ["Transfer-Encoding"];
@@ -566,12 +566,10 @@ namespace System.Net
 				}
 			}
 
-			data.stream = stream;
-			
 			if (!expect_content)
 				stream.ForceCompletion ();
 
-			data.request.SetResponseData (data.Headers, data.Version, data.StatusCode, data.StatusDescription, data.stream, data.request);
+			data.Request.SetResponseData (data.Headers, data.Version, data.StatusCode, data.StatusDescription, stream, data.Request);
 		}
 
 		bool ExpectContent (int statusCode, string method)
@@ -674,11 +672,11 @@ namespace System.Net
 						if (pos >= max)
 							return pos;
 
-						if (data.request.ExpectContinue) {
-							data.request.DoContinueDelegate (data.StatusCode, data.Headers);
+						if (data.Request.ExpectContinue) {
+							data.Request.DoContinueDelegate (data.StatusCode, data.Headers);
 							// Prevent double calls when getting the
 							// headers in several packets.
-							data.request.ExpectContinue = false;
+							data.Request.ExpectContinue = false;
 						}
 
 						data.ReadState = ReadState.None;
@@ -778,8 +776,8 @@ namespace System.Net
 		internal void NextRead ()
 		{
 			lock (this) {
-				if (Data.request != null)
-					Data.request.FinishedReading = true;
+				if (Data.Request != null)
+					Data.Request.FinishedReading = true;
 				string header = (ServicePoint.UsesProxy) ? "Proxy-Connection" : "Connection";
 				string cncHeader = (Data.Headers != null) ? Data.Headers [header] : null;
 				bool keepAlive = (Data.Version == HttpVersion.Version11 && this.keepAlive);
@@ -852,7 +850,7 @@ namespace System.Net
 		{
 			Stream s = null;
 			lock (this) {
-				if (Data.request != request)
+				if (Data.Request != request)
 					throw new ObjectDisposedException (typeof (NetworkStream).FullName);
 				if (nstream == null)
 					return null;
@@ -888,7 +886,7 @@ namespace System.Net
 		{
 			Stream s = null;
 			lock (this) {
-				if (Data.request != request)
+				if (Data.Request != request)
 					throw new ObjectDisposedException (typeof (NetworkStream).FullName);
 				if (nstream == null)
 					throw new ObjectDisposedException (typeof (NetworkStream).FullName);
@@ -980,7 +978,7 @@ namespace System.Net
 		{
 			Stream s = null;
 			lock (this) {
-				if (Data.request != request)
+				if (Data.Request != request)
 					throw new ObjectDisposedException (typeof (NetworkStream).FullName);
 				if (nstream == null)
 					return null;
@@ -1004,7 +1002,7 @@ namespace System.Net
 			lock (this) {
 				if (status == WebExceptionStatus.RequestCanceled)
 					return true;
-				if (Data.request != request)
+				if (Data.Request != request)
 					throw new ObjectDisposedException (typeof (NetworkStream).FullName);
 				if (nstream == null)
 					throw new ObjectDisposedException (typeof (NetworkStream).FullName);
@@ -1026,7 +1024,7 @@ namespace System.Net
 		{
 			Stream s = null;
 			lock (this) {
-				if (Data.request != request)
+				if (Data.Request != request)
 					throw new ObjectDisposedException (typeof (NetworkStream).FullName);
 				if (nstream == null)
 					return 0;
@@ -1068,7 +1066,7 @@ namespace System.Net
 			err_msg = null;
 			Stream s = null;
 			lock (this) {
-				if (Data.request != request)
+				if (Data.Request != request)
 					throw new ObjectDisposedException (typeof (NetworkStream).FullName);
 				s = nstream;
 				if (s == null)
@@ -1095,8 +1093,8 @@ namespace System.Net
 		internal void Close (bool sendNext)
 		{
 			lock (this) {
-				if (Data != null && Data.request != null && Data.request.ReuseConnection) {
-					Data.request.ReuseConnection = false;
+				if (Data != null && Data.Request != null && Data.Request.ReuseConnection) {
+					Data.Request.ReuseConnection = false;
 					return;
 				}
 
@@ -1136,13 +1134,13 @@ namespace System.Net
 			lock (this) {
 				lock (RequestQueue) {
 					HttpWebRequest req = (HttpWebRequest) sender;
-					if (Data.request == req || Data.request == null) {
+					if (Data.Request == req || Data.Request == null) {
 						if (!req.FinishedReading) {
 							status = WebExceptionStatus.RequestCanceled;
 							Close (false);
 							if (RequestQueue.Count > 0) {
-								Data.request = RequestQueue.Dequeue ();
-								SendRequest (Data.request);
+								Data.Request = RequestQueue.Dequeue ();
+								SendRequest (Data.Request);
 							}
 						}
 						return;
@@ -1220,25 +1218,15 @@ namespace System.Net
 
 		class WebConnectionData
 		{
-			public HttpWebRequest request;
+			public HttpWebRequest Request;
 			public int StatusCode;
 			public string StatusDescription;
 			public WebHeaderCollection Headers;
 			public Version Version;
 			public Version ProxyVersion;
-			public Stream stream;
 			public string[] Challenge;
+
 			ReadState _readState;
-
-			public WebConnectionData ()
-			{
-			}
-
-			public WebConnectionData (HttpWebRequest request)
-			{
-				this.request = request;
-			}
-
 			public ReadState ReadState {
 				get {
 					return _readState;
@@ -1250,6 +1238,15 @@ namespace System.Net
 						_readState = value;
 					}
 				}
+			}
+
+			public WebConnectionData ()
+			{
+			}
+
+			public WebConnectionData (HttpWebRequest request)
+			{
+				Request = request;
 			}
 		}
 	}
