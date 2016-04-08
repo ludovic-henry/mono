@@ -457,7 +457,7 @@ namespace System.Net
 				result.SetCompleted (false, 0);
 				if (!initRead) {
 					initRead = true;
-					WebConnection.InitRead (cnc);
+					cnc.InitRead ();
 				}
 			} catch (Exception e) {
 				KillBuffer ();
@@ -664,7 +664,7 @@ namespace System.Net
 					cnc.EndWrite (request, true, r);
 					if (!initRead) {
 						initRead = true;
-						WebConnection.InitRead (cnc);
+						cnc.InitRead ();
 					}
 					var cl = request.ContentLength;
 					if (!sendChunked && cl == 0)
@@ -728,7 +728,7 @@ namespace System.Net
 
 				if (!initRead) {
 					initRead = true;
-					WebConnection.InitRead (cnc);
+					cnc.InitRead ();
 				}
 
 				if (length == 0) {
@@ -798,7 +798,7 @@ namespace System.Net
 				complete_request_written = true;
 				if (!initRead) {
 					initRead = true;
-					WebConnection.InitRead (cnc);
+					cnc.InitRead ();
 				}
 				return;
 			}

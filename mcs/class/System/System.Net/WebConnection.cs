@@ -57,7 +57,6 @@ namespace System.Net
 		WebExceptionStatus status;
 		bool keepAlive;
 		byte [] buffer;
-		static AsyncCallback readDoneDelegate = new AsyncCallback (ReadDone);
 		EventHandler abortHandler;
 		WebConnectionData Data;
 		bool chunkedRead;
@@ -79,7 +78,6 @@ namespace System.Net
 		HttpWebRequest connect_request;
 
 		Exception connect_exception;
-		static object classLock = new object ();
 		MonoTlsStream tlsStream;
 
 #if MONOTOUCH && !MONOTOUCH_TV && !MONOTOUCH_WATCH
@@ -468,13 +466,12 @@ namespace System.Net
 			}
 		}
 		
-		static void ReadDone (IAsyncResult result)
+		void ReadDone (IAsyncResult result)
 		{
-			WebConnection cnc = (WebConnection)result.AsyncState;
-			WebConnectionData data = cnc.Data;
-			Stream ns = cnc.nstream;
+			WebConnectionData data = Data;
+			Stream ns = nstream;
 			if (ns == null) {
-				cnc.Close (true);
+				Close (true);
 				return;
 			}
 
@@ -487,84 +484,84 @@ namespace System.Net
 				if (e.InnerException is ObjectDisposedException)
 					return;
 
-				cnc.HandleError (WebExceptionStatus.ReceiveFailure, e, "ReadDone1");
+				HandleError (WebExceptionStatus.ReceiveFailure, e, "ReadDone1");
 				return;
 			}
 
 			if (nread == 0) {
-				cnc.HandleError (WebExceptionStatus.ReceiveFailure, null, "ReadDone2");
+				HandleError (WebExceptionStatus.ReceiveFailure, null, "ReadDone2");
 				return;
 			}
 
 			if (nread < 0) {
-				cnc.HandleError (WebExceptionStatus.ServerProtocolViolation, null, "ReadDone3");
+				HandleError (WebExceptionStatus.ServerProtocolViolation, null, "ReadDone3");
 				return;
 			}
 
 			int pos = -1;
-			nread += cnc.position;
+			nread += position;
 			if (data.ReadState == ReadState.None) { 
 				Exception exc = null;
 				try {
-					pos = GetResponse (data, cnc.ServicePoint, cnc.buffer, nread);
+					pos = GetResponse (data, ServicePoint, buffer, nread);
 				} catch (Exception e) {
 					exc = e;
 				}
 
 				if (exc != null || pos == -1) {
-					cnc.HandleError (WebExceptionStatus.ServerProtocolViolation, exc, "ReadDone4");
+					HandleError (WebExceptionStatus.ServerProtocolViolation, exc, "ReadDone4");
 					return;
 				}
 			}
 
 			if (data.ReadState == ReadState.Aborted) {
-				cnc.HandleError (WebExceptionStatus.RequestCanceled, null, "ReadDone");
+				HandleError (WebExceptionStatus.RequestCanceled, null, "ReadDone");
 				return;
 			}
 
 			if (data.ReadState != ReadState.Content) {
 				int est = nread * 2;
-				int max = (est < cnc.buffer.Length) ? cnc.buffer.Length : est;
+				int max = (est < buffer.Length) ? buffer.Length : est;
 				byte [] newBuffer = new byte [max];
-				Buffer.BlockCopy (cnc.buffer, 0, newBuffer, 0, nread);
-				cnc.buffer = newBuffer;
-				cnc.position = nread;
+				Buffer.BlockCopy (buffer, 0, newBuffer, 0, nread);
+				buffer = newBuffer;
+				position = nread;
 				data.ReadState = ReadState.None;
-				InitRead (cnc);
+				InitRead ();
 				return;
 			}
 
-			cnc.position = 0;
+			position = 0;
 
-			WebConnectionStream stream = new WebConnectionStream (cnc, data.request, data.Headers);
+			WebConnectionStream stream = new WebConnectionStream (this, data.request, data.Headers);
 			bool expect_content = ExpectContent (data.StatusCode, data.request.Method);
 			string tencoding = null;
 			if (expect_content)
 				tencoding = data.Headers ["Transfer-Encoding"];
 
-			cnc.chunkedRead = (tencoding != null && tencoding.IndexOf ("chunked", StringComparison.OrdinalIgnoreCase) != -1);
-			if (!cnc.chunkedRead) {
-				stream.ReadBuffer = cnc.buffer;
+			chunkedRead = (tencoding != null && tencoding.IndexOf ("chunked", StringComparison.OrdinalIgnoreCase) != -1);
+			if (!chunkedRead) {
+				stream.ReadBuffer = buffer;
 				stream.ReadBufferOffset = pos;
 				stream.ReadBufferSize = nread;
 				try {
 					stream.CheckResponseInBuffer ();
 				} catch (Exception e) {
-					cnc.HandleError (WebExceptionStatus.ReceiveFailure, e, "ReadDone7");
+					HandleError (WebExceptionStatus.ReceiveFailure, e, "ReadDone7");
 				}
-			} else if (cnc.chunkStream == null) {
+			} else if (chunkStream == null) {
 				try {
-					cnc.chunkStream = new ChunkStream (cnc.buffer, pos, nread, data.Headers);
+					chunkStream = new ChunkStream (buffer, pos, nread, data.Headers);
 				} catch (Exception e) {
-					cnc.HandleError (WebExceptionStatus.ServerProtocolViolation, e, "ReadDone5");
+					HandleError (WebExceptionStatus.ServerProtocolViolation, e, "ReadDone5");
 					return;
 				}
 			} else {
-				cnc.chunkStream.ResetBuffer ();
+				chunkStream.ResetBuffer ();
 				try {
-					cnc.chunkStream.Write (cnc.buffer, pos, nread);
+					chunkStream.Write (buffer, pos, nread);
 				} catch (Exception e) {
-					cnc.HandleError (WebExceptionStatus.ServerProtocolViolation, e, "ReadDone6");
+					HandleError (WebExceptionStatus.ServerProtocolViolation, e, "ReadDone6");
 					return;
 				}
 			}
@@ -577,28 +574,23 @@ namespace System.Net
 			data.request.SetResponseData (data.Headers, data.Version, data.StatusCode, data.StatusDescription, data.stream, data.request);
 		}
 
-		static bool ExpectContent (int statusCode, string method)
+		bool ExpectContent (int statusCode, string method)
 		{
 			if (method == "HEAD")
 				return false;
 			return (statusCode >= 200 && statusCode != 204 && statusCode != 304);
 		}
 
-		internal static void InitRead (object state)
+		internal void InitRead ()
 		{
-			WebConnection cnc = (WebConnection) state;
-			Stream ns = cnc.nstream;
-
 			try {
-				int size = cnc.buffer.Length - cnc.position;
-				ns.BeginRead (cnc.buffer, cnc.position, size, readDoneDelegate, cnc);
+				nstream.BeginRead (buffer, position, buffer.Length - position, ReadDone, this);
 			} catch (Exception e) {
-				cnc.HandleError (WebExceptionStatus.ReceiveFailure, e, "InitRead");
+				HandleError (WebExceptionStatus.ReceiveFailure, e, "InitRead");
 			}
 		}
 		
-		static int GetResponse (WebConnectionData data, ServicePoint sPoint,
-		                        byte [] buffer, int max)
+		int GetResponse (WebConnectionData data, ServicePoint sPoint, byte [] buffer, int max)
 		{
 			int pos = 0;
 			string line = null;
@@ -813,7 +805,7 @@ namespace System.Net
 			}
 		}
 		
-		static bool ReadLine (byte [] buffer, ref int start, int max, ref string output)
+		bool ReadLine (byte [] buffer, ref int start, int max, ref string output)
 		{
 			bool foundCR = false;
 			StringBuilder text = new StringBuilder ();
