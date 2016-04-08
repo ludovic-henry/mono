@@ -50,11 +50,9 @@ namespace System.Net
 
 	class WebConnection
 	{
-		ServicePoint sPoint;
 		Stream nstream;
 		internal Socket socket;
 		object socketLock = new object ();
-		WebConnectionState state;
 		WebExceptionStatus status;
 		WaitCallback initConn;
 		bool keepAlive;
@@ -65,7 +63,7 @@ namespace System.Net
 		internal WebConnectionData Data;
 		bool chunkedRead;
 		ChunkStream chunkStream;
-		Queue queue;
+		readonly Queue queue;
 		bool reused;
 		int position;
 		HttpWebRequest priority_request;		
@@ -95,10 +93,30 @@ namespace System.Net
 			get { return chunkStream; }
 		}
 
-		public WebConnection (WebConnectionState wcs, ServicePoint sPoint)
+		public WebConnectionGroup Group {
+			get;
+		}
+
+		public ServicePoint ServicePoint {
+			get;
+		}
+
+		public DateTime IdleSince {
+			get;
+			private set;
+		}
+
+		public bool Busy {
+			get;
+			private set;
+		}
+
+		public WebConnection (WebConnectionGroup group)
 		{
-			this.state = wcs;
-			this.sPoint = sPoint;
+			Group = group;
+			ServicePoint = group.ServicePoint;
+			IdleSince = DateTime.UtcNow;
+
 			buffer = new byte [4096];
 			Data = new WebConnectionData ();
 			initConn = new WaitCallback (state => {
@@ -106,7 +124,7 @@ namespace System.Net
 					InitConnection (state);
 				} catch {}
 				});
-			queue = wcs.Group.Queue;
+			queue = group.Queue;
 			abortHelper = new AbortHelper ();
 			abortHelper.Connection = this;
 			abortHandler = new EventHandler (abortHelper.Abort);
@@ -149,20 +167,20 @@ namespace System.Net
 				}
 
 				chunkStream = null;
-				IPHostEntry hostEntry = sPoint.HostEntry;
+				IPHostEntry hostEntry = ServicePoint.HostEntry;
 
 				if (hostEntry == null) {
 #if MONOTOUCH && !MONOTOUCH_TV && !MONOTOUCH_WATCH
-					xamarin_start_wwan (sPoint.Address.ToString ());
-					hostEntry = sPoint.HostEntry;
-					if (hostEntry == null) {
+					xamarin_start_wwan (ServicePoint.Address.ToString ());
+					hostEntry = ServicePoint.HostEntry;
+
+					if (hostEntry == null)
 #endif
-						status = sPoint.UsesProxy ? WebExceptionStatus.ProxyNameResolutionFailure :
+					{
+						status = ServicePoint.UsesProxy ? WebExceptionStatus.ProxyNameResolutionFailure :
 									    WebExceptionStatus.NameResolutionFailure;
 						return;
-#if MONOTOUCH && !MONOTOUCH_TV && !MONOTOUCH_WATCH
 					}
-#endif
 				}
 
 				//WebConnectionData data = Data;
@@ -176,15 +194,15 @@ namespace System.Net
 						connect_exception = se;
 						return;
 					}
-					IPEndPoint remote = new IPEndPoint (address, sPoint.Address.Port);
-					socket.NoDelay = !sPoint.UseNagleAlgorithm;
+					IPEndPoint remote = new IPEndPoint (address, ServicePoint.Address.Port);
+					socket.NoDelay = !ServicePoint.UseNagleAlgorithm;
 					try {
-						sPoint.KeepAliveSetup (socket);
+						ServicePoint.KeepAliveSetup (socket);
 					} catch {
 						// Ignore. Not supported in all platforms.
 					}
 
-					if (!sPoint.CallEndPointDelegate (socket, remote)) {
+					if (!ServicePoint.CallEndPointDelegate (socket, remote)) {
 						socket.Close ();
 						socket = null;
 						status = WebExceptionStatus.ConnectFailure;
@@ -396,8 +414,8 @@ namespace System.Net
 #if SECURITY_DEP
 					if (!reused || nstream == null || tlsStream == null) {
 						byte [] buffer = null;
-						if (sPoint.UseConnect) {
-							bool ok = CreateTunnel (request, sPoint.Address, serverStream, out buffer);
+						if (ServicePoint.UseConnect) {
+							bool ok = CreateTunnel (request, ServicePoint.Address, serverStream, out buffer);
 							if (!ok)
 								return false;
 						}
@@ -491,7 +509,7 @@ namespace System.Net
 			if (data.ReadState == ReadState.None) { 
 				Exception exc = null;
 				try {
-					pos = GetResponse (data, cnc.sPoint, cnc.buffer, nread);
+					pos = GetResponse (data, cnc.ServicePoint, cnc.buffer, nread);
 				} catch (Exception e) {
 					exc = e;
 				}
@@ -740,7 +758,7 @@ namespace System.Net
 				return null;
 
 			lock (this) {
-				if (state.TrySetBusy ()) {
+				if (TrySetBusy ()) {
 					status = WebExceptionStatus.Success;
 					ThreadPool.QueueUserWorkItem (initConn, request);
 				} else {
@@ -773,7 +791,7 @@ namespace System.Net
 			lock (this) {
 				if (Data.request != null)
 					Data.request.FinishedReading = true;
-				string header = (sPoint.UsesProxy) ? "Proxy-Connection" : "Connection";
+				string header = (ServicePoint.UsesProxy) ? "Proxy-Connection" : "Connection";
 				string cncHeader = (Data.Headers != null) ? Data.Headers [header] : null;
 				bool keepAlive = (Data.Version == HttpVersion.Version11 && this.keepAlive);
 				if (Data.ProxyVersion != null && Data.ProxyVersion != HttpVersion.Version11)
@@ -788,7 +806,7 @@ namespace System.Net
 					Close (false);
 				}
 
-				state.SetIdle ();
+				SetIdle ();
 				if (priority_request != null) {
 					SendRequest (priority_request);
 					priority_request = null;
@@ -1114,7 +1132,7 @@ namespace System.Net
 						Data.ReadState = ReadState.Aborted;
 					}
 				}
-				state.SetIdle ();
+				SetIdle ();
 				Data = new WebConnectionData ();
 				if (sendNext)
 					SendNext ();
@@ -1191,6 +1209,25 @@ namespace System.Net
 			set { unsafe_sharing = value; }
 		}
 		// -
+
+		public bool TrySetBusy ()
+		{
+			lock (ServicePoint) {
+				if (Busy)
+					return false;
+				Busy = true;
+				IdleSince = DateTime.MaxValue;
+				return true;
+			}
+		}
+
+		public void SetIdle ()
+		{
+			lock (ServicePoint) {
+				Busy = false;
+				IdleSince = DateTime.UtcNow;
+			}
+		}
 	}
 }
 

@@ -44,7 +44,7 @@ namespace System.Net
 	{
 		ServicePoint sPoint;
 		string name;
-		LinkedList<WebConnectionState> connections;
+		LinkedList<WebConnection> connections;
 		Queue queue;
 		bool closing;
 
@@ -52,7 +52,7 @@ namespace System.Net
 		{
 			this.sPoint = sPoint;
 			this.name = name;
-			connections = new LinkedList<WebConnectionState> ();
+			connections = new LinkedList<WebConnection> ();
 			queue = new Queue ();
 		}
 
@@ -74,7 +74,7 @@ namespace System.Net
 				closing = true;
 				var iter = connections.First;
 				while (iter != null) {
-					var cnc = iter.Value.Connection;
+					var cnc = iter.Value;
 					var node = iter;
 					iter = iter.Next;
 
@@ -131,7 +131,7 @@ namespace System.Net
 			}
 		}
 
-		WebConnectionState FindIdleConnection ()
+		WebConnection FindIdleConnection ()
 		{
 			foreach (var cnc in connections) {
 				if (cnc.Busy)
@@ -150,22 +150,22 @@ namespace System.Net
 			var cnc = FindIdleConnection ();
 			if (cnc != null) {
 				created = false;
-				PrepareSharingNtlm (cnc.Connection, request);
-				return cnc.Connection;
+				PrepareSharingNtlm (cnc, request);
+				return cnc;
 			}
 
 			if (sPoint.ConnectionLimit > connections.Count || connections.Count == 0) {
 				created = true;
-				cnc = new WebConnectionState (this);
+				cnc = new WebConnection (this);
 				connections.AddFirst (cnc);
-				return cnc.Connection;
+				return cnc;
 			}
 
 			created = false;
 			cnc = connections.Last.Value;
 			connections.Remove (cnc);
 			connections.AddFirst (cnc);
-			return cnc.Connection;
+			return cnc;
 		}
 
 		public string Name {
@@ -215,7 +215,7 @@ namespace System.Net
 
 					if (connectionsToClose == null)
 						connectionsToClose = new List<WebConnection> ();
-					connectionsToClose.Add (cnc.Connection);
+					connectionsToClose.Add (cnc);
 					connections.Remove (node);
 				}
 
@@ -236,59 +236,6 @@ namespace System.Net
 
 		internal ServicePoint ServicePoint {
 			get { return sPoint; }
-		}
-	}
-
-	class WebConnectionState {
-		public WebConnection Connection {
-			get;
-			private set;
-		}
-
-		public WebConnectionGroup Group {
-			get;
-			private set;
-		}
-
-		public ServicePoint ServicePoint {
-			get { return Group.ServicePoint; }
-		}
-
-		bool busy;
-		DateTime idleSince;
-
-		public bool Busy {
-			get { return busy; }
-		}
-
-		public DateTime IdleSince {
-			get { return idleSince; }
-		}
-
-		public bool TrySetBusy ()
-		{
-			lock (ServicePoint) {
-				if (busy)
-					return false;
-				busy = true;
-				idleSince = DateTime.UtcNow + TimeSpan.FromDays (3650);
-				return true;
-			}
-		}
-
-		public void SetIdle ()
-		{
-			lock (ServicePoint) {
-				busy = false;
-				idleSince = DateTime.UtcNow;
-			}
-		}
-
-		public WebConnectionState (WebConnectionGroup group)
-		{
-			Group = group;
-			idleSince = DateTime.UtcNow;
-			Connection = new WebConnection (this, group.ServicePoint);
 		}
 	}
 }
