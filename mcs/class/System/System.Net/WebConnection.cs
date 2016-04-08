@@ -59,7 +59,6 @@ namespace System.Net
 		byte [] buffer;
 		static AsyncCallback readDoneDelegate = new AsyncCallback (ReadDone);
 		EventHandler abortHandler;
-		AbortHelper abortHelper;
 		WebConnectionData Data;
 		bool chunkedRead;
 		ChunkStream chunkStream;
@@ -131,21 +130,13 @@ namespace System.Net
 			buffer = new byte [4096];
 			Data = new WebConnectionData ();
 			RequestQueue = queue;
-			abortHelper = new AbortHelper ();
-			abortHelper.Connection = this;
-			abortHandler = new EventHandler (abortHelper.Abort);
-		}
 
-		class AbortHelper {
-			public WebConnection Connection;
-
-			public void Abort (object sender, EventArgs args)
-			{
-				WebConnection other = ((HttpWebRequest) sender).WebConnection;
+			abortHandler = new EventHandler ((s, e) => {
+				WebConnection other = ((HttpWebRequest) s).WebConnection;
 				if (other == null)
-					other = Connection;
-				other.Abort (sender, args);
-			}
+					other = this;
+				other.Abort (s, e);
+			});
 		}
 
 		bool CanReuse ()
