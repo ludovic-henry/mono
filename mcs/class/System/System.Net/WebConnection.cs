@@ -57,7 +57,6 @@ namespace System.Net
 		WebExceptionStatus status;
 		bool keepAlive;
 		byte [] buffer;
-		EventHandler abortHandler;
 		WebConnectionData Data;
 		bool chunkedRead;
 		ChunkStream chunkStream;
@@ -124,17 +123,8 @@ namespace System.Net
 			Group = group;
 			ServicePoint = group.ServicePoint;
 			IdleSince = DateTime.UtcNow;
-
 			buffer = new byte [4096];
-			Data = new WebConnectionData ();
 			RequestQueue = queue;
-
-			abortHandler = new EventHandler ((s, e) => {
-				WebConnection other = ((HttpWebRequest) s).WebConnection;
-				if (other == null)
-					other = this;
-				other.Abort (s, e);
-			});
 		}
 
 		bool CanReuse ()
@@ -444,7 +434,7 @@ namespace System.Net
 			status = st;
 			lock (this) {
 				if (st == WebExceptionStatus.RequestCanceled)
-					Data = new WebConnectionData ();
+					Data = null;
 			}
 
 			if (e == null) { // At least we now where it comes from
@@ -692,9 +682,8 @@ namespace System.Net
 			return -1;
 		}
 		
-		void InitConnection (object state)
+		void InitConnection (HttpWebRequest request)
 		{
-			HttpWebRequest request = (HttpWebRequest) state;
 			request.WebConnection = this;
 			if (request.ReuseConnection)
 				request.StoredConnection = this;
@@ -703,7 +692,6 @@ namespace System.Net
 				return;
 
 			keepAlive = request.KeepAlive;
-			Data = new WebConnectionData (request);
 		retry:
 			Connect (request);
 			if (request.Aborted)
@@ -746,8 +734,9 @@ namespace System.Net
 
 			lock (this) {
 				if (TrySetBusy ()) {
+					Data = new WebConnectionData (request);
 					status = WebExceptionStatus.Success;
-					ThreadPool.QueueUserWorkItem (r => { try { InitConnection (r); } catch {} }, request);
+					ThreadPool.QueueUserWorkItem (r => { try { InitConnection ((HttpWebRequest) r); } catch {} }, request);
 				} else {
 					lock (RequestQueue) {
 #if MONOTOUCH
@@ -761,7 +750,14 @@ namespace System.Net
 				}
 			}
 
-			return abortHandler;
+			return new EventHandler ((s, e) => {
+				/* FIXME: in which case would s != request and req.WebConnection != this ? */
+				HttpWebRequest req = (HttpWebRequest) s;
+				WebConnection other = req.WebConnection;
+				if (other == null)
+					other = this;
+				other.Abort (req);
+			});
 		}
 		
 		void SendNext ()
@@ -793,7 +789,10 @@ namespace System.Net
 					Close (false);
 				}
 
+				Data = null;
+
 				SetIdle ();
+
 				if (priority_request != null) {
 					SendRequest (priority_request);
 					priority_request = null;
@@ -850,7 +849,7 @@ namespace System.Net
 		{
 			Stream s = null;
 			lock (this) {
-				if (Data.Request != request)
+				if (Data == null || Data.Request != request)
 					throw new ObjectDisposedException (typeof (NetworkStream).FullName);
 				if (nstream == null)
 					return null;
@@ -886,7 +885,7 @@ namespace System.Net
 		{
 			Stream s = null;
 			lock (this) {
-				if (Data.Request != request)
+				if (Data == null || Data.Request != request)
 					throw new ObjectDisposedException (typeof (NetworkStream).FullName);
 				if (nstream == null)
 					throw new ObjectDisposedException (typeof (NetworkStream).FullName);
@@ -978,7 +977,7 @@ namespace System.Net
 		{
 			Stream s = null;
 			lock (this) {
-				if (Data.Request != request)
+				if (Data == null || Data.Request != request)
 					throw new ObjectDisposedException (typeof (NetworkStream).FullName);
 				if (nstream == null)
 					return null;
@@ -1002,7 +1001,7 @@ namespace System.Net
 			lock (this) {
 				if (status == WebExceptionStatus.RequestCanceled)
 					return true;
-				if (Data.Request != request)
+				if (Data == null || Data.Request != request)
 					throw new ObjectDisposedException (typeof (NetworkStream).FullName);
 				if (nstream == null)
 					throw new ObjectDisposedException (typeof (NetworkStream).FullName);
@@ -1024,7 +1023,7 @@ namespace System.Net
 		{
 			Stream s = null;
 			lock (this) {
-				if (Data.Request != request)
+				if (Data == null || Data.Request != request)
 					throw new ObjectDisposedException (typeof (NetworkStream).FullName);
 				if (nstream == null)
 					return 0;
@@ -1066,7 +1065,7 @@ namespace System.Net
 			err_msg = null;
 			Stream s = null;
 			lock (this) {
-				if (Data.Request != request)
+				if (Data == null || Data.Request != request)
 					throw new ObjectDisposedException (typeof (NetworkStream).FullName);
 				s = nstream;
 				if (s == null)
@@ -1114,46 +1113,39 @@ namespace System.Net
 
 				if (ntlm_authenticated)
 					ResetNtlm ();
-				if (Data != null) {
-					lock (Data) {
-						Data.ReadState = ReadState.Aborted;
-					}
-				}
+
+				Data = null;
+
 				SetIdle ();
-				Data = new WebConnectionData ();
+
 				if (sendNext)
 					SendNext ();
-				
+
 				connect_request = null;
 				connect_ntlm_auth_state = NtlmAuthState.None;
 			}
 		}
 
-		void Abort (object sender, EventArgs args)
+		void Abort (HttpWebRequest request)
 		{
 			lock (this) {
 				lock (RequestQueue) {
-					HttpWebRequest req = (HttpWebRequest) sender;
-					if (Data.Request == req || Data.Request == null) {
-						if (!req.FinishedReading) {
+					if (Data.Request == request || Data.Request == null) {
+						if (!request.FinishedReading) {
 							status = WebExceptionStatus.RequestCanceled;
-							Close (false);
-							if (RequestQueue.Count > 0) {
-								Data.Request = RequestQueue.Dequeue ();
-								SendRequest (Data.Request);
-							}
+							Close (true);
 						}
 						return;
 					}
 
-					req.FinishedReading = true;
-					req.SetResponseError (WebExceptionStatus.RequestCanceled, null, "User aborted");
-					if (RequestQueue.Count > 0 && RequestQueue.Peek () == sender) {
+					request.FinishedReading = true;
+					request.SetResponseError (WebExceptionStatus.RequestCanceled, null, "User aborted");
+					if (RequestQueue.Count > 0 && RequestQueue.Peek () == request) {
 						RequestQueue.Dequeue ();
 					} else if (RequestQueue.Count > 0) {
 						for (int i = 0, count = RequestQueue.Count; i < count; ++i) {
 							HttpWebRequest item = RequestQueue.Dequeue ();
-							if (item != sender)
+							if (item != request)
 								RequestQueue.Enqueue (item);
 						}
 					}
@@ -1197,9 +1189,9 @@ namespace System.Net
 		}
 		// -
 
-		public bool TrySetBusy ()
+		bool TrySetBusy ()
 		{
-			lock (ServicePoint) {
+			lock (this) {
 				if (Busy)
 					return false;
 				Busy = true;
@@ -1208,9 +1200,9 @@ namespace System.Net
 			}
 		}
 
-		public void SetIdle ()
+		void SetIdle ()
 		{
-			lock (ServicePoint) {
+			lock (this) {
 				Busy = false;
 				IdleSince = DateTime.UtcNow;
 			}
@@ -1238,10 +1230,6 @@ namespace System.Net
 						_readState = value;
 					}
 				}
-			}
-
-			public WebConnectionData ()
-			{
 			}
 
 			public WebConnectionData (HttpWebRequest request)
