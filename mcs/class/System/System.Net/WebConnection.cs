@@ -40,15 +40,6 @@ using Mono.Net.Security;
 
 namespace System.Net
 {
-	enum ReadState
-	{
-		None,
-		Status,
-		Headers,
-		Content,
-		Aborted
-	}
-
 	class WebConnection
 	{
 		Stream nstream;
@@ -1206,6 +1197,15 @@ namespace System.Net
 				Busy = false;
 				IdleSince = DateTime.UtcNow;
 			}
+		}
+
+		enum ReadState
+		{
+			None,
+			Status,
+			Headers,
+			Content,
+			Aborted
 		}
 
 		class WebConnectionData
