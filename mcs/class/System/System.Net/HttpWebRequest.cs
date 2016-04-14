@@ -1775,6 +1775,230 @@ namespace System.Net
 		}
 
 		internal WebConnection StoredConnection;
+
+		/* referencesources support */
+
+		internal const HttpStatusCode MaxOkStatus = (HttpStatusCode)299;
+		internal const string ChunkedHeader = "chunked";
+
+		internal UnlockConnectionDelegate UnlockConnectionDelegate
+		{
+			get { throw new NotSupportedException (); }
+			set { throw new NotSupportedException (); }
+		}
+
+		internal HttpAbortDelegate AbortDelegate
+		{
+			set { throw new NotSupportedException (); }
+		}
+
+		internal bool NtlmKeepAlive
+		{
+			get { throw new NotSupportedException (); }
+			set { throw new NotSupportedException (); }
+		}
+
+		internal bool HasEntityBody
+		{
+			get { throw new NotSupportedException (); }
+		}
+
+		internal bool Async
+		{
+			get { throw new NotSupportedException (); }
+			set { throw new NotSupportedException (); }
+		}
+
+		internal LazyAsyncResult ConnectionAsyncResult
+		{
+			get { throw new NotSupportedException (); }
+		}
+
+		internal bool IsWebSocketRequest
+		{
+			get { throw new NotSupportedException (); }
+			private set { throw new NotSupportedException (); }
+		}
+
+		internal bool HeadersCompleted
+		{
+			get { throw new NotSupportedException (); }
+			set { throw new NotSupportedException (); }
+		}
+
+		internal LazyAsyncResult ConnectionReaderAsyncResult
+		{
+			get { throw new NotSupportedException (); }
+		}
+
+		internal bool CanGetResponseStream
+		{
+			get { throw new NotSupportedException (); }
+		}
+
+		internal bool Saw100Continue
+		{
+			get { throw new NotSupportedException (); }
+			set { throw new NotSupportedException (); }
+		}
+
+		internal bool BodyStarted
+		{
+			get { throw new NotSupportedException (); }
+		}
+
+		internal bool NeedsToReadForResponse
+		{
+			get { throw new NotSupportedException (); }
+			set { throw new NotSupportedException (); }
+		}
+
+		internal int RequestContinueCount
+		{
+			get { throw new NotSupportedException (); }
+		}
+
+		internal KnownHttpVerb CurrentMethod
+		{
+			get { throw new NotSupportedException (); }
+			set { throw new NotSupportedException (); }
+		}
+
+		internal IWebProxy InternalProxy
+		{
+			get { throw new NotSupportedException (); }
+			set { throw new NotSupportedException (); }
+		}
+
+		internal bool LockConnection
+		{
+			get { throw new NotSupportedException (); }
+			set { throw new NotSupportedException (); }
+		}
+
+		internal HttpWriteMode HttpWriteMode
+		{
+			get { throw new NotSupportedException (); }
+			set { throw new NotSupportedException (); }
+		}
+
+		internal byte[] WriteBuffer
+		{
+			get { throw new NotSupportedException (); }
+		}
+
+		internal int WriteBufferLength
+		{
+			get { throw new NotSupportedException (); }
+		}
+
+		internal bool UserRetrievedWriteStream
+		{
+			get { throw new NotSupportedException (); }
+		}
+
+		internal AuthenticationState CurrentAuthenticationState
+		{
+			get { throw new NotSupportedException (); }
+			set { throw new NotSupportedException (); }
+		}
+
+		internal bool IsTunnelRequest
+		{
+			get { throw new NotSupportedException (); }
+			set { throw new NotSupportedException (); }
+		}
+
+		internal  bool UnsafeOrProxyAuthenticatedConnectionSharing
+		{
+			get { throw new NotSupportedException (); }
+		}
+
+		internal HttpWebRequest(Uri proxyUri, Uri requestUri, HttpWebRequest orginalRequest)
+			: this (proxyUri, null)
+		{
+			throw new NotSupportedException ();
+		}
+
+		internal void CheckWriteSideResponseProcessing()
+		{
+			throw new NotSupportedException ();
+		}
+
+		internal void ErrorStatusCodeNotify (Connection connection, bool isKeepAlive, bool fatal)
+		{
+			throw new NotSupportedException ();
+		}
+
+		internal bool FinishContinueWait ()
+		{
+			throw new NotSupportedException ();
+		}
+
+		internal void OpenWriteSideResponseWindow ()
+		{
+			throw new NotSupportedException ();
+		}
+
+		internal void SetAndOrProcessResponse (object responseOrException)
+		{
+			throw new NotSupportedException ();
+		}
+
+		internal void SetRequestSubmitDone (ConnectStream submitStream)
+		{
+			throw new NotSupportedException ();
+		}
+
+		internal void SetRequestContinue ()
+		{
+			throw new NotSupportedException ();
+		}
+
+		internal void SetRequestContinue(CoreResponseData continueResponse)
+		{
+			throw new NotSupportedException ();
+		}
+
+		internal void WriteCallDone(ConnectStream stream, ConnectionReturnResult returnResult)
+		{
+			throw new NotSupportedException ();
+		}
+
+		internal void WriteHeadersCallback(WebExceptionStatus errorStatus, ConnectStream stream, bool async)
+		{
+			throw new NotSupportedException ();
+		}
+
+		internal void StartAsync100ContinueTimer()
+		{
+			throw new NotSupportedException ();
+		}
+
+		internal void StartContinueWait()
+		{
+			throw new NotSupportedException ();
+		}
+
+		internal bool ShouldWaitFor100Continue()
+		{
+			throw new NotSupportedException ();
+		}
+
+		internal void FreeWriteBuffer()
+		{
+			throw new NotSupportedException ();
+		}
+
+		internal void NeedEndSubmitRequest()
+		{
+			throw new NotSupportedException ();
+		}
+
+		internal long SwitchToContentLength()
+		{
+			throw new NotSupportedException ();
+		}
 	}
 }
 

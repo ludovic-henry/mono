@@ -489,6 +489,55 @@ namespace System.Net
 				return true;
 			}
 		}
+
+		/* referencesources support */
+
+		internal TimerThread.Queue ConnectionLeaseTimerQueue
+		{
+			get { throw new NotSupportedException (); }
+		}
+
+		internal bool InternalProxyServicePoint
+		{
+			get { throw new NotSupportedException (); }
+		}
+
+		internal Uri InternalAddress
+		{
+			get { throw new NotSupportedException (); }
+		}
+
+		internal HttpBehaviour HttpBehaviour
+		{
+			get { throw new NotSupportedException (); }
+			set { throw new NotSupportedException (); }
+		}
+
+		internal bool Understands100Continue
+		{
+			get { throw new NotSupportedException (); }
+			set { throw new NotSupportedException (); }
+		}
+
+		internal Socket GetConnection(PooledStream PooledStream, object owner, bool async, out IPAddress address, ref Socket abortSocket, ref Socket abortSocket6)
+		{
+			throw new NotSupportedException ();
+		}
+
+		internal void IncrementConnection()
+		{
+			throw new NotSupportedException ();
+		}
+
+		internal void DecrementConnection()
+		{
+			throw new NotSupportedException ();
+		}
+
+		internal TimerThread.Timer CreateConnectionGroupTimer(ConnectionGroup connectionGroup)
+		{
+			throw new NotSupportedException ();
+		}
 	}
 }
 

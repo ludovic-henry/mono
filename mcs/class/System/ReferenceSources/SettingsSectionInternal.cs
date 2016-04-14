@@ -15,5 +15,8 @@ namespace System.Net.Configuration {
 #endif
 
 		internal bool HttpListenerUnescapeRequestUrl = true;
+
+		public bool UseUnsafeHeaderParsing { get { return false; } }
+		public int MaximumUnauthorizedUploadLength { get { return -1; } }
 	}
 }

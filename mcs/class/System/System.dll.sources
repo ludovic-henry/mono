@@ -477,7 +477,6 @@ System.Net/WebConnection.cs
 System.Net/WebConnectionGroup.cs
 System.Net/WebConnectionStream.cs
 System.Net/WebException.cs
-System.Net/WebExceptionStatus.cs
 System.Net/WebHeaderCollection.cs
 System.Net/WebProxy.cs
 System.Net/WebRequest.cs
@@ -641,19 +640,25 @@ Mono.Net.Security/NoReflectionHelper.cs
 Mono.Net.Security/SystemCertificateValidator.cs
 
 ReferenceSources/AssertWrapper.cs
+ReferenceSources/AuthenticationState.cs
 ReferenceSources/BinaryCompatibility.cs
+ReferenceSources/CaseInsensitiveAscii.cs
 ReferenceSources/ConfigurationManagerInternalFactory.cs
 ReferenceSources/EnvironmentHelpers.cs
-ReferenceSources/Internal.cs
 ReferenceSources/HttpSysSettings.cs
+ReferenceSources/Internal.cs
 ReferenceSources/Logging.cs
 ReferenceSources/NativeMethods.cs
+ReferenceSources/NetworkingPerfCounters.cs
+ReferenceSources/Semaphore.cs
 ReferenceSources/SettingsSectionInternal.cs
 ReferenceSources/Socket.cs
+ReferenceSources/SpnToken.cs
 ReferenceSources/SR.cs
 ReferenceSources/SR2.cs
 ReferenceSources/SRCategoryAttribute.cs
 ReferenceSources/SystemNetworkCredential.cs
+ReferenceSources/TlsStream.cs
 ReferenceSources/WebHeaderCollectionType.cs
 ReferenceSources/Win32Exception.cs
 
@@ -1036,19 +1041,34 @@ ReferenceSources/_SslStream.cs
 ../../../external/referencesource/System/net/System/URIPartial.cs
 
 ../../../external/referencesource/System/net/System/Net/_BufferOffsetSize.cs
+../../../external/referencesource/System/net/System/Net/_ChunkParser.cs
+../../../external/referencesource/System/net/System/Net/_Connection.cs
+../../../external/referencesource/System/net/System/Net/_ConnectionGroup.cs
+../../../external/referencesource/System/net/System/Net/_ConnectStream.cs
+../../../external/referencesource/System/net/System/Net/_IRequestLifetimeTracker.cs
+../../../external/referencesource/System/net/System/Net/_IStreams.cs
 ../../../external/referencesource/System/net/System/Net/_LazyAsyncResult.cs
 ../../../external/referencesource/System/net/System/Net/_LoggingObject.cs
+../../../external/referencesource/System/net/System/Net/_NestedMultipleAsyncResult.cs
+../../../external/referencesource/System/net/System/Net/_NestedSingleAsyncResult.cs
+../../../external/referencesource/System/net/System/Net/_NetRes.cs
+../../../external/referencesource/System/net/System/Net/_PooledStream.cs
+../../../external/referencesource/System/net/System/Net/_RequestLifetimeSetter.cs
 ../../../external/referencesource/System/net/System/Net/_ScatterGatherBuffers.cs
+../../../external/referencesource/System/net/System/Net/_TimerThread.cs
+../../../external/referencesource/System/net/System/Net/connectionpool.cs
 ../../../external/referencesource/System/net/System/Net/cookie.cs
 ../../../external/referencesource/System/net/System/Net/cookiecollection.cs
 ../../../external/referencesource/System/net/System/Net/cookiecontainer.cs
 ../../../external/referencesource/System/net/System/Net/cookieexception.cs
 ../../../external/referencesource/System/net/System/Net/HttpListenerRequestUriBuilder.cs
 ../../../external/referencesource/System/net/System/Net/Internal.cs
+../../../external/referencesource/System/net/System/Net/ServicePointManager.cs
 ../../../external/referencesource/System/net/System/Net/UnicodeDecodingConformance.cs
 ../../../external/referencesource/System/net/System/Net/UnicodeEncodingConformance.cs
-../../../external/referencesource/System/net/System/Net/ServicePointManager.cs
 ../../../external/referencesource/System/net/System/Net/webclient.cs
+../../../external/referencesource/System/net/System/Net/WebException.cs
+../../../external/referencesource/System/net/System/Net/WebExceptionStatus.cs
 ../../../external/referencesource/System/net/System/Net/WebPermission.cs
 ../../../external/referencesource/System/net/System/Net/WebUtility.cs
 ../../../external/referencesource/System/net/System/Net/WriteStreamClosedEventArgs.cs
@@ -1187,3 +1207,5 @@ ReferenceSources/_SslStream.cs
 ../../../external/referencesource/System/services/monitoring/system/diagnosticts/processwaithandle.cs
 
 ../../../external/referencesource/System/compmod/microsoft/win32/safehandles/SafeProcessHandle.cs
+
+../../../external/referencesource/System/InternalApis/NDP_Common/inc/PinnableBufferCache.cs
