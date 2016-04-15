@@ -259,7 +259,6 @@ System.Net.Configuration/WebRequestModuleElement.cs
 System.Net.Configuration/WebRequestModulesSection.cs
 System.Net/ConnectionModes.cs
 System.Net/CredentialCache.cs
-System.Net/DecompressionMethods.cs
 System.Net/DefaultCertificatePolicy.cs
 System.Net/DigestClient.cs
 System.Net/Dns.cs
@@ -1042,6 +1041,7 @@ ReferenceSources/_SslStream.cs
 ../../../external/referencesource/System/net/System/Net/_Connection.cs
 ../../../external/referencesource/System/net/System/Net/_ConnectionGroup.cs
 ../../../external/referencesource/System/net/System/Net/_ConnectStream.cs
+../../../external/referencesource/System/net/System/Net/_ContextAwareResult.cs
 ../../../external/referencesource/System/net/System/Net/_HeaderInfo.cs
 ../../../external/referencesource/System/net/System/Net/_HeaderInfoTable.cs
 ../../../external/referencesource/System/net/System/Net/_HTTPDateParse.cs
@@ -1066,6 +1066,7 @@ ReferenceSources/_SslStream.cs
 ../../../external/referencesource/System/net/System/Net/HttpListenerRequestUriBuilder.cs
 ../../../external/referencesource/System/net/System/Net/HttpStatusCode.cs
 ../../../external/referencesource/System/net/System/Net/HttpVersion.cs
+../../../external/referencesource/System/net/System/Net/HttpWebRequest.cs
 ../../../external/referencesource/System/net/System/Net/HttpWebResponse.cs
 ../../../external/referencesource/System/net/System/Net/Internal.cs
 ../../../external/referencesource/System/net/System/Net/ServicePointManager.cs
