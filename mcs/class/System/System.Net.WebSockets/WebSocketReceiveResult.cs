@@ -77,6 +77,13 @@ namespace System.Net.WebSockets
 			get;
 			private set;
 		}
+
+		/* referencesource support */
+
+		internal WebSocketReceiveResult Copy(int count)
+		{
+			throw new NotSupportedException ();
+		}
 	}
 }
 

@@ -1779,7 +1779,10 @@ namespace System.Net
 		/* referencesources support */
 
 		internal const HttpStatusCode MaxOkStatus = (HttpStatusCode)299;
+		private const string ContinueHeader = "100-continue";
 		internal const string ChunkedHeader = "chunked";
+		internal const string GZipHeader    = "gzip";
+		internal const string DeflateHeader = "deflate";
 
 		internal UnlockConnectionDelegate UnlockConnectionDelegate
 		{
@@ -1912,6 +1915,11 @@ namespace System.Net
 		internal  bool UnsafeOrProxyAuthenticatedConnectionSharing
 		{
 			get { throw new NotSupportedException (); }
+		}
+
+		internal HttpWebRequest(Uri uri, ServicePoint servicePoint)
+		{
+			throw new NotSupportedException ();
 		}
 
 		internal HttpWebRequest(Uri proxyUri, Uri requestUri, HttpWebRequest orginalRequest)

@@ -498,6 +498,13 @@ namespace System.Net {
 
 			cookies.Add (cookie);
 		}
+
+		/* referencesource support */
+
+		internal void ComputeCoreHeaders()
+		{
+			throw new NotSupportedException ();
+		}
 	}
 
 	// do not inline into HttpListenerResponse as this recursively brings everything that's 
