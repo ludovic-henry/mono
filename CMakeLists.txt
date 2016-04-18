@@ -2181,6 +2181,7 @@ message(STATUS "CMAKE_EXE_LINKER_FLAGS = ${CMAKE_EXE_LINKER_FLAGS}")
 add_subdirectory(eglib)
 add_subdirectory(mono)
 add_subdirectory(support)
+add_subdirectory(runtime)
 
 #add_executable(mono ${SOURCE_FILES})
 
