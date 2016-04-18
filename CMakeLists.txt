@@ -740,6 +740,7 @@ if(NOT HOST_WINDOWS)
     message(STATUS "clock_gettime() found in '${CLOCK_GETTIME_LIB}'")
     set(LIBS ${LIBS} ${CLOCK_GETTIME_LIB})
   endif()
+  check_functions_exists_ext(clock_nanosleep)
 
   # dynamic loader support
   search_libraries_for_function(dlopen DLOPEN_LIB dl)

@@ -149,6 +149,8 @@ set(X86_SOURCES
   mini-x86.h
   exceptions-x86.c
   tramp-x86.c
+  mini-x86-gsharedvt.c
+  tramp-x86-gsharedvt.c
 )
 
 set(AMD64_SOURCES
@@ -156,6 +158,9 @@ set(AMD64_SOURCES
   mini-amd64.h
   exceptions-amd64.c
   tramp-amd64.c
+  mini-amd64-gsharedvt.c
+  mini-amd64-gsharedvt.h
+  tramp-amd64-gsharedvt.c
 )
 
 set(PPC_SOURCES
@@ -172,6 +177,8 @@ set(ARM_SOURCES
   mini-arm-tls.h
   exceptions-arm.c
   tramp-arm.c
+  mini-arm-gsharedvt.c
+  tramp-arm-gsharedvt.c
 )
 
 set(ARM64_SOURCES
@@ -179,6 +186,8 @@ set(ARM64_SOURCES
   mini-arm64.h
   exceptions-arm64.c
   tramp-arm64.c
+  mini-arm64-gsharedvt.c
+  tramp-arm64-gsharedvt.c
 )
 
 set(MIPS_SOURCES
@@ -246,6 +255,8 @@ set(COMMON_SOURCES
   seq-points.h
   ir-emit.h
   method-to-ir.c
+  cfgdump.h
+  cfgdump.c
   decompose.c
   mini.h
   ${CMAKE_CURRENT_BINARY_DIR}/version.h
