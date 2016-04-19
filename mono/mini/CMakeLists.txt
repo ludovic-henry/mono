@@ -1,8 +1,8 @@
 include_directories(
-  ${CMAKE_SOURCE_DIR}
   ${CMAKE_BINARY_DIR}
-  ${CMAKE_CURRENT_SOURCE_DIR}
+  ${CMAKE_SOURCE_DIR}
   ${CMAKE_CURRENT_BINARY_DIR}
+  ${CMAKE_CURRENT_SOURCE_DIR}
   ${LIBGC_INCLUDE_DIRECTORIES}
   ${GLIB_INCLUDE_DIRECTORIES}
 )
@@ -114,14 +114,14 @@ endif()
 # Create monow.exe, linked for the 'windows' subsystem
 if(HOST_WIN32)
   if(SUPPORT_BOEHM)
-    add_executable(monow ${MONO_BOEHM_SOURCES} buildver-boehm.h)
+    add_executable(monow WIN32 ${MONO_BOEHM_SOURCES} buildver-boehm.h)
     target_link_libraries(monow ${MONO_LIB} ${MONOBINLDFLAGS} ${MONOBIN_PLATFORM_LDFLAGS} ${LLVMMONOF})
   elseif(SUPPORT_SGEN)
-    add_executable(monow ${MONO_SGEN_SOURCES} buildver-sgen.h)
+    add_executable(monow WIN32 ${MONO_SGEN_SOURCES} buildver-sgen.h)
     target_link_libraries(monow ${MONO_SGEN_LIB} ${MONOBINLDFLAGS} ${MONOBIN_PLATFORM_LDFLAGS} ${LLVMMONOF})
   endif()
-  if(TARGET monow AND NOT MSVC)
-    target_link_libraries(monow -mwindows)
+  if(TARGET monow AND MSVC)
+    target_link_libraries(monow "-entry:mainCRTStartup")
   endif()
 endif()
 
@@ -286,6 +286,7 @@ set(COMMON_SOURCES
   graph.c
   mini-codegen.c
   mini-exceptions.c
+  mini-exceptions-native-unwinder.c
   mini-trampolines.c
   branch-opts.c
   mini-generic-sharing.c

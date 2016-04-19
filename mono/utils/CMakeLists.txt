@@ -162,6 +162,9 @@ if(NOT CMAKE_CROSSCOMPILE)
 
   if(TARGET_AMD64)
     list(APPEND SOURCES mach-support-amd64.c)
+    if(MSVC)
+      list(APPEND SOURCES win64.asm)
+    endif()
   endif()
 
   if(TARGET_ARM)

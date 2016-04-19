@@ -3,6 +3,7 @@
 #-I$(top_srcdir)
 include_directories(
   ${CMAKE_SOURCE_DIR}
+  ${CMAKE_CURRENT_SOURCE_DIR}
   ${CMAKE_BINARY_DIR}
   ${GLIB_INCLUDE_DIRECTORIES}
 )
@@ -101,12 +102,12 @@ else()
   set(Z_SOURCE zlib-helper.c ${ZLIB_SOURCES})
 endif()
 
-add_library(MonoPosixHelper SHARED ${MPH_SOURCES} ${Z_SOURCES} ${MINIZIP_SOURCE})
+add_library(MonoPosixHelper SHARED ${MPH_SOURCES} ${Z_SOURCE} ${MINIZIP_SOURCE})
 target_link_libraries(MonoPosixHelper ${MPH_LIBS} ${Z_LIBS} ${XATTR_LIB})
 if(NOT MSVC AND NOT PLATFORM_DARWIN)
   target_link_libraries(MonoPosixHelper -no-undefined -avoid-version)
 endif()
-add_library(MonoPosixHelper-static STATIC ${MPH_SOURCES} ${Z_SOURCES} ${MINIZIP_SOURCE})
+add_library(MonoPosixHelper-static STATIC ${MPH_SOURCES} ${Z_SOURCE} ${MINIZIP_SOURCE})
 target_link_libraries(MonoPosixHelper-static ${MPH_LIBS} ${Z_LIBS} ${XATTR_LIB})
 
 if(NOT HOST_WINDOWS)

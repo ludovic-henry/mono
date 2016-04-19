@@ -230,6 +230,10 @@ if(NOT HOST_TRIPLE STREQUAL TARGET_TRIPLE)
   set(MONO_CROSS_COMPILE YES)
 endif()
 
+if(MSVC)
+  enable_language(ASM_MASM)
+endif()
+
 # Package info
 set(PACKAGE_NAME mono)
 set(PACKAGE "${PACKAGE_NAME}")
@@ -535,7 +539,7 @@ if(ENABLE_WERROR)
   set(WERROR_CFLAGS "-Werror")
 endif()
 
-set(GLIB_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/eglib/src" "${CMAKE_BINARY_DIR}/eglib/src")
+set(GLIB_INCLUDE_DIRECTORIES "${CMAKE_BINARY_DIR}/eglib/src" "${CMAKE_SOURCE_DIR}/eglib/src")
 
 # Enable support for fast thread-local storage
 # Some systems have broken support, so we allow to disable it.
@@ -1361,6 +1365,7 @@ else()
   endif()
   unset(CMAKE_EXTRA_INCLUDE_FILES)
 
+  set(HAVE_SYSTEM YES)
   set(HAVE_GETADDRINFO YES)
   set(HAVE_GETHOSTBYNAME YES)
   set(HAVE_GETPROTOBYNAME YES)

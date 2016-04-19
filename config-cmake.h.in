@@ -972,7 +972,7 @@
 #cmakedefine HAVE_WRITEV 1
 
 /* Have system zlib */
-#cmakedefine01 HAVE_ZLIB
+#cmakedefine HAVE_ZLIB 1
 
 /* Define to 1 if you have the `_finite' function. */
 #cmakedefine HAVE__FINITE 1
