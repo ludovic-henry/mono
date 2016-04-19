@@ -60,7 +60,11 @@ message(STATUS "sizeof(int) = ${SIZEOF_INT}")
 message(STATUS "sizeof(long) = ${SIZEOF_LONG}")
 message(STATUS "sizeof(long long) = ${SIZEOF_LONG_LONG}")
 
-check_functions_exists_ext(strlcpy stpcpy strtok_r rewinddir vasprintf)
+check_functions_exists_ext(strlcpy stpcpy strtok_r rewinddir)
+unset(HAVE_VASPRINTF CACHE)
+if(NOT HOST_WIN32)
+  check_functions_exists_ext(vasprintf)
+endif()
 check_functions_exists_ext(getrlimit)
 check_functions_exists_ext(fork execv execve)
 

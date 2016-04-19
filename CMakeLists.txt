@@ -137,7 +137,7 @@ macro(set_os NAME PREFIX)
     set("${PREFIX}_OS" "Linux")
     set("${PREFIX}_LINUX" YES)
     set("${PREFIX}_UNIX" YES)
-  elseif(${NAME} MATCHES "Windows")
+  elseif(${NAME} MATCHES "Windows" OR "${NAME}" MATCHES "CYGWIN")
     set("${PREFIX}_OS" "Windows")
     set("${PREFIX}_WIN32" YES)
     set("${PREFIX}_WINDOWS" YES)
@@ -654,7 +654,7 @@ check_c_source_compiles("
 #
 # Boehm GC configuration
 #
-if(NOT MSVC)
+if(NOT (MSVC OR HOST_WIN32 AND HOST_AMD64))
   set(ENABLE_BOEHM YES CACHE BOOL "Enable the Boehm GC")
 endif()
 set(SUPPORT_BOEHM ${ENABLE_BOEHM})
@@ -1380,7 +1380,11 @@ else()
   check_symbol_exists(InterlockedIncrement64 windows.h HAVE_DECL_INTERLOCKEDINCREMENT64)
   check_symbol_exists(InterlockedAdd windows.h HAVE_DECL_INTERLOCKEDADD)
   check_symbol_exists(InterlockedAdd64 windows.h HAVE_DECL_INTERLOCKEDADD64)
-  check_c_snippet_compiles("unsigned long w = __readfsdword(0);" "windows.h" HAVE_DECL___READFSDWORD)
+  if(MSVC)
+    set(HAVE_DECL___READFSDWORD YES)
+  else()
+    check_c_snippet_compiles("unsigned long w = __readfsdword(0);" "windows.h" HAVE_DECL___READFSDWORD)
+  endif()
 endif()
 
 # socklen_t check
