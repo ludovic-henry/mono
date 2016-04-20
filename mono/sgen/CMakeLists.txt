@@ -1,9 +1,9 @@
 #AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/mono $(LIBGC_CPPFLAGS) $(GLIB_CFLAGS) $(SHARED_CFLAGS)
 include_directories(
-  ${CMAKE_SOURCE_DIR}
   ${CMAKE_BINARY_DIR}
-  ${CMAKE_SOURCE_DIR}/mono
+  ${CMAKE_SOURCE_DIR}
   ${CMAKE_BINARY_DIR}/mono
+  ${CMAKE_SOURCE_DIR}/mono
   ${LIBGC_INCLUDE_DIRECTORIES}
   ${GLIB_INCLUDE_DIRECTORIES}
 )

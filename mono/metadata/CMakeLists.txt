@@ -36,10 +36,10 @@ endif()
 
 #AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/mono $(LIBGC_CPPFLAGS) $(GLIB_CFLAGS) $(SHARED_CFLAGS)
 include_directories(
-  ${CMAKE_SOURCE_DIR}
   ${CMAKE_BINARY_DIR}
-  ${CMAKE_SOURCE_DIR}/mono
+  ${CMAKE_SOURCE_DIR}
   ${CMAKE_BINARY_DIR}/mono
+  ${CMAKE_SOURCE_DIR}/mono
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${LIBGC_INCLUDE_DIRECTORIES}
   ${GLIB_INCLUDE_DIRECTORIES}
@@ -245,5 +245,5 @@ endif()
 
 if(SHARED_MONO AND SUPPORT_BOEHM)
   add_executable(pedump pedump.c)
-  target_link_libraries(pedump monoruntimeboehm)
+  target_link_libraries(pedump monoruntimeboehm ${LIBS})
 endif()

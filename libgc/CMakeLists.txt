@@ -38,7 +38,7 @@ elseif(HOST_WINDOWS)
   # Wine getenv may not return NULL for missing entry
   set(LIBGC_DEFINES ${LIBGC_DEFINES} -DNO_GETENV=1)
   if(LIBGC_ENABLE_WIN32_DLLMAIN)
-    set(LIBGC_DEFINES ${LIBGC_DEFINES} -DGC_INSIDE_DLL=1)
+    set(LIBGC_DEFINES ${LIBGC_DEFINES} -DGC_INSIDE_DLL)
   endif()
 else()
   # TODO: Port other supported platforms

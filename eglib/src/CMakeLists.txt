@@ -56,11 +56,11 @@ set(SOURCES
   ${VASPRINTF_FILES}
 )
 
-if(NOT HOST_WIN32)
+if(NOT MSVC)
   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/eglib-config.h.in ${CMAKE_CURRENT_BINARY_DIR}/eglib-config.h)
 endif()
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
 
 if(MSVC)
   add_definitions("/W4")

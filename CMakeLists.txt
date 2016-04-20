@@ -201,6 +201,18 @@ if(MSVC)
     set_cpu("x86" "HOST")
     set_cpu("x86" "TARGET")
   endif()
+elseif(CYGWIN OR MINGW)
+  # Check with the configured GCC whether we're building 32/64-bit
+  check_symbol_exists("__x86_64__" "" GCC_X86_64)
+  if(GCC_X86_64)
+    set_cpu("amd64" "BUILD")
+    set_cpu("amd64" "HOST")
+    set_cpu("amd64" "TARGET")
+  else()
+    set_cpu("x86" "BUILD")
+    set_cpu("x86" "HOST")
+    set_cpu("x86" "TARGET")
+  endif()
 else()
   set_cpu(${CMAKE_HOST_SYSTEM_PROCESSOR} "BUILD")
   set_cpu(${CMAKE_SYSTEM_PROCESSOR} "HOST")
@@ -232,6 +244,10 @@ endif()
 
 if(MSVC)
   enable_language(ASM_MASM)
+endif()
+
+if(CYGWIN)
+  set(CMAKE_SHARED_LIBRARY_PREFIX "")
 endif()
 
 # Package info
@@ -289,6 +305,9 @@ if(HOST_WINDOWS)
   # mono_cv_clang=no
   # Windows Vista or later is required
   set(CPPFLAGS "${CPPFLAGS} -DWINVER=0x0600 -D_WIN32_WINNT=0x0600 -D_WIN32_IE=0x0501 -D_UNICODE -DUNICODE -DWIN32_THREADS -DFD_SETSIZE=1024 -D_CRT_NONSTDC_NO_DEPRECATE -D_CRT_SECURE_NO_WARNINGS")
+  if(CYGWIN)
+    set(CPPFLAGS "${CPPFLAGS} -D_GNU_SOURCE")
+  endif()
 #  set(LDFLAGS "${LDFLAGS} -lmswsock -lws2_32 -lole32 -loleaut32 -lpsapi -lversion -ladvapi32 -lwinmm -lkernel32 -liphlpapi")
   set(LIBGC_COMPILE_DEFINITIONS ${LIBGC_COMPILE_DEFINITIONS} -D_CRT_SECURE_NO_WARNINGS)
   set(LIBMONO_CFLAGS "-mms-bitfields -mwindows")
@@ -543,7 +562,7 @@ set(GLIB_INCLUDE_DIRECTORIES "${CMAKE_BINARY_DIR}/eglib/src" "${CMAKE_SOURCE_DIR
 
 # Enable support for fast thread-local storage
 # Some systems have broken support, so we allow to disable it.
-if(NOT MSVC)
+if(NOT WITH_TLS)
   set(WITH_TLS "__thread" CACHE STRING "Select Thread Local Storage implementation. One of [__thread, pthread]. (defaults to __thread)")
 endif()
 
@@ -654,7 +673,7 @@ check_c_source_compiles("
 #
 # Boehm GC configuration
 #
-if(NOT (MSVC OR HOST_WIN32 AND HOST_AMD64))
+if(NOT HOST_WIN32)
   set(ENABLE_BOEHM YES CACHE BOOL "Enable the Boehm GC")
 endif()
 set(SUPPORT_BOEHM ${ENABLE_BOEHM})
@@ -2166,15 +2185,6 @@ endif()
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DHAVE_CONFIG_H ${CFLAGS} ${CPPFLAGS}")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DHAVE_CONFIG_H ${CXXFLAGS} ${CPPFLAGS}")
-foreach(LIB ${LIBS})
-  if(MSVC)
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${LIB}.lib")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${LIB}.lib")
-  else()
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -l${LIB}")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -l${LIB}")
-  endif()
-endforeach()
 
 message(STATUS "CMAKE_C_FLAGS = ${CMAKE_C_FLAGS}")
 message(STATUS "CMAKE_CXX_FLAGS = ${CMAKE_CXX_FLAGS}")
@@ -2184,6 +2194,7 @@ message(STATUS "CMAKE_C_FLAGS_RELEASE = ${CMAKE_C_FLAGS_RELEASE}")
 message(STATUS "CMAKE_CXX_FLAGS_RELEASE = ${CMAKE_CXX_FLAGS_RELEASE}")
 message(STATUS "CMAKE_SHARED_LINKER_FLAGS = ${CMAKE_SHARED_LINKER_FLAGS}")
 message(STATUS "CMAKE_EXE_LINKER_FLAGS = ${CMAKE_EXE_LINKER_FLAGS}")
+message(STATUS "LIBS = ${LIBS}")
 
 #SUBDIRS = po $(libgc_dir) eglib mono $(ikvm_native_dir) support data runtime scripts man samples msvc $(docs_dir) acceptance-tests
 #add_subdirectory(po)

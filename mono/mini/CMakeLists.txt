@@ -9,7 +9,7 @@ include_directories(
 
 if(HOST_WIN32)
   if(NOT MSVC)
-    set(LIBMONOLDFLAGS -no-undefined -avoid-version -Wl,--kill-at ${MONOLDFLAGS})
+    set(LIBMONOLDFLAGS -Wl,--no-undefined -Wl,--kill-at ${MONOLDFLAGS})
   endif()
 elseif(PLATFORM_ANDROID)
   set(LIBMONOLDFLAGS -avoid-version ${MONOLDFLAGS})
@@ -447,6 +447,7 @@ add_library(mini_objects OBJECT ${COMMON_SOURCES} ${LLVM_SOURCES} ${LLVM_RUNTIME
 add_library(mini INTERFACE)
 target_sources(mini INTERFACE $<TARGET_OBJECTS:mini_objects>)
 target_link_object_libraries(mini monoutils)
+target_link_libraries(mini INTERFACE ${LIBS})
 
 if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/empty.c")
   file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/empty.c" "")
@@ -485,9 +486,18 @@ else()
   set(GENMDESC_PRG $<TARGET_FILE:genmdesc> ${GENMDESC_OPTS})
 endif()
 
+set(GENMDESC_MD_PATH "${CMAKE_CURRENT_SOURCE_DIR}/${GENMDESC_MD_FILE}")
+set(GENMDESC_HEADER_PATH "${CMAKE_CURRENT_BINARY_DIR}/${GENMDESC_HEADER_FILE}")
+if(CYGWIN AND NOT GENMDESC_PRG STREQUAL "perl")
+  # Run paths through cygpath to get proper windows paths that genmdesc will understand
+  execute_process(COMMAND cygpath.exe -m "${GENMDESC_MD_PATH}" OUTPUT_VARIABLE GENMDESC_MD_PATH OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND cygpath.exe -m "${GENMDESC_HEADER_PATH}" OUTPUT_VARIABLE GENMDESC_HEADER_PATH OUTPUT_STRIP_TRAILING_WHITESPACE)
+  message(STATUS "GENMDESC_MD_PATH = ${GENMDESC_MD_PATH}")
+  message(STATUS "GENMDESC_HEADER_PATH = ${GENMDESC_MD_PATH}")
+endif()
 add_custom_command(
   OUTPUT ${GENMDESC_HEADER_FILE}
-  COMMAND ${GENMDESC_PRG} "${CMAKE_CURRENT_BINARY_DIR}/${GENMDESC_HEADER_FILE}" ${GENMDESC_SYMBOL_NAME} "${CMAKE_CURRENT_SOURCE_DIR}/${GENMDESC_MD_FILE}"
+  COMMAND ${GENMDESC_PRG} "${GENMDESC_HEADER_PATH}" ${GENMDESC_SYMBOL_NAME} "${GENMDESC_MD_PATH}"
   DEPENDS genmdesc ${GENMDESC_MD_FILE}
 )
 
