@@ -11,8 +11,6 @@ include_directories(
 
 if(ENABLE_DTRACE)
   set(BUILT_SOURCES mono-dtrace.h)
-#  mono-dtrace.h: $(top_srcdir)/data/mono.d
-#  $(DTRACE) $(DTRACEFLAGS) -h -s $(top_srcdir)/data/mono.d -o $@ || > $@
 endif()
 
 set(SOURCES
@@ -226,6 +224,12 @@ add_library(monoutils_objects OBJECT ${SOURCES})
 add_library(monoutils INTERFACE)
 target_sources(monoutils INTERFACE $<TARGET_OBJECTS:monoutils_objects> $<TARGET_OBJECTS:monoutils_objects>)
 target_link_object_libraries(monoutils eglib)
+
+if(ENABLE_DTRACE)
+  add_custom_command(OUTPUT mono-dtrace.h COMMAND ${DTRACE} ${DTRACEFLAGS} -h -s ${CMAKE_SOURCE_DIR}/data/mono.d -o mono-dtrace.h)
+  add_custom_target(mono-dtrace.h DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/mono-dtrace.h)
+  add_dependencies(monoutils_objects mono-dtrace.h)
+endif()
 
 # Also create a static library which is used when linking genmdesc in ../mini/. If we link it against monoutils we will
 # end up with unresolved symbols since all object files will be linked eagerly even though genmdesc only uses symbols
