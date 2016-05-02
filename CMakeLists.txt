@@ -11,6 +11,18 @@ include(CheckTypeSize)
 include(CheckStructHasMember)
 include(CheckSymbolExists)
 
+# Build Google Test
+set(BUILD_GTEST ON CACHE BOOL "" FORCE) # Enable googletest
+set(BUILD_GMOCK OFF CACHE BOOL "" FORCE) # Disable googlemock
+if(MSVC)
+  # Force Google Test to compile with /MD rather than /MT since we build everything else with /MD.
+  set(gtest_force_shared_crt ON)
+endif()
+add_subdirectory(external/googletest)
+include_directories(${gtest_SOURCE_DIR}/include)
+
+enable_testing()
+
 # Works around a cmake bug in target_link_libraries() when linking INTERFACE libraries with transitive dependencies on
 # other INTERFACE libraries.
 function(target_link_object_libraries TARGET)
