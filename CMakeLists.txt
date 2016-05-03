@@ -536,29 +536,9 @@ endif()
 set(CFLAGS "${CFLAGS} ${WARN}")
 set(CPPFLAGS "${CPPFLAGS} ${WARN}")
 
-# TODO: Alternate mcs source tree support
-set(MCSDIR "mcs")
-# Where's the 'mcs' source tree?
-#if(IS_DIRECTORY "${CMAKE_SOURCE_DIR}/mcs")
-#  set(MCSDIR "mcs")
-#else()
-#  set(MCSDIR "../mcs")
-#endif()
-#
-#set(WITH_MCS_PATH "" CACHE PATH "Specify an alternate mcs source tree")
-#if(NOT WITH_MCS_PATH STREQUAL "")
-#  if(NOT IS_DIRECTORY ${WITH_MCS_PATH})
-#    message(FATAL_ERROR "${WITH_MCS_PATH} is not a directory")
-#  endif()
-#  set(MCSDIR ${WITH_MCS_PATH})
-#endif()
-
 set(JUMPTABLES NO CACHE BOOL "enable/disable support for jumptables (ARM-only for now")
 
 # TODO: Solaris ancient tar support
-
-# TODO: Port mcs_topdir handling from original configure.ac
-get_filename_component(MCS_TOPDIR "${MCSDIR}" REALPATH)
 
 # TODO: gettext support
 
@@ -596,8 +576,6 @@ endif()
 #case $host in
 #*nacl* ) with_shared_mono=yes;;
 #esac
-
-set(ENABLE_MCS_BUILD YES CACHE BOOL "Enable the build of the mcs directory")
 
 if(NOT MSVC)
   set(ENABLE_XEN_OPT YES CACHE BOOL "Enable Xen-specific behaviour (defaults to yes)")
@@ -2102,11 +2080,6 @@ endif()
 #fi
 #AC_SUBST(docs_dir)
 
-## Maybe should also disable if mcsdir is invalid.  Let's punt the issue for now.
-if(NOT CMAKE_CROSSCOMPILING AND ENABLE_MCS_BUILD)
-  set(BUILD_MCS YES)
-endif()
-
 set(INSTALL_4_X ${WITH_PROFILE4_X})
 set(INSTALL_MONODROID ${WITH_MONODROID})
 set(INSTALL_MONOTOUCH ${WITH_MONOTOUCH})
@@ -2135,11 +2108,6 @@ set(MONO_ARCHITECTURE "${ARCH_TARGET}")
 
 #This must always be defined when building the runtime
 set(MONO_INSIDE_RUNTIME YES) # Disable banned functions from being used by the runtime
-
-set(MONO_BUILD_ROOT ${CMAKE_SOURCE_DIR})
-set(MONO_RUNTIME mono/mini/mono)
-set(MONO_CFG_ROOT ${MONO_BUILD_ROOT}/runtime)
-set(MONO_CFG_DIR ${MONO_CFG_ROOT}/etc)
 
 # TODO: DEFAULT_PROFILE ?
 
@@ -2205,20 +2173,106 @@ message(STATUS "CMAKE_SHARED_LINKER_FLAGS = ${CMAKE_SHARED_LINKER_FLAGS}")
 message(STATUS "CMAKE_EXE_LINKER_FLAGS = ${CMAKE_EXE_LINKER_FLAGS}")
 message(STATUS "LIBS = ${LIBS}")
 
+set(ENABLE_MCS_BUILD YES CACHE BOOL "Enable the build of the mcs directory")
+set(MONOLITE_BUILD 4457 CACHE STRING "The monolite build to download when ENABLE_MCS_BUILD=NO")
+set(BUILD_MCS ${ENABLE_MCS_BUILD})
+
+if(NOT BUILD_MCS)
+  # We need a working mcs to build the tests. This downloads a monolite build.
+  # TODO: Download the monolite tarball best corresponding to the current source tree.
+
+  set(MONOLITE_DOWNLOAD_URL "https://jenkins-master-2.cloudapp.net/view/All/job/build-source-tarball-mono/${MONOLITE_BUILD}/Azure/processDownloadRequest/${MONOLITE_BUILD}/monolite-146-latest.tar.gz")
+  set(MONOLITE_BUILD_PATH "${CMAKE_BINARY_DIR}/monolite/${MONOLITE_BUILD}")
+  set(MONOLITE_DIST_PATH "${MONOLITE_BUILD_PATH}/monolite-146-latest")
+  set(MONOLITE_ARCHIVE_PATH "${MONOLITE_BUILD_PATH}/monolite-146-latest.tar.gz")
+  if(NOT IS_DIRECTORY ${MONOLITE_DIST_PATH})
+    message(STATUS "Downloading ${MONOLITE_DOWNLOAD_URL} to ${MONOLITE_ARCHIVE_PATH}")
+    file(DOWNLOAD "${MONOLITE_DOWNLOAD_URL}" "${MONOLITE_ARCHIVE_PATH}" SHOW_PROGRESS STATUS MONOLITE_DOWNLOAD_STATUS)
+    list(GET MONOLITE_DOWNLOAD_STATUS 0 MONOLITE_DOWNLOAD_STATUS_CODE)
+    if(MONOLITE_DOWNLOAD_STATUS_CODE)
+      file(REMOVE_RECURSE "${MONOLITE_BUILD_PATH}")
+      message(FATAL_ERROR "Failed to download ${MONOLITE_DOWNLOAD_URL}: ${MONOLITE_DOWNLOAD_STATUS}")
+    endif()
+    message(STATUS "Extracting ${MONOLITE_ARCHIVE_PATH}")
+    execute_process(
+      COMMAND ${CMAKE_COMMAND} -E tar xvfz "${MONOLITE_ARCHIVE_PATH}"
+      WORKING_DIRECTORY "${MONOLITE_BUILD_PATH}"
+    )
+  endif()
+
+  set(MCS_EXE "${MONOLITE_DIST_PATH}/basic.exe")
+  set(MONO_PATH "${MONOLITE_DIST_PATH}")
+  set(MCS_MSG "Using Mono C\# compiler from monolite build ${MONOLITE_BUILD}")
+else()
+  set(MCS_EXE "${CMAKE_SOURCE_DIR}/mcs/class/lib/build/mcs.exe")
+  set(MONO_PATH "${CMAKE_SOURCE_DIR}/mcs/class/lib/net_4_x")
+  set(MCS_MSG "Using internal Mono C\# compiler")
+endif()
+
+if(SUPPORT_SGEN)
+  set(MONO_EXECUTABLE "${CMAKE_BINARY_DIR}/mono/mini/${CMAKE_CFG_INTDIR}/mono-sgen${CMAKE_EXECUTABLE_SUFFIX}")
+  set(MONO_EXECUTABLE_TARGET mono-sgen)
+else()
+  set(MONO_EXECUTABLE "${CMAKE_BINARY_DIR}/mono/mini/${CMAKE_CFG_INTDIR}/mono-boehm${CMAKE_EXECUTABLE_SUFFIX}")
+  set(MONO_EXECUTABLE_TARGET mono-boehm)
+endif()
+
+add_custom_command(OUTPUT etc/mono/2.0/machine.config COMMAND cmake -E copy ${CMAKE_SOURCE_DIR}/data/net_2_0/machine.config ${CMAKE_BINARY_DIR}/etc/mono/2.0/machine.config DEPENDS data/net_2_0/machine.config)
+add_custom_command(OUTPUT etc/mono/4.0/machine.config COMMAND cmake -E copy ${CMAKE_SOURCE_DIR}/data/net_4_0/machine.config ${CMAKE_BINARY_DIR}/etc/mono/4.0/machine.config DEPENDS data/net_4_0/machine.config)
+add_custom_command(OUTPUT etc/mono/4.5/machine.config COMMAND cmake -E copy ${CMAKE_SOURCE_DIR}/data/net_4_5/machine.config ${CMAKE_BINARY_DIR}/etc/mono/4.5/machine.config DEPENDS data/net_4_5/machine.config)
+add_custom_target(mono-config ALL DEPENDS etc/mono/2.0/machine.config etc/mono/4.0/machine.config etc/mono/4.5/machine.config)
+
+set(MONO_CFG_DIR ${CMAKE_BINARY_DIR}/etc)
+
+set(MONO_WRAPPER_NAME "mono-wrapper.sh")
+if(HOST_WINDOWS AND NOT CYGWIN)
+  set(MONO_WRAPPER_NAME "mono-wrapper.bat")
+endif()
+set(MONO_WRAPPER "${CMAKE_BINARY_DIR}/mono/mini/${CMAKE_CFG_INTDIR}/${MONO_WRAPPER_NAME}")
+add_custom_command(
+  OUTPUT ${MONO_WRAPPER}
+  COMMAND ${CMAKE_COMMAND}
+    -DMONO_PATH=${MONO_PATH}
+    -DMONO_EXECUTABLE=${MONO_EXECUTABLE}
+    -DMONO_CFG_DIR=${MONO_CFG_DIR}
+    -DFILE=${MONO_WRAPPER}
+    -P "${CMAKE_SOURCE_DIR}/cmake/GenerateMonoWrapper.cmake"
+  DEPENDS ${MONO_EXECUTABLE_TARGET}
+  VERBATIM
+)
+add_custom_target(mono-wrapper ALL DEPENDS mono-config ${MONO_WRAPPER})
+
+set(MCS_WRAPPER_NAME "mcs-wrapper.sh")
+if(HOST_WINDOWS AND NOT CYGWIN)
+  set(MCS_WRAPPER_NAME "mcs-wrapper.bat")
+endif()
+set(MCS_WRAPPER "${CMAKE_BINARY_DIR}/mono/mini/${CMAKE_CFG_INTDIR}/${MCS_WRAPPER_NAME}")
+message(STATUS "MCS_WRAPPER = ${MCS_WRAPPER}")
+add_custom_command(
+  OUTPUT ${MCS_WRAPPER}
+  COMMAND ${CMAKE_COMMAND}
+    -DMONO_PATH=${MONO_PATH}
+    -DMONO_EXECUTABLE=${MONO_EXECUTABLE}
+    -DMONO_CFG_DIR=${MONO_CFG_DIR}
+    -DFILE=${MCS_WRAPPER}
+    -DEXE=${MCS_EXE}
+    -P "${CMAKE_SOURCE_DIR}/cmake/GenerateMonoWrapper.cmake"
+  DEPENDS ${MONO_EXECUTABLE_TARGET}
+  VERBATIM
+)
+add_custom_target(mcs-wrapper ALL DEPENDS mono-config ${MCS_WRAPPER})
+
 #SUBDIRS = po $(libgc_dir) eglib mono $(ikvm_native_dir) support data runtime scripts man samples msvc $(docs_dir) acceptance-tests
 #add_subdirectory(po)
 #add_subdirectory(libgc)
 add_subdirectory(eglib)
 add_subdirectory(mono)
 add_subdirectory(support)
-#add_subdirectory(runtime)
-
-#add_executable(mono ${SOURCE_FILES})
+add_subdirectory(runtime)
 
 message(STATUS "
-        mcs source:  ${MCSDIR}
-
   Engine:
+    MCS:             ${MCS_MSG}
     Host:            ${HOST_TRIPLE}
     Target:          ${TARGET}
     GC:	             ${GC_MSG}
