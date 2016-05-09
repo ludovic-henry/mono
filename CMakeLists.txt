@@ -11,12 +11,14 @@ include(CheckTypeSize)
 include(CheckStructHasMember)
 include(CheckSymbolExists)
 
+include(${CMAKE_SOURCE_DIR}/cmake/CSharp.cmake)
+
 # Build Google Test
 set(BUILD_GTEST ON CACHE BOOL "" FORCE) # Enable googletest
 set(BUILD_GMOCK OFF CACHE BOOL "" FORCE) # Disable googlemock
 if(MSVC)
   # Force Google Test to compile with /MD rather than /MT since we build everything else with /MD.
-  set(gtest_force_shared_crt ON)
+  set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 endif()
 add_subdirectory(external/googletest)
 include_directories(${gtest_SOURCE_DIR}/include)
@@ -2187,7 +2189,7 @@ if(NOT BUILD_MCS)
   set(MONOLITE_ARCHIVE_PATH "${MONOLITE_BUILD_PATH}/monolite-146-latest.tar.gz")
   if(NOT IS_DIRECTORY ${MONOLITE_DIST_PATH})
     message(STATUS "Downloading ${MONOLITE_DOWNLOAD_URL} to ${MONOLITE_ARCHIVE_PATH}")
-    file(DOWNLOAD "${MONOLITE_DOWNLOAD_URL}" "${MONOLITE_ARCHIVE_PATH}" SHOW_PROGRESS STATUS MONOLITE_DOWNLOAD_STATUS)
+    file(DOWNLOAD "${MONOLITE_DOWNLOAD_URL}" "${MONOLITE_ARCHIVE_PATH}" SHOW_PROGRESS STATUS MONOLITE_DOWNLOAD_STATUS TLS_VERIFY OFF)
     list(GET MONOLITE_DOWNLOAD_STATUS 0 MONOLITE_DOWNLOAD_STATUS_CODE)
     if(MONOLITE_DOWNLOAD_STATUS_CODE)
       file(REMOVE_RECURSE "${MONOLITE_BUILD_PATH}")
