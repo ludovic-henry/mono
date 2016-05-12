@@ -23,6 +23,10 @@ if(MSVC)
   # Force Google Test to compile with /MD rather than /MT since we build everything else with /MD.
   set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 endif()
+if(MINGW)
+  # Prevent googletest from trying to use pthreads on Windows with the mingw compiler
+  set(gtest_disable_pthreads ON CACHE BOOL "" FORCE)
+endif()
 add_subdirectory(external/googletest)
 include_directories(${gtest_SOURCE_DIR}/include)
 
