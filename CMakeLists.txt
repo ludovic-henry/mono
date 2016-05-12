@@ -270,7 +270,7 @@ endif()
 # Package info
 set(PACKAGE_NAME mono)
 set(PACKAGE "${PACKAGE_NAME}")
-set(PACKAGE_VERSION 4.5.0)
+set(PACKAGE_VERSION 4.5.1)
 set(PACKAGE_BUGREPORT "http://bugzilla.xamarin.com/enter_bug.cgi?classification=Mono")
 set(PACKAGE_STRING "${PACKAGE_NAME} ${PACKAGE_VERSION}")
 set(PACKAGE_TARNAME "${PACKAGE_NAME}")
@@ -2002,19 +2002,6 @@ set(WITH_BITCODE NO CACHE BOOL "If bitcode is enabled (defaults to no)")
 set(WITH_XAMMAC NO CACHE BOOL "If you want to build the Xamarin.Mac assemblies (defaults to no)")
 set(WITH_MOBILE_STATIC NO CACHE BOOL "If you want to build the mobile_static assemblies (defaults to no)")
 
-set(OPROFILE NO)
-set(WITH_OPROFILE "" CACHE PATH "Enable oprofile support (defaults to no)")
-if(WITH_OPROFILE)
-  set(OPROFILE_INCLUDE "${WITH_OPROFILE}/include")
-  if(NOT EXISTS "${OPROFILE_INCLUDE}/opagent.h")
-    message(STATUS "oprofile include file not found at ${OPROFILE_INCLUDE}/opagent.h")
-  endif()
-  set(OPROFILE YES)
-  set(OPROFILE_CFLAGS "-I${OPROFILE_INCLUDE}")
-  set(OPROFILE_LIBS "-L${WITH_OPROFILE}/lib/oprofile -lopagent")
-  set(HAVE_OPROFILE YES)
-endif()
-
 set(USE_MALLOC_FOR_MEMPOOLS NO CACHE BOOL "Use malloc for each single mempool allocation (only for runtime debugging, defaults to no)")
 
 set(DISABLE_MCS_DOCS NO CACHE BOOL "If you want to build the documentation under mcs (defaults to yes)")
@@ -2284,7 +2271,6 @@ message(STATUS "
     TLS:             ${WITH_TLS}
     SIGALTSTACK:     ${WITH_SIGALTSTACK}
     Engine:          ${JIT_STATUS}
-    oprofile:        ${OPROFILE}
     BigArrays:       ${ENABLE_BIG_ARRAYS}
     DTrace:          ${ENABLE_DTRACE}
     LLVM Back End:   ${ENABLE_LLVM} (dynamically loaded: ${ENABLE_LOADEDLLVM})
