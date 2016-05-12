@@ -86,7 +86,9 @@ macro(check_types_size_ext)
     set(X__HAVE "HAVE_${X__T}")
     check_type_size(${T} "${X__SIZEOF}")
     if(${X__SIZEOF})
-      set(${X__HAVE} YES)
+      set(${X__HAVE} YES CACHE INTERNAL "")
+    else()
+      set(${X__HAVE} NO CACHE INTERNAL "")
     endif()
   endforeach()
 endmacro()
@@ -656,16 +658,20 @@ if(ENABLE_NATIVE_TYPES)
   set(MONO_NATIVE_TYPES YES)
 endif()
 
-message(STATUS "Checking for visibility __attribute__")
-check_c_source_compiles("
-  void __attribute__ ((visibility (\"hidden\"))) doit (void) {}
-  int main () { doit (); return 0; }" HAVE_VISIBILITY_HIDDEN)
+if(NOT DEFINED HAVE_VISIBILITY_HIDDEN)
+  message(STATUS "Checking for visibility __attribute__")
+  check_c_source_compiles("
+    void __attribute__ ((visibility (\"hidden\"))) doit (void) {}
+    int main () { doit (); return 0; }" HAVE_VISIBILITY_HIDDEN)
+endif()
 
-message(STATUS "Checking for deprecated __attribute__")
-check_c_source_compiles("
-  int doit (void) __attribute__ ((deprecated));
-  int doit (void) { return 0; }
-  int main () { doit (); return 0; }" HAVE_DEPRECATED)
+if(NOT DEFINED HAVE_DEPRECATED)
+  message(STATUS "Checking for deprecated __attribute__")
+  check_c_source_compiles("
+    int doit (void) __attribute__ ((deprecated));
+    int doit (void) { return 0; }
+    int main () { doit (); return 0; }" HAVE_DEPRECATED)
+endif()
 
 #
 # Boehm GC configuration
@@ -702,10 +708,8 @@ if(ENABLE_BOEHM)
     set(DEFAULT_GC_NAME "Included Boehm (with typed GC)")
   endif()
 else()
-  message(WARNING "Compiling mono without GC.")
   set(DEFAULT_GC_NAME "none")
   set(HAVE_NULL_GC YES)
-  set(GC_MSG "none")
 endif()
 
 set(ENABLE_LARGE_HEAP NO CACHE BOOL "Enable support for GC heaps larger than 3GB (defaults to no)")
@@ -720,22 +724,24 @@ endif()
 # *************************************
 # *** Checks for zero length arrays ***
 # *************************************
-message(STATUS "Checking whether ${CMAKE_C_COMPILER_ID} supports zero length arrays")
-check_c_source_compiles("\
-  struct s {
-    int  length;
-    char data [0];
-  };
-  struct t {
-    struct s s;
-    int  foo;
-  };
-  int main() { return 0; }
-" CHECK_LENGTH_OF_ZERO_LENGTH_ARRAYS)
-if(CHECK_LENGTH_OF_ZERO_LENGTH_ARRAYS)
-  set(MONO_ZERO_LEN_ARRAY 0)
-else()
-  set(MONO_ZERO_LEN_ARRAY 1)
+if(NOT DEFINED MONO_ZERO_LEN_ARRAY)
+  message(STATUS "Checking whether ${CMAKE_C_COMPILER_ID} supports zero length arrays")
+  check_c_source_compiles("\
+    struct s {
+      int  length;
+      char data [0];
+    };
+    struct t {
+      struct s s;
+      int  foo;
+    };
+    int main() { return 0; }
+  " CHECK_LENGTH_OF_ZERO_LENGTH_ARRAYS)
+  if(CHECK_LENGTH_OF_ZERO_LENGTH_ARRAYS)
+    set(MONO_ZERO_LEN_ARRAY 0 CACHE INTERNAL "")
+  else()
+    set(MONO_ZERO_LEN_ARRAY 1 CACHE INTERNAL "")
+  endif()
 endif()
 
 check_include_files_ext(nacl/nacl_dyncode.h)
@@ -949,14 +955,16 @@ if(NOT HOST_WINDOWS)
   # *********************************
   # *** Check for struct ip_mreqn ***
   # *********************************
-  message(STATUS "Checking for struct ip_mreqn")
-  set(CMAKE_EXTRA_INCLUDE_FILES "netinet/in.h")
-  check_types_size_ext("struct ip_mreqn")
-  if(NOT HAVE_STRUCT_IP_MREQN)
-    message(STATUS "Checking for struct ip_mreq")
-    check_types_size_ext("struct ip_mreq")
+  if(NOT DEFINED HAVE_STRUCT_IP_MREQN)
+    message(STATUS "Checking for struct ip_mreqn")
+    set(CMAKE_EXTRA_INCLUDE_FILES "netinet/in.h")
+    check_types_size_ext("struct ip_mreqn")
+    if(NOT HAVE_STRUCT_IP_MREQN)
+      message(STATUS "Checking for struct ip_mreq")
+      check_types_size_ext("struct ip_mreq")
+    endif()
+    unset(CMAKE_EXTRA_INCLUDE_FILES)
   endif()
-  unset(CMAKE_EXTRA_INCLUDE_FILES)
 
   # **********************************
   # *** Check for getaddrinfo ***
@@ -1372,14 +1380,16 @@ else()
   # *********************************
   # *** Check for struct ip_mreqn ***
   # *********************************
-  message(STATUS "Checking for struct ip_mreqn")
-  set(CMAKE_EXTRA_INCLUDE_FILES "ws2tcpip.h")
-  check_types_size_ext("struct ip_mreqn")
-  if(NOT HAVE_STRUCT_IP_MREQN)
-    message(STATUS "Checking for struct ip_mreq")
-    check_types_size_ext("struct ip_mreq")
+  if(NOT DEFINED HAVE_STRUCT_IP_MREQN)
+    message(STATUS "Checking for struct ip_mreqn")
+    set(CMAKE_EXTRA_INCLUDE_FILES "ws2tcpip.h")
+    check_types_size_ext("struct ip_mreqn")
+    if(NOT HAVE_STRUCT_IP_MREQN)
+      message(STATUS "Checking for struct ip_mreq")
+      check_types_size_ext("struct ip_mreq")
+    endif()
+    unset(CMAKE_EXTRA_INCLUDE_FILES)
   endif()
-  unset(CMAKE_EXTRA_INCLUDE_FILES)
 
   set(HAVE_SYSTEM YES)
   set(HAVE_GETADDRINFO YES)
@@ -1406,12 +1416,16 @@ endif()
 # socklen_t check
 check_type_size_ext("socklen_t" "sys/types.h;sys/socket.h")
 
-message(STATUS "Checking for array element initializer support")
-check_c_snippet_compiles("const int array[] = {[1] = 2,};" "" HAVE_ARRAY_ELEM_INIT)
+if(NOT DEFINED HAVE_ARRAY_ELEM_INIT)
+  message(STATUS "Checking for array element initializer support")
+  check_c_snippet_compiles("const int array[] = {[1] = 2,};" "" HAVE_ARRAY_ELEM_INIT)
+endif()
 
-message(STATUS "Checking for trunc in math.h")
-# Simply calling trunc (0.0) is no good since gcc will optimize the call away
-check_c_snippet_compiles("static void *p = &trunc;" "math.h" HAVE_TRUNC)
+if(NOT DEFINED HAVE_TRUNC)
+  message(STATUS "Checking for trunc in math.h")
+  # Simply calling trunc (0.0) is no good since gcc will optimize the call away
+  check_c_snippet_compiles("static void *p = &trunc;" "math.h" HAVE_TRUNC)
+endif()
 
 if(NOT HAVE_TRUNC)
   check_library_exists(sunmath aintl "" HAVE_AINTL)
@@ -1852,7 +1866,11 @@ set(ENABLE_SGEN YES CACHE BOOL "Extra Generational GC, default=yes")
 if(ENABLE_SGEN)
   set(HAVE_MOVING_COLLECTOR YES)
   set(SGEN_DEFINES "-DHAVE_SGEN_GC")
-  set(GC_MSG "sgen and ${GC_MSG}")
+  if(GC_MSG)
+    set(GC_MSG "sgen and ${GC_MSG}")
+  else()
+    set(GC_MSG "sgen")
+  endif()
 endif()
 set(SUPPORT_SGEN ${ENABLE_SGEN})
 
@@ -2244,7 +2262,6 @@ if(HOST_WINDOWS AND NOT CYGWIN)
   set(MCS_WRAPPER_NAME "mcs-wrapper.bat")
 endif()
 set(MCS_WRAPPER "${CMAKE_BINARY_DIR}/mono/mini/${CMAKE_CFG_INTDIR}/${MCS_WRAPPER_NAME}")
-message(STATUS "MCS_WRAPPER = ${MCS_WRAPPER}")
 add_custom_command(
   OUTPUT ${MCS_WRAPPER}
   COMMAND ${CMAKE_COMMAND}

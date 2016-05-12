@@ -465,8 +465,6 @@ if(CYGWIN AND NOT GENMDESC_PRG STREQUAL "perl")
   # Run paths through cygpath to get proper windows paths that genmdesc will understand
   execute_process(COMMAND cygpath.exe -m "${GENMDESC_MD_PATH}" OUTPUT_VARIABLE GENMDESC_MD_PATH OUTPUT_STRIP_TRAILING_WHITESPACE)
   execute_process(COMMAND cygpath.exe -m "${GENMDESC_HEADER_PATH}" OUTPUT_VARIABLE GENMDESC_HEADER_PATH OUTPUT_STRIP_TRAILING_WHITESPACE)
-  message(STATUS "GENMDESC_MD_PATH = ${GENMDESC_MD_PATH}")
-  message(STATUS "GENMDESC_HEADER_PATH = ${GENMDESC_MD_PATH}")
 endif()
 add_custom_command(
   OUTPUT ${GENMDESC_HEADER_FILE}
