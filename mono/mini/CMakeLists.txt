@@ -315,33 +315,6 @@ set(COMMON_SOURCES
   llvm-runtime.h
 )
 
-set(TEST_SOURCES
-  basic-calls.cs
-  basic-long.cs
-  bench.cs
-  objects.cs
-  arrays.cs
-  basic-float.cs
-  basic-math.cs
-  basic.cs
-  exceptions.cs
-  devirtualization.cs
-  iltests.il
-  test.cs
-  generics.cs
-  generics-variant-types.il
-  basic-simd.cs
-  aot-tests.cs
-  gc-test.cs
-  gshared.cs
-)
-
-set(REGTESTS basic.exe basic-float.exe basic-long.exe basic-calls.exe objects.exe arrays.exe basic-math.exe exceptions.exe iltests.exe devirtualization.exe generics.exe basic-simd.exe)
-if(NACL_CODEGEN)
-  set(TEST_SOURCES ${TEST_SOURCES} nacl.cs)
-  set(REGTESTS ${REGTESTS} nacl.exe)
-endif()
-
 if(X86)
   set(ARCH_SOURCES ${X86_SOURCES})
   set(GENMDESC_ARCH x86)
@@ -529,3 +502,129 @@ if(IS_DIRECTORY "${CMAKE_SOURCE_DIR}/.git")
 else()
   file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/version.h" "#define FULL_VERSION \"tarball\"")
 endif()
+
+# Tests
+set(TESTS_FOLDER "Tests/mini")
+set(JIT_TESTS_FOLDER "${TESTS_FOLDER}/JIT")
+set(ASSEMBLIES_TEST_FOLDER "${TESTS_FOLDER}/Assemblies")
+set(TOOLS_TEST_FOLDER "${TESTS_FOLDER}/Tools")
+
+set(TEST_SOURCES
+  basic-calls.cs
+  basic-long.cs
+  objects.cs
+  arrays.cs
+  basic-float.cs
+  basic-math.cs
+  basic.cs
+  exceptions.cs
+  devirtualization.cs
+  # TODO: We need ilasm to compile this
+  # iltests.il
+)
+
+set(CSFLAGS "-unsafe" "-nowarn:0219,0169,0414,0649")
+cs_add_assembly(TestDriver.dll SOURCES TestDriver.cs FLAGS ${CSFLAGS} FOLDER ${ASSEMBLIES_TEST_FOLDER})
+foreach(TEST_SOURCE ${TEST_SOURCES})
+  string(REGEX REPLACE "(\\.cs|\\.il)$" ".exe" TEST_EXE ${TEST_SOURCE})
+  cs_add_assembly(${TEST_EXE} SOURCES ${TEST_SOURCE} FLAGS ${CSFLAGS} LIBRARIES TestDriver.dll FOLDER ${ASSEMBLIES_TEST_FOLDER})
+  set(REGTESTS ${REGTESTS} ${TEST_EXE})
+endforeach()
+
+# TODO: We need Mono.Simd.dll to compile this
+# cs_add_assembly(basic-simd.exe SOURCES basic-simd.cs FLAGS ${CSFLAGS} LIBRARIES TestDriver.dll Mono.Simd.dll)
+# set(REGTESTS ${REGTESTS} basic-simd.exe)
+
+if(NACL_CODEGEN)
+  # TODO: We need Mono.Simd.dll to compile this
+  # cs_add_assembly(nacl.exe SOURCES nacl.cs FLAGS ${CSFLAGS} LIBRARIES TestDriver.dll Mono.Simd.dll)
+  # set(REGTESTS ${REGTESTS} nacl.exe)
+endif()
+
+# TODO: We need ilasm to compile this
+# cs_add_assembly(generics-variant-types.dll SOURCES generics-variant-types.il)
+# cs_add_assembly(generics.exe SOURCES generics.cs FLAGS ${CSFLAGS} LIBRARIES TestDriver.dll generics-variant-types.dll System.Core.dll)
+# set(REGTESTS ${REGTESTS} generics.exe)
+
+# Join test assemblies with \0 as separator
+list(SORT REGTESTS)
+list(REVERSE REGTESTS)
+foreach(REGTEST ${REGTESTS})
+  set(TEST_ASSEMBLIES "${REGTEST}\\0${TEST_ASSEMBLIES}")
+endforeach()
+set(TEST_ASSEMBLIES "${TEST_ASSEMBLIES}\\0")
+
+# gen-jit-regression-tests.exe generates Google Test methods by reflecting over the test methods in the test assemblies.
+cs_add_assembly(gen-jit-regression-tests.exe SOURCES gen-jit-regression-tests.cs FOLDER ${TOOLS_TEST_FOLDER})
+
+set(ALL_OPTS
+   0
+   peephole
+   branch
+   cfold
+   fcmov
+   alias_analysis
+)
+if(NOT DISABLE_SIMD)
+  set(ALL_OPTS ${ALL_OPTS}
+    simd
+    sse2
+    simd+sse2
+  )
+endif()
+set(ALL_OPTS ${ALL_OPTS}
+  branch+peephole+intrins
+  branch+peephole+intrins+alias_analysis
+  branch+peephole+linears
+  branch+peephole+linears+copyprop
+  branch+peephole+linears+cfold
+  branch+peephole+linears+copyprop+consprop+deadce
+  branch+peephole+linears+copyprop+consprop+deadce+alias_analysis
+  branch+peephole+linears+copyprop+consprop+deadce+loop+inline+intrins
+  branch+peephole+linears+copyprop+consprop+deadce+loop+inline+intrins+tailc
+  branch+peephole+linears+copyprop+consprop+deadce+loop+inline+intrins+ssa
+  branch+peephole+linears+copyprop+consprop+deadce+loop+inline+intrins+exception
+  branch+peephole+linears+copyprop+consprop+deadce+loop+inline+intrins+exception+cmov
+  branch+peephole+linears+copyprop+consprop+deadce+loop+inline+intrins+exception+abcrem
+  branch+peephole+linears+copyprop+consprop+deadce+loop+inline+intrins+abcrem
+  branch+peephole+linears+copyprop+consprop+deadce+loop+inline+intrins+abcrem+shared
+  branch+peephole+linears+consprop+copyprop+deadce+loop+inline+intrins+exception+gshared+cmov+simd+alias_analysis+aot+cfold
+)
+
+set(N 0)
+foreach(OPTS ${ALL_OPTS})
+  if(HOST_WINDOWS)
+    # Windows has some ridiculous limits on path length
+    if(N LESS 10)
+      set(TEST_NAME "jit-test-0${N}")
+    else()
+      set(TEST_NAME "jit-test-${N}")
+    endif()
+    math(EXPR N "${N} + 1")
+  else()
+    set(TEST_NAME "jit-test-${OPTS}")
+    if(OPTS STREQUAL "0")
+      set(TEST_NAME "jit-test-noopts")
+    endif()
+  endif()
+
+  if(OPTS STREQUAL "0")
+    set(COMPILE_OPTS "0")
+  else()
+    string(REPLACE "+" "|MONO_OPT_" COMPILE_OPTS ${OPTS})
+    string(TOUPPER ${COMPILE_OPTS} COMPILE_OPTS)
+    set(COMPILE_OPTS "MONO_OPT_${COMPILE_OPTS}")
+  endif()
+
+  add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/${TEST_NAME}.cpp
+    COMMAND ${MONO_WRAPPER} ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/gen-jit-regression-tests.exe ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/${TEST_NAME}.cpp ${OPTS} ${REGTESTS}
+    DEPENDS mono-wrapper gen-jit-regression-tests.exe gen-jit-regression-tests.cs ${REGTESTS}
+  )
+  add_executable(${TEST_NAME} jit-regression-tests.cpp jit-regression-tests.h ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/${TEST_NAME}.cpp)
+  set_property(TARGET ${TEST_NAME} PROPERTY FOLDER ${JIT_TESTS_FOLDER})
+  target_link_libraries(${TEST_NAME} gtest monosgen-static)
+  target_compile_definitions(${TEST_NAME} PRIVATE -DCONFIG_DIR="${MONO_CFG_DIR}" -DASSEMBLY_DIR="${MONO_PATH}" -DCOMPILE_OPTS=${COMPILE_OPTS})
+  target_include_directories(${TEST_NAME} PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR})
+  add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR})
+  add_dependencies(${TEST_NAME} gen-jit-regression-tests.exe ${REGTESTS})
+endforeach()
