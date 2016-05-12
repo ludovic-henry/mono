@@ -34,9 +34,9 @@ string(REPLACE ";" " " BUILD_PROFILES "${BUILD_PROFILES}")
 if(BUILD_MCS)
 #  cd $(mcs_topdir) && $(MAKE) NO_DIR_CHECK=1 PROFILES='$(build_profiles)' RUNTIME_HAS_CONSISTENT_GACDIR=yes prefix=$(prefix) install-profiles
 
-  file(COPY "${CMAKE_SOURCE_DIR}/data/net_2_0/machine.config" DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/etc/mono/2.0")
-  file(COPY "${CMAKE_SOURCE_DIR}/data/net_4_0/machine.config" DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/etc/mono/4.0")
-  file(COPY "${CMAKE_SOURCE_DIR}/data/net_4_5/machine.config" DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/etc/mono/4.5")
+#  file(COPY "${CMAKE_SOURCE_DIR}/data/net_2_0/machine.config" DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/etc/mono/2.0")
+#  file(COPY "${CMAKE_SOURCE_DIR}/data/net_4_0/machine.config" DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/etc/mono/4.0")
+#  file(COPY "${CMAKE_SOURCE_DIR}/data/net_4_5/machine.config" DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/etc/mono/4.5")
 #etc/mono/2.0/machine.config: $(top_srcdir)/data/net_2_0/machine.config
 #etc/mono/2.0/web.config: $(top_srcdir)/data/net_2_0/web.config
 #etc/mono/browscap.ini: $(top_srcdir)/data/browscap.ini
@@ -52,11 +52,12 @@ if(BUILD_MCS)
   # assumes there's a mono executable in mono/mini/.
   # TODO: Couldn't get assembly signing to work so disable it with NO_SIGN_ASSEMBLY=1
   ExternalProject_Add(mcs
-    SOURCE_DIR ${MCS_TOPDIR}
+    SOURCE_DIR ${CMAKE_SOURCE_DIR}/mcs
     UPDATE_COMMAND ""
     CONFIGURE_COMMAND ""
     BUILD_COMMAND bash -c "CMAKE_BINARY_DIR='${CMAKE_BINARY_DIR}' make -w V=1 NO_SIGN_ASSEMBLY=1 NO_DIR_CHECK=1 PROFILES='${BUILD_PROFILES}' CC=${CMAKE_C_COMPILER} runtime_dep='' all-profiles"
-    INSTALL_COMMAND bash -c "CMAKE_BINARY_DIR='${CMAKE_BINARY_DIR}' make -w V=1 NO_SIGN_ASSEMBLY=1 NO_DIR_CHECK=1 PROFILES='${BUILD_PROFILES}' RUNTIME_HAS_CONSISTENT_GACDIR=yes prefix='${CMAKE_BINARY_DIR}/mcs' install-profiles"
+    INSTALL_COMMAND ""
+    #bash -c "CMAKE_BINARY_DIR='${CMAKE_BINARY_DIR}' make -w V=1 NO_SIGN_ASSEMBLY=1 NO_DIR_CHECK=1 PROFILES='${BUILD_PROFILES}' RUNTIME_HAS_CONSISTENT_GACDIR=yes prefix='${CMAKE_BINARY_DIR}/mcs' install-profiles"
     BUILD_IN_SOURCE 1
     LOG_BUILD 1
   )
@@ -72,7 +73,9 @@ if(BUILD_MCS)
 #if test -w $(mcs_topdir); then :; else chmod -R +w $(mcs_topdir); fi
 #cd $(mcs_topdir) && $(MAKE) $(MAKE_FLAGS) NO_DIR_CHECK=1 PROFILES='$(build_profiles)' CC='$(CC)' all-profiles
 
-
+else()
+  # Dummy target which does nothing
+  add_custom_target(mcs)
 endif()
 
 
