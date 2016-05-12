@@ -12,6 +12,7 @@ include(CheckStructHasMember)
 include(CheckSymbolExists)
 
 include(${CMAKE_SOURCE_DIR}/cmake/CSharp.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/ToNativePath.cmake)
 
 # If the generator supports it we want folders
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)

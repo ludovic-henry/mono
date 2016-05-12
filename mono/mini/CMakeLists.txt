@@ -591,7 +591,12 @@ set(ALL_OPTS ${ALL_OPTS}
   branch+peephole+linears+consprop+copyprop+deadce+loop+inline+intrins+exception+gshared+cmov+simd+alias_analysis+aot+cfold
 )
 
-set(N 0)
+to_native_path(${MONO_CFG_DIR} CONFIG_DIR)
+to_native_path(${MONO_PATH} ASSEMBLY_DIR)
+string(REPLACE "\\" "\\\\" CONFIG_DIR ${CONFIG_DIR})
+string(REPLACE "\\" "\\\\" ASSEMBLY_DIR ${ASSEMBLY_DIR})
+
+set(N 1)
 foreach(OPTS ${ALL_OPTS})
   if(HOST_WINDOWS)
     # Windows has some ridiculous limits on path length
@@ -616,15 +621,23 @@ foreach(OPTS ${ALL_OPTS})
     set(COMPILE_OPTS "MONO_OPT_${COMPILE_OPTS}")
   endif()
 
-  add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/${TEST_NAME}.cpp
-    COMMAND ${MONO_WRAPPER} ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/gen-jit-regression-tests.exe ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/${TEST_NAME}.cpp ${OPTS} ${REGTESTS}
+  set(TEST_OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/${TEST_NAME}.cpp)
+  set(GEN_JIT_REGRESSION_TEST_EXE ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/gen-jit-regression-tests.exe)
+  to_native_path(${TEST_OUTPUT} TEST_OUTPUT_NATIVE)
+  to_native_path(${GEN_JIT_REGRESSION_TEST_EXE} GEN_JIT_REGRESSION_TEST_EXE_NATIVE)
+
+  add_custom_command(OUTPUT ${TEST_OUTPUT}
+    COMMAND ${MONO_WRAPPER} ${GEN_JIT_REGRESSION_TEST_EXE_NATIVE} ${TEST_OUTPUT_NATIVE} ${OPTS} ${REGTESTS}
     DEPENDS mono-wrapper gen-jit-regression-tests.exe gen-jit-regression-tests.cs ${REGTESTS}
+    VERBATIM
   )
-  add_executable(${TEST_NAME} jit-regression-tests.cpp jit-regression-tests.h ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/${TEST_NAME}.cpp)
+  add_executable(${TEST_NAME} jit-regression-tests.cpp jit-regression-tests.h ${TEST_OUTPUT})
   set_property(TARGET ${TEST_NAME} PROPERTY FOLDER ${JIT_TESTS_FOLDER})
   target_link_libraries(${TEST_NAME} gtest monosgen-static)
-  target_compile_definitions(${TEST_NAME} PRIVATE -DCONFIG_DIR="${MONO_CFG_DIR}" -DASSEMBLY_DIR="${MONO_PATH}" -DCOMPILE_OPTS=${COMPILE_OPTS})
-  target_include_directories(${TEST_NAME} PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR})
-  add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR})
+  if(CYGWIN)
+    target_link_libraries(${TEST_NAME} -static)
+  endif()
+  target_compile_definitions(${TEST_NAME} PRIVATE -DCONFIG_DIR="${CONFIG_DIR}" -DASSEMBLY_DIR="${ASSEMBLY_DIR}" -DCOMPILE_OPTS=${COMPILE_OPTS})
+  add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
   add_dependencies(${TEST_NAME} gen-jit-regression-tests.exe ${REGTESTS})
 endforeach()

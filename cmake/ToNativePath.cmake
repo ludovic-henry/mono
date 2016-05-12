@@ -1,0 +1,8 @@
+function(to_native_path F VAR)
+  if(CMAKE_HOST_WIN32)
+    file(TO_NATIVE_PATH "${F}" F)
+  elseif(CYGWIN)
+    execute_process(COMMAND cygpath -w "${F}" OUTPUT_VARIABLE F OUTPUT_STRIP_TRAILING_WHITESPACE)
+  endif()
+  set(${VAR} ${F} PARENT_SCOPE)
+endfunction()
