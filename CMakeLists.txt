@@ -2166,14 +2166,14 @@ message(STATUS "CMAKE_EXE_LINKER_FLAGS = ${CMAKE_EXE_LINKER_FLAGS}")
 message(STATUS "LIBS = ${LIBS}")
 
 set(ENABLE_MCS_BUILD YES CACHE BOOL "Enable the build of the mcs directory")
-set(MONOLITE_BUILD 4457 CACHE STRING "The monolite build to download when ENABLE_MCS_BUILD=NO")
+set(MONOLITE_BUILD 4491 CACHE STRING "The monolite build to download when ENABLE_MCS_BUILD=NO")
 set(BUILD_MCS ${ENABLE_MCS_BUILD})
 
 if(NOT BUILD_MCS)
   # We need a working mcs to build the tests. This downloads a monolite build.
   # TODO: Download the monolite tarball best corresponding to the current source tree.
 
-  set(MONOLITE_DOWNLOAD_URL "https://jenkins-master-2.cloudapp.net/view/All/job/build-source-tarball-mono/${MONOLITE_BUILD}/Azure/processDownloadRequest/${MONOLITE_BUILD}/monolite-146-latest.tar.gz")
+  set(MONOLITE_DOWNLOAD_URL "https://jenkins.mono-project.com/job/build-source-tarball-mono/${MONOLITE_BUILD}/Azure/processDownloadRequest/${MONOLITE_BUILD}/monolite-146-latest.tar.gz")
   set(MONOLITE_BUILD_PATH "${CMAKE_BINARY_DIR}/monolite/${MONOLITE_BUILD}")
   set(MONOLITE_DIST_PATH "${MONOLITE_BUILD_PATH}/monolite-146-latest")
   set(MONOLITE_ARCHIVE_PATH "${MONOLITE_BUILD_PATH}/monolite-146-latest.tar.gz")
