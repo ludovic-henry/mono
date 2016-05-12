@@ -13,6 +13,9 @@ include(CheckSymbolExists)
 
 include(${CMAKE_SOURCE_DIR}/cmake/CSharp.cmake)
 
+# If the generator supports it we want folders
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
 # Build Google Test
 set(BUILD_GTEST ON CACHE BOOL "" FORCE) # Enable googletest
 set(BUILD_GMOCK OFF CACHE BOOL "" FORCE) # Disable googlemock
