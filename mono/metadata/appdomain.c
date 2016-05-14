@@ -289,9 +289,7 @@ mono_runtime_init_checked (MonoDomain *domain, MonoThreadStartCB start_cb, MonoT
 	return_if_nok (error);
 	mono_context_set (domain->default_context);
 
-#ifndef DISABLE_SOCKETS
 	mono_network_init ();
-#endif
 	
 	mono_console_init ();
 	mono_attach_init ();
@@ -393,9 +391,8 @@ mono_runtime_cleanup (MonoDomain *domain)
 
 	mono_thread_cleanup ();
 
-#ifndef DISABLE_SOCKETS
 	mono_network_cleanup ();
-#endif
+
 	mono_marshal_cleanup ();
 
 	mono_type_initialization_cleanup ();
@@ -2165,9 +2162,6 @@ ves_icall_System_AppDomain_InternalUnload (gint32 domain_id)
 	 */
 	if (g_getenv ("MONO_NO_UNLOAD"))
 		return;
-#ifdef __native_client__
-	return;
-#endif
 
 	mono_domain_try_unload (domain, (MonoObject**)&exc);
 	if (exc)

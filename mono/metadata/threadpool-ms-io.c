@@ -10,8 +10,6 @@
 
 #include <config.h>
 
-#ifndef DISABLE_SOCKETS
-
 #include <glib.h>
 
 #if defined(HOST_WIN32)
@@ -639,37 +637,3 @@ mono_threadpool_ms_io_remove_domain_jobs (MonoDomain *domain)
 
 	mono_coop_mutex_unlock (&threadpool_io->updates_lock);
 }
-
-#else
-
-void
-ves_icall_System_IOSelector_Add (gpointer handle, MonoIOSelectorJob *job)
-{
-	g_assert_not_reached ();
-}
-
-void
-ves_icall_System_IOSelector_Remove (gpointer handle)
-{
-	g_assert_not_reached ();
-}
-
-void
-mono_threadpool_ms_io_cleanup (void)
-{
-	g_assert_not_reached ();
-}
-
-void
-mono_threadpool_ms_io_remove_socket (int fd)
-{
-	g_assert_not_reached ();
-}
-
-void
-mono_threadpool_ms_io_remove_domain_jobs (MonoDomain *domain)
-{
-	g_assert_not_reached ();
-}
-
-#endif

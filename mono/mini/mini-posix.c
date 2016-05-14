@@ -76,7 +76,7 @@
 #include <mach/clock.h>
 #endif
 
-#if defined(__native_client__) || defined(HOST_WATCHOS)
+#if defined(HOST_WATCHOS)
 
 void
 mono_runtime_setup_stat_profiler (void)
@@ -927,7 +927,7 @@ mono_gdb_render_native_backtraces (pid_t crashed_pid)
 		unlink (template_);
 }
 #endif
-#endif /* __native_client__ */
+#endif /* HOST_WATCHOS */
 
 #if !defined (__MACH__)
 

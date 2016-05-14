@@ -145,7 +145,7 @@ mono_rand_close (gpointer handle)
 	CryptReleaseContext ((HCRYPTPROV) handle, 0);
 }
 
-#elif defined (HAVE_SYS_UN_H) && !defined(__native_client__)
+#elif defined (HAVE_SYS_UN_H)
 
 #include <errno.h>
 #include <fcntl.h>

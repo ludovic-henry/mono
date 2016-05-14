@@ -23,11 +23,6 @@
 gboolean
 _wapi_lock_file_region (int fd, off_t offset, off_t length)
 {
-#if defined(__native_client__)
-	printf("WARNING: locking.c: _wapi_lock_file_region(): fcntl() not available on Native Client!\n");
-	// behave as below -- locks are not available
-	return(TRUE);
-#else
 	struct flock lock_data;
 	int ret;
 
@@ -68,16 +63,11 @@ _wapi_lock_file_region (int fd, off_t offset, off_t length)
 	}
 
 	return(TRUE);
-#endif /* __native_client__ */
 }
 
 gboolean
 _wapi_unlock_file_region (int fd, off_t offset, off_t length)
 {
-#if defined(__native_client__)
-	printf("WARNING: locking.c: _wapi_unlock_file_region(): fcntl() not available on Native Client!\n");
-	return (TRUE);
-#else
 	struct flock lock_data;
 	int ret;
 
@@ -113,7 +103,6 @@ _wapi_unlock_file_region (int fd, off_t offset, off_t length)
 	}
 
 	return(TRUE);
-#endif /* __native_client__ */
 }
 
 gboolean

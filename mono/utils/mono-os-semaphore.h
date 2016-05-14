@@ -202,11 +202,7 @@ mono_os_sem_timedwait (MonoSemType *sem, guint32 timeout_ms, MonoSemFlags flags)
 	copy = ts;
 
 retry:
-#if defined(__native_client__) && defined(USE_NEWLIB)
-	res = sem_trywait (sem);
-#else
 	res = sem_timedwait (sem, &ts);
-#endif
 	if (res == -1)
 		g_assert (errno != EINVAL);
 

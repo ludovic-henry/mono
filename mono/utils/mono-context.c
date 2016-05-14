@@ -35,7 +35,7 @@
 void
 mono_sigctx_to_monoctx (void *sigctx, MonoContext *mctx)
 {
-#if defined (__native_client__) || defined (HOST_WATCHOS)
+#if defined (HOST_WATCHOS)
 	printf("WARNING: mono_arch_sigctx_to_monoctx() called!\n");
 	mctx->eax = 0xDEADBEEF;
 	mctx->ebx = 0xDEADBEEF;
@@ -84,13 +84,13 @@ mono_sigctx_to_monoctx (void *sigctx, MonoContext *mctx)
 	mctx->esi = ctx->SC_ESI;
 	mctx->edi = ctx->SC_EDI;
 	mctx->eip = ctx->SC_EIP;
-#endif /* if defined(__native_client__) */
+#endif /* if defined(HOST_WATCHOS) */
 }
 
 void
 mono_monoctx_to_sigctx (MonoContext *mctx, void *sigctx)
 {
-#if defined(__native_client__) || defined(HOST_WATCHOS)
+#if defined(HOST_WATCHOS)
 	printf("WARNING: mono_arch_monoctx_to_sigctx() called!\n");
 #elif MONO_CROSS_COMPILE
 	g_assert_not_reached ();
@@ -130,7 +130,7 @@ mono_monoctx_to_sigctx (MonoContext *mctx, void *sigctx)
 	ctx->SC_ESI = mctx->esi;
 	ctx->SC_EDI = mctx->edi;
 	ctx->SC_EIP = mctx->eip;
-#endif /* __native_client__ */
+#endif /* HOST_WATCHOS */
 }
 
 #elif (defined(__x86_64__) && !defined(MONO_CROSS_COMPILE)) || (defined(TARGET_AMD64)) /* defined(__i386__) */
@@ -144,10 +144,6 @@ mono_monoctx_to_sigctx (MonoContext *mctx, void *sigctx)
 void
 mono_sigctx_to_monoctx (void *sigctx, MonoContext *mctx)
 {
-#if defined(__native_client_codegen__) || defined(__native_client__)
-	printf("WARNING: mono_arch_sigctx_to_monoctx() called!\n");
-#endif
-
 #ifdef MONO_CROSS_COMPILE
 	g_assert_not_reached ();
 #elif defined(MONO_SIGNAL_USE_UCONTEXT_T)
@@ -198,10 +194,6 @@ mono_sigctx_to_monoctx (void *sigctx, MonoContext *mctx)
 void
 mono_monoctx_to_sigctx (MonoContext *mctx, void *sigctx)
 {
-#if defined(__native_client__) || defined(__native_client_codegen__)
-  printf("WARNING: mono_arch_monoctx_to_sigctx() called!\n");
-#endif
-
 #ifdef MONO_CROSS_COMPILE
 	g_assert_not_reached ();
 #elif defined(MONO_SIGNAL_USE_UCONTEXT_T)
@@ -297,8 +289,6 @@ mono_sigctx_to_monoctx (void *sigctx, MonoContext *mctx)
 {
 #ifdef MONO_CROSS_COMPILE
 	g_assert_not_reached ();
-#elif defined(__native_client__)
-	g_assert_not_reached ();
 #else
 	arm_ucontext *my_uc = sigctx;
 
@@ -316,8 +306,6 @@ void
 mono_monoctx_to_sigctx (MonoContext *mctx, void *ctx)
 {
 #ifdef MONO_CROSS_COMPILE
-	g_assert_not_reached ();
-#elif defined(__native_client__)
 	g_assert_not_reached ();
 #else
 	arm_ucontext *my_uc = ctx;

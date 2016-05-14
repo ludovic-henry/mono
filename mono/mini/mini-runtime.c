@@ -352,75 +352,6 @@ void *mono_global_codeman_reserve (int size)
 	}
 }
 
-#if defined(__native_client_codegen__) && defined(__native_client__)
-void
-mono_nacl_gc()
-{
-#ifdef __native_client_gc__
-	__nacl_suspend_thread_if_needed();
-#endif
-}
-
-/* Given the temporary buffer (allocated by mono_global_codeman_reserve) into
- * which we are generating code, return a pointer to the destination in the
- * dynamic code segment into which the code will be copied when
- * mono_global_codeman_commit is called.
- * LOCKING: Acquires the jit lock.
- */
-void*
-nacl_global_codeman_get_dest (void *data)
-{
-	void *dest;
-	mono_jit_lock ();
-	dest = nacl_code_manager_get_code_dest (global_codeman, data);
-	mono_jit_unlock ();
-	return dest;
-}
-
-void
-mono_global_codeman_commit (void *data, int size, int newsize)
-{
-	mono_jit_lock ();
-	mono_code_manager_commit (global_codeman, data, size, newsize);
-	mono_jit_unlock ();
-}
-
-/*
- * Convenience function which calls mono_global_codeman_commit to validate and
- * copy the code. The caller sets *buf_base and *buf_size to the start and size
- * of the buffer (allocated by mono_global_codeman_reserve), and *code_end to
- * the byte after the last instruction byte. On return, *buf_base will point to
- * the start of the copied in the code segment, and *code_end will point after
- * the end of the copied code.
- */
-void
-nacl_global_codeman_validate (guint8 **buf_base, int buf_size, guint8 **code_end)
-{
-	guint8 *tmp = nacl_global_codeman_get_dest (*buf_base);
-	mono_global_codeman_commit (*buf_base, buf_size, *code_end - *buf_base);
-	*code_end = tmp + (*code_end - *buf_base);
-	*buf_base = tmp;
-}
-#else
-/* no-op versions of Native Client functions */
-void*
-nacl_global_codeman_get_dest (void *data)
-{
-	return data;
-}
-
-void
-mono_global_codeman_commit (void *data, int size, int newsize)
-{
-}
-
-void
-nacl_global_codeman_validate (guint8 **buf_base, int buf_size, guint8 **code_end)
-{
-}
-
-#endif /* __native_client__ */
-
 /**
  * mono_create_unwind_op:
  *
@@ -1452,13 +1383,7 @@ mono_resolve_patch_target (MonoMethod *method, MonoDomain *domain, guint8 *code,
 		target = patch_info->data.inst->inst_c0 + code;
 		break;
 	case MONO_PATCH_INFO_IP:
-#if defined(__native_client__) && defined(__native_client_codegen__)
-		/* Need to transform to the destination address, it's */
-		/* emitted as an immediate in the code. */
-		target = nacl_inverse_modify_patch_target(ip);
-#else
 		target = ip;
-#endif
 		break;
 	case MONO_PATCH_INFO_METHOD_REL:
 		target = code + patch_info->data.offset;
@@ -1485,13 +1410,6 @@ mono_resolve_patch_target (MonoMethod *method, MonoDomain *domain, guint8 *code,
 		target = mono_create_jump_trampoline (domain, patch_info->data.method, FALSE, error);
 		if (!mono_error_ok (error))
 			return NULL;
-#if defined(__native_client__) && defined(__native_client_codegen__)
-# if defined(TARGET_AMD64)
-		/* This target is an absolute address, not relative to the */
-		/* current code being emitted on AMD64. */
-		target = nacl_inverse_modify_patch_target(target);
-# endif
-#endif
 		break;
 	case MONO_PATCH_INFO_METHOD:
 		if (patch_info->data.method == method) {
@@ -1519,21 +1437,12 @@ mono_resolve_patch_target (MonoMethod *method, MonoDomain *domain, guint8 *code,
 		break;
 	}
 	case MONO_PATCH_INFO_GC_SAFE_POINT_FLAG:
-#if defined(__native_client_codegen__)
-		target = (gpointer)&__nacl_thread_suspension_needed;
-#else
 		g_assert (mono_threads_is_coop_enabled ());
 		target = (gpointer)&mono_polling_required;
-#endif
 		break;
 	case MONO_PATCH_INFO_SWITCH: {
 		gpointer *jump_table;
 		int i;
-#if defined(__native_client__) && defined(__native_client_codegen__)
-		/* This memory will leak, but we don't care if we're */
-		/* not deleting JIT'd methods anyway                 */
-		jump_table = g_malloc0 (sizeof(gpointer) * patch_info->data.table->table_size);
-#else
 		if (method && method->dynamic) {
 			jump_table = (void **)mono_code_manager_reserve (mono_dynamic_code_hash_lookup (domain, method)->code_mp, sizeof (gpointer) * patch_info->data.table->table_size);
 		} else {
@@ -1543,27 +1452,12 @@ mono_resolve_patch_target (MonoMethod *method, MonoDomain *domain, guint8 *code,
 				jump_table = (void **)mono_domain_code_reserve (domain, sizeof (gpointer) * patch_info->data.table->table_size);
 			}
 		}
-#endif
 
 		for (i = 0; i < patch_info->data.table->table_size; i++) {
-#if defined(__native_client__) && defined(__native_client_codegen__)
-			/* 'code' is relative to the current code blob, we */
-			/* need to do this transform on it to make the     */
-			/* pointers in this table absolute                 */
-			jump_table [i] = nacl_inverse_modify_patch_target (code) + GPOINTER_TO_INT (patch_info->data.table->table [i]);
-#else
 			jump_table [i] = code + GPOINTER_TO_INT (patch_info->data.table->table [i]);
-#endif
 		}
 
-#if defined(__native_client__) && defined(__native_client_codegen__)
-		/* jump_table is in the data section, we need to transform */
-		/* it here so when it gets modified in amd64_patch it will */
-		/* then point back to the absolute data address            */
-		target = nacl_inverse_modify_patch_target (jump_table);
-#else
 		target = jump_table;
-#endif
 		break;
 	}
 	case MONO_PATCH_INFO_METHODCONST:
@@ -3605,7 +3499,7 @@ mini_init (const char *filename, const char *runtime_version)
 
 	CHECKED_MONO_INIT ();
 
-#if defined(__linux__) && !defined(__native_client__)
+#if defined(__linux__)
 	if (access ("/proc/self/maps", F_OK) != 0) {
 		g_print ("Mono requires /proc to be mounted.\n");
 		exit (1);
@@ -3891,10 +3785,6 @@ register_icalls (void)
 	register_icall (mono_store_remote_field_new_icall, "mono_store_remote_field_new_icall", "void object ptr ptr object", FALSE);
 #endif
 
-#if defined(__native_client__) || defined(__native_client_codegen__)
-	register_icall (mono_nacl_gc, "mono_nacl_gc", "void", FALSE);
-#endif
-
 	if (mono_threads_is_coop_enabled ())
 		register_icall (mono_threads_state_poll, "mono_threads_state_poll", "void", FALSE);
 
@@ -3963,12 +3853,8 @@ register_icalls (void)
 	register_opcode_emulation (OP_LCONV_TO_R_UN, "__emul_lconv_to_r8_un", "double long", mono_lconv_to_r8_un, "mono_lconv_to_r8_un", FALSE);
 #endif
 #ifdef MONO_ARCH_EMULATE_FREM
-#if defined(__default_codegen__)
 	register_opcode_emulation (OP_FREM, "__emul_frem", "double double double", fmod, "fmod", FALSE);
 	register_opcode_emulation (OP_RREM, "__emul_rrem", "float float float", fmodf, "fmodf", FALSE);
-#elif defined(__native_client_codegen__)
-	register_opcode_emulation (OP_FREM, "__emul_frem", "double double double", mono_fmod, "mono_fmod", FALSE);
-#endif
 #endif
 
 #ifdef MONO_ARCH_SOFT_FLOAT_FALLBACK

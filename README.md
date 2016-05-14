@@ -451,15 +451,6 @@ disable it.
   * There are a number of runtime options to control this
 also, see the man page.
 
-* `--enable-nacl`
-
-  * This configures the Mono compiler to generate code
-suitable to be used by Google's Native Client:
-http://code.google.com/p/nativeclient/
-
-  * Currently this is used with Mono's AOT engine as
-Native Client does not support JIT engines yet.
-
 Working With Submodules
 =======================
 

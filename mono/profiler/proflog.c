@@ -42,7 +42,7 @@
 #endif
 #include <fcntl.h>
 #include <errno.h>
-#if defined(HOST_WIN32) || defined(DISABLE_SOCKETS)
+#if defined(HOST_WIN32)
 #define DISABLE_HELPER_THREAD 1
 #endif
 

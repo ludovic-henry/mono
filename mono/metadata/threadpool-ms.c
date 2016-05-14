@@ -1318,9 +1318,7 @@ heuristic_adjust (void)
 void
 mono_threadpool_ms_cleanup (void)
 {
-	#ifndef DISABLE_SOCKETS
-		mono_threadpool_ms_io_cleanup ();
-	#endif
+	mono_threadpool_ms_io_cleanup ();
 	mono_lazy_cleanup (&status, cleanup);
 }
 
@@ -1429,13 +1427,11 @@ mono_threadpool_ms_remove_domain_jobs (MonoDomain *domain, int timeout)
 	if (timeout != -1)
 		end = mono_msec_ticks () + timeout;
 
-#ifndef DISABLE_SOCKETS
 	mono_threadpool_ms_io_remove_domain_jobs (domain);
 	if (timeout != -1) {
 		if (mono_msec_ticks () > end)
 			return FALSE;
 	}
-#endif
 
 	/*
 	 * There might be some threads out that could be about to execute stuff from the given domain.

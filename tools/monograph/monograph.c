@@ -18,11 +18,6 @@ static int max_depth = 6;
 static int verbose = 0;
 static const char *graph_properties = "\tnode [fontsize=8.0]\n\tedge [len=2,color=red]\n";
 
-#if defined(__native_client__) || defined(__native_client_codegen__)
-volatile int __nacl_thread_suspension_needed = 0;
-void __nacl_suspend_thread_if_needed() {}
-#endif
-
 static void
 output_type_edge (MonoClass *first, MonoClass *second) {
 	if (include_namespace)

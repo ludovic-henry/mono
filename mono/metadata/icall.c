@@ -6779,7 +6779,7 @@ ves_icall_System_Environment_get_MachineName (void)
 
 	g_free (buf);
 	return result;
-#elif !defined(DISABLE_SOCKETS)
+#else
 	MonoString *result;
 	char *buf;
 	int n;
@@ -6798,8 +6798,6 @@ ves_icall_System_Environment_get_MachineName (void)
 	g_free (buf);
 	
 	return result;
-#else
-	return mono_string_new (mono_domain_get (), "mono");
 #endif
 }
 
@@ -7065,7 +7063,6 @@ ves_icall_System_Environment_Exit (int result)
  * if the program is going to exit, everything will be cleaned up when
  * NaCl exits anyway.
  */
-#ifndef __native_client__
 	if (!mono_runtime_try_shutdown ())
 		mono_thread_exit ();
 
@@ -7073,7 +7070,6 @@ ves_icall_System_Environment_Exit (int result)
 	mono_thread_suspend_all_other_threads ();
 
 	mono_runtime_quit ();
-#endif
 
 	/* we may need to do some cleanup here... */
 	exit (result);
@@ -7850,12 +7846,6 @@ mono_ArgIterator_IntGetNextArg (MonoArgIterator *iter)
 	iter->args = (guint8*)(((gsize)iter->args + (align) - 1) & ~(align - 1));
 #endif
 	res.value = iter->args;
-#if defined(__native_client__) && SIZEOF_REGISTER == 8
-	/* Values are stored as 8 byte register sized objects, but 'value'
-	 * is dereferenced as a pointer in other routines.
-	 */
-	res.value = (char*)res.value + 4;
-#endif
 #if G_BYTE_ORDER != G_LITTLE_ENDIAN
 	if (arg_size <= sizeof (gpointer)) {
 		int dummy;

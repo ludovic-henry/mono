@@ -51,10 +51,6 @@
 #include "mono/metadata/exception.h"
 #include "mono/utils/mono-compiler.h"
 
-#ifdef __native_client_codegen__
-#include <nacl/nacl_dyncode.h>
-#endif
-
 
 /*
  * The mini code should not have any compile time dependencies on the GC being used, so the same object file from mini/
@@ -1615,11 +1611,7 @@ typedef struct {
 	MonoInst *stack_inbalance_var;
 
 	unsigned char   *cil_start;
-#ifdef __native_client_codegen__
-	/* this alloc is not aligned, native_code */
-	/* is the 32-byte aligned version of this */
-	unsigned char   *native_code_alloc;
-#endif
+
 	unsigned char   *native_code;
 	guint            code_size;
 	guint            code_len;
@@ -2436,43 +2428,7 @@ gint32    mono_linterval_get_intersect_pos  (MonoLiveInterval *i1, MonoLiveInter
 void      mono_linterval_split              (MonoCompile *cfg, MonoLiveInterval *interval, MonoLiveInterval **i1, MonoLiveInterval **i2, int pos);
 void      mono_liveness_handle_exception_clauses (MonoCompile *cfg);
 
-/* Native Client functions */
 gpointer mono_realloc_native_code(MonoCompile *cfg);
-#ifdef __native_client_codegen__
-void mono_nacl_align_inst(guint8 **pcode, int instlen);
-void mono_nacl_align_call(guint8 **start, guint8 **pcode);
-guint8 *mono_nacl_pad_call(guint8 *code, guint8 ilength);
-guint8 *mono_nacl_align(guint8 *code);
-void mono_nacl_fix_patches(const guint8 *code, MonoJumpInfo *ji);
-/* Defined for each arch */
-guint8 *mono_arch_nacl_pad(guint8 *code, int pad);
-guint8 *mono_arch_nacl_skip_nops(guint8 *code);
-
-#if defined(TARGET_X86)
-#define kNaClAlignment kNaClAlignmentX86
-#define kNaClAlignmentMask kNaClAlignmentMaskX86
-#elif defined(TARGET_AMD64)
-#define kNaClAlignment kNaClAlignmentAMD64
-#define kNaClAlignmentMask kNaClAlignmentMaskAMD64
-#elif defined(TARGET_ARM)
-#define kNaClAlignment kNaClAlignmentARM
-#define kNaClAlignmentMask kNaClAlignmentMaskARM
-#endif
-
-#define NACL_BUNDLE_ALIGN_UP(p) ((((p)+kNaClAlignmentMask)) & ~kNaClAlignmentMask)
-#endif
-
-#if defined(__native_client__) || defined(__native_client_codegen__)
-extern volatile int __nacl_thread_suspension_needed;
-void __nacl_suspend_thread_if_needed(void);
-void mono_nacl_gc(void);
-#endif
-
-#if defined(__native_client_codegen__) || defined(__native_client__)
-#define NACL_SIZE(a, b) (b)
-#else
-#define NACL_SIZE(a, b) (a)
-#endif
 
 extern MonoDebugOptions debug_options;
 
@@ -2607,9 +2563,6 @@ MonoFtnDesc      *mini_create_llvmonly_ftndesc (MonoDomain *domain, gpointer add
 
 gboolean          mono_running_on_valgrind (void);
 void*             mono_global_codeman_reserve (int size);
-void*             nacl_global_codeman_get_dest(void *data);
-void              mono_global_codeman_commit(void *data, int size, int newsize);
-void              nacl_global_codeman_validate(guint8 **buf_base, int buf_size, guint8 **code_end);
 const char       *mono_regname_full (int reg, int bank);
 gint32*           mono_allocate_stack_slots (MonoCompile *cfg, gboolean backward, guint32 *stack_size, guint32 *stack_align);
 void              mono_local_regalloc (MonoCompile *cfg, MonoBasicBlock *bb);

@@ -15,8 +15,6 @@
 
 #include <config.h>
 
-#ifndef DISABLE_SOCKETS
-
 #if defined(__APPLE__) || defined(__FreeBSD__)
 #define __APPLE_USE_RFC_3542
 #endif
@@ -2835,5 +2833,3 @@ icall_cancel_blocking_socket_operation (MonoThread *thread)
 
 	mono_thread_info_abort_socket_syscall_for_close (MONO_UINT_TO_NATIVE_THREAD_ID (internal->tid));
 }
-
-#endif /* #ifndef DISABLE_SOCKETS */

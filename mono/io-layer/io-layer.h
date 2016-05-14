@@ -43,8 +43,4 @@ typedef struct pollfd {
 #include "mono/io-layer/uglify.h"
 #endif /* HOST_WIN32 */
 
-#ifdef __native_client__
-#include "mono/metadata/nacl-stub.h"
-#endif
-
 #endif /* _MONO_IOLAYER_IOLAYER_H_ */

@@ -403,7 +403,6 @@ ICALL(MTYPE_1, "GetCorrespondingInflatedConstructor", ves_icall_MonoType_GetCorr
 ICALL(MTYPE_2, "GetCorrespondingInflatedMethod", ves_icall_MonoType_GetCorrespondingInflatedMethod)
 ICALL(MTYPE_3, "type_from_obj", ves_icall_MonoType_type_from_obj)
 
-#ifndef DISABLE_SOCKETS
 ICALL_TYPE(NDNS, "System.Net.Dns", NDNS_1)
 ICALL(NDNS_1, "GetHostByAddr_internal(string,string&,string[]&,string[]&)", ves_icall_System_Net_Dns_GetHostByAddr_internal)
 ICALL(NDNS_2, "GetHostByName_internal(string,string&,string[]&,string[]&)", ves_icall_System_Net_Dns_GetHostByName_internal)
@@ -445,7 +444,6 @@ ICALL(SOCK_21a, "cancel_blocking_socket_operation", icall_cancel_blocking_socket
 
 ICALL_TYPE(SOCKEX, "System.Net.Sockets.SocketException", SOCKEX_1)
 ICALL(SOCKEX_1, "WSAGetLastError_internal", ves_icall_System_Net_Sockets_SocketException_WSAGetLastError_internal)
-#endif /* !DISABLE_SOCKETS */
 
 ICALL_TYPE(NUMBER, "System.Number", NUMBER_1)
 ICALL(NUMBER_1, "NumberBufferToDecimal", mono_decimal_from_number)

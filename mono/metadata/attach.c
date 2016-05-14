@@ -11,10 +11,7 @@
 #include <config.h>
 #include <glib.h>
 
-#ifdef HOST_WIN32
-#define DISABLE_ATTACH
-#endif
-#ifndef DISABLE_ATTACH
+#ifndef HOST_WIN32
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -579,7 +576,7 @@ receiver_thread (void *arg)
 	return 0;
 }
 
-#else /* DISABLE_ATTACH */
+#else /* HOST_WIN32 */
 
 void
 mono_attach_parse_options (char *options)
@@ -607,4 +604,4 @@ mono_attach_cleanup (void)
 {
 }
 
-#endif /* DISABLE_ATTACH */
+#endif /* HOST_WIN32 */

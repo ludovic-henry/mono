@@ -61,9 +61,7 @@ static struct _WapiHandleOps *handle_ops[WAPI_HANDLE_COUNT]={
 	&_wapi_sem_ops,
 	&_wapi_mutex_ops,
 	&_wapi_event_ops,
-#ifndef DISABLE_SOCKETS
 	&_wapi_socket_ops,
-#endif
 	&_wapi_find_ops,
 	&_wapi_process_ops,
 	&_wapi_pipe_ops,
@@ -1692,9 +1690,7 @@ gboolean _wapi_handle_get_or_set_share (guint64 device, guint64 inode,
  */
 static void _wapi_handle_check_share_by_pid (struct _WapiFileShare *share_info)
 {
-#if defined(__native_client__)
-	g_assert_not_reached ();
-#elif defined(HAVE_KILL)
+#if defined(HAVE_KILL)
 	if (kill (share_info->opened_by_pid, 0) == -1 &&
 	    (errno == ESRCH ||
 	     errno == EPERM)) {

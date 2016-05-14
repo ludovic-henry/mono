@@ -8,17 +8,6 @@
 #include "mono-poll.h"
 #include <errno.h>
 
-#ifdef DISABLE_SOCKETS
-#include <glib.h>
-
-int
-mono_poll (mono_pollfd *ufds, unsigned int nfds, int timeout)
-{
-	g_assert_not_reached ();
-	return -1;
-}
-#else
-
 #if defined(HAVE_POLL) && !defined(__APPLE__)
 int
 mono_poll (mono_pollfd *ufds, unsigned int nfds, int timeout)
@@ -131,5 +120,3 @@ mono_poll (mono_pollfd *ufds, unsigned int nfds, int timeout)
 }
 
 #endif
-
-#endif /* #ifndef DISABLE_SOCKETS */

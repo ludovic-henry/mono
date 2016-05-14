@@ -29,13 +29,9 @@
 extern int tkill (pid_t tid, int signal);
 #endif
 
-#if defined(_POSIX_VERSION) || defined(__native_client__)
+#if defined(_POSIX_VERSION)
 
 #include <sys/resource.h>
-
-#if defined(__native_client__)
-void nacl_shutdown_gc_thread(void);
-#endif
 
 typedef struct {
 	void *(*start_routine)(void*);
@@ -174,10 +170,6 @@ mono_threads_core_exit (int exit_code)
 {
 	MonoThreadInfo *current = mono_thread_info_current ();
 
-#if defined(__native_client__)
-	nacl_shutdown_gc_thread();
-#endif
-
 	wapi_thread_handle_set_exited (current->handle, exit_code);
 
 	mono_thread_info_detach ();
@@ -243,9 +235,6 @@ mono_threads_pthread_kill (MonoThreadInfo *info, int signum)
 		errno = old_errno;
 	}
 	return result;
-#elif defined(__native_client__)
-	/* Workaround pthread_kill abort() in NaCl glibc. */
-	return 0;
 #elif !defined(HAVE_PTHREAD_KILL)
 	g_error ("pthread_kill() is not supported by this platform");
 #else
@@ -319,7 +308,7 @@ mono_native_thread_set_name (MonoNativeThreadId tid, const char *name)
 #endif
 }
 
-#endif /* defined(_POSIX_VERSION) || defined(__native_client__) */
+#endif /* defined(_POSIX_VERSION) */
 
 #if defined(USE_POSIX_BACKEND)
 

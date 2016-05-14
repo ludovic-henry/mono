@@ -58,7 +58,6 @@ mono_threads_posix_signal_search_alternative (int min_signal)
 static void
 signal_add_handler (int signo, gpointer handler, int flags)
 {
-#if !defined(__native_client__)
 	/*FIXME, move the code from mini to utils and do the right thing!*/
 	struct sigaction sa;
 	struct sigaction previous_sa;
@@ -71,7 +70,6 @@ signal_add_handler (int signo, gpointer handler, int flags)
 	ret = sigaction (signo, &sa, &previous_sa);
 
 	g_assert (ret != -1);
-#endif
 }
 
 static int
@@ -135,24 +133,17 @@ abort_signal_get (void)
 static void
 restart_signal_handler (int _dummy, siginfo_t *_info, void *context)
 {
-#if defined(__native_client__)
-	g_assert_not_reached ();
-#else
 	MonoThreadInfo *info;
 	int old_errno = errno;
 
 	info = mono_thread_info_current ();
 	info->signal = restart_signal_num;
 	errno = old_errno;
-#endif
 }
 
 static void
 suspend_signal_handler (int _dummy, siginfo_t *info, void *context)
 {
-#if defined(__native_client__)
-	g_assert_not_reached ();
-#else
 	int old_errno = errno;
 	int hp_save_index = mono_hazard_pointer_save_for_signal_handler ();
 
@@ -229,17 +220,12 @@ suspend_signal_handler (int _dummy, siginfo_t *info, void *context)
 done:
 	mono_hazard_pointer_restore_for_signal_handler (hp_save_index);
 	errno = old_errno;
-#endif
 }
 
 static void
 abort_signal_handler (int _dummy, siginfo_t *info, void *context)
 {
-#if defined(__native_client__)
-	g_assert_not_reached ();
-#else
 	suspend_signal_handler (_dummy, info, context);
-#endif
 }
 
 void

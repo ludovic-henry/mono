@@ -61,7 +61,6 @@ gpointer _wapi_stdhandle_create (int fd, const gchar *name)
 	MONO_TRACE (G_LOG_LEVEL_DEBUG, MONO_TRACE_IO_LAYER, "%s: creating standard handle type %s, fd %d", __func__,
 		  name, fd);
 
-#if !defined(__native_client__)	
 	/* Check if fd is valid */
 	do {
 		flags=fcntl(fd, F_GETFL);
@@ -78,13 +77,6 @@ gpointer _wapi_stdhandle_create (int fd, const gchar *name)
 		return(INVALID_HANDLE_VALUE);
 	}
 	file_handle.fileaccess=convert_from_flags(flags);
-#else
-	/* 
-	 * fcntl will return -1 in nacl, as there is no real file system API. 
-	 * Yet, standard streams are available.
-	 */
-	file_handle.fileaccess = (fd == STDIN_FILENO) ? GENERIC_READ : GENERIC_WRITE;
-#endif
 
 	file_handle.fd = fd;
 	file_handle.filename = g_strdup(name);

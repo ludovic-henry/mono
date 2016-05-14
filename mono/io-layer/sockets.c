@@ -9,8 +9,6 @@
 
 #include <config.h>
 
-#ifndef DISABLE_SOCKETS
-
 #include <glib.h>
 #include <pthread.h>
 #include <errno.h>
@@ -1423,5 +1421,3 @@ int WSASend (guint32 fd, WapiWSABuf *buffers, guint32 count, guint32 *sent,
 	*sent = ret;
 	return 0;
 }
-
-#endif /* ifndef DISABLE_SOCKETS */

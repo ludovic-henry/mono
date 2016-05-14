@@ -124,13 +124,6 @@ opt_funcs [sizeof (int) * 8] = {
 	NULL
 };
 
-#ifdef __native_client_codegen__
-extern gint8 nacl_align_byte;
-#endif
-#ifdef __native_client__
-extern char *nacl_mono_path;
-#endif
-
 #define DEFAULT_OPTIMIZATIONS (	\
 	MONO_OPT_PEEPHOLE |	\
 	MONO_OPT_CFOLD |	\
@@ -1241,9 +1234,6 @@ mini_usage (void)
 		"    --trace[=EXPR]         Enable tracing, use --help-trace for details\n"
 		"    --jitmap               Output a jit method map to /tmp/perf-PID.map\n"
 		"    --help-devel           Shows more options available to developers\n"
-#ifdef __native_client_codegen__
-		"    --nacl-align-mask-off  Turn off Native Client 32-byte alignment mask (for debug only)\n"
-#endif
 		"\n"
 		"Runtime:\n"
 		"    --config FILE          Loads FILE as the Mono config\n"
@@ -1605,9 +1595,6 @@ mono_main (int argc, char* argv[])
 #ifdef HOST_WIN32
 	int mixed_mode = FALSE;
 #endif
-#ifdef __native_client__
-	gboolean nacl_null_checks_off = FALSE;
-#endif
 
 #ifdef MOONLIGHT
 #ifndef HOST_WIN32
@@ -1909,16 +1896,6 @@ mono_main (int argc, char* argv[])
 #endif
 		} else if (strcmp (argv [i], "--nollvm") == 0){
 			mono_use_llvm = FALSE;
-#ifdef __native_client_codegen__
-		} else if (strcmp (argv [i], "--nacl-align-mask-off") == 0){
-			nacl_align_byte = -1; /* 0xff */
-#endif
-#ifdef __native_client__
-		} else if (strcmp (argv [i], "--nacl-mono-path") == 0){
-			nacl_mono_path = g_strdup(argv[++i]);
-		} else if (strcmp (argv [i], "--nacl-null-checks-off") == 0){
-			nacl_null_checks_off = TRUE;
-#endif
 		} else if (argv [i][0] == '-' && argv [i][1] == '-' && mini_parse_debug_option (argv [i] + 2)) {
 		} else {
 			fprintf (stderr, "Unknown command line option: '%s'\n", argv [i]);
@@ -1926,16 +1903,6 @@ mono_main (int argc, char* argv[])
 		}
 	}
 
-#ifdef __native_client_codegen__
-	if (g_getenv ("MONO_NACL_ALIGN_MASK_OFF"))
-	{
-		nacl_align_byte = -1; /* 0xff */
-	}
-	if (!nacl_null_checks_off) {
-		MonoDebugOptions *opt = mini_get_debug_options ();
-		opt->explicit_null_checks = TRUE;
-	}
-#endif
 
 #if defined(DISABLE_HW_TRAPS) || defined(MONO_ARCH_DISABLE_HW_TRAPS)
 	// Signal handlers not available
