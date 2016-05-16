@@ -478,28 +478,30 @@ if(IS_DIRECTORY "${CMAKE_SOURCE_DIR}/.git")
     COMMAND git log -1 --format=%h
     WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
     RESULT_VARIABLE EXITCODE
-    OUTPUT_VARIABLE GIT_COMMIT)
+    OUTPUT_VARIABLE GIT_COMMIT
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
   if(EXITCODE EQUAL 0)
-    string(STRIP ${GIT_COMMIT} GIT_COMMIT)
     execute_process(
       COMMAND git symbolic-ref --short HEAD
       WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
       RESULT_VARIABLE SUCCESS
-      OUTPUT_VARIABLE GIT_BRANCH)
+      OUTPUT_VARIABLE GIT_BRANCH
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
     if(EXITCODE EQUAL 0)
       # We're on a branch
-      string(STRIP ${GIT_BRANCH} GIT_BRANCH)
-      file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/version.h" "#define FULL_VERSION \"${GIT_BRANCH}/${GIT_COMMIT}\"")
+      file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/version.h.tmp" "#define FULL_VERSION \"${GIT_BRANCH}/${GIT_COMMIT}\"\n")
     else()
       # We're in detached state
-      file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/version.h" "#define FULL_VERSION \"explicit/${GIT_COMMIT}\"")
+      file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/version.h.tmp" "#define FULL_VERSION \"explicit/${GIT_COMMIT}\"\n")
     endif()
   else()
     message(FATAL_ERROR "Failed to determine current git commit. git exited with ${EXITCODE}")
   endif()
 else()
-  file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/version.h" "#define FULL_VERSION \"tarball\"")
+  file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/version.h.tmp" "#define FULL_VERSION \"tarball\"\n")
 endif()
+execute_process(COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_BINARY_DIR}/version.h.tmp" "${CMAKE_CURRENT_BINARY_DIR}/version.h")
+file(REMOVE "${CMAKE_CURRENT_BINARY_DIR}/version.h.tmp")
 
 # Tests
 set(TESTS_FOLDER "Tests/mini")
