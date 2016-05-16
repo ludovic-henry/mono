@@ -234,7 +234,9 @@ endif()
 # Also create a static library which is used when linking genmdesc in ../mini/. If we link it against monoutils we will
 # end up with unresolved symbols since all object files will be linked eagerly even though genmdesc only uses symbols
 # in a few of them. With a static lib only object files with referenced symbols will be linked in.
-file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/empty.c" "")
+if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/empty.c")
+  file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/empty.c" "")
+endif()
 add_library(monoutils-static STATIC "${CMAKE_CURRENT_BINARY_DIR}/empty.c")
 target_link_libraries(monoutils-static PRIVATE monoutils)
 
