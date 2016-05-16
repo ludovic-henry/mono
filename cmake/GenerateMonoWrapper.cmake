@@ -58,5 +58,5 @@ else()
 	execute_process(COMMAND chmod +x "${TMP_FILE}")
 endif()
 
-execute_process(COMMAND cmake -E copy_if_different ${TMP_FILE} ${FILE})
+execute_process(COMMAND ${CMAKE_COMMAND} -E copy_if_different ${TMP_FILE} ${FILE})
 file(REMOVE ${TMP_FILE})
