@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.1)
 project(mono)
 
+# Add cmake/ to CMAKE_MODULE_PATH to make cmake find our custom modules
+set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH};${CMAKE_SOURCE_DIR}/cmake")
+
 include(ExternalProject)
 include(CheckIncludeFiles)
 include(CheckFunctionExists)
@@ -11,8 +14,9 @@ include(CheckTypeSize)
 include(CheckStructHasMember)
 include(CheckSymbolExists)
 
-include(${CMAKE_SOURCE_DIR}/cmake/CSharp.cmake)
-include(${CMAKE_SOURCE_DIR}/cmake/ToNativePath.cmake)
+# Load custom modules
+include(CSharp)
+include(ToNativePath)
 
 if(IS_DIRECTORY ${CMAKE_SOURCE_DIR}/.git)
   if(NOT SKIP_UPDATE_SUBMODULES)
