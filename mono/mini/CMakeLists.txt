@@ -525,38 +525,34 @@ set(TEST_SOURCES
 )
 
 set(CSFLAGS "-unsafe" "-nowarn:0219,0169,0414,0649")
-cs_add_assembly(TestDriver.dll SOURCES TestDriver.cs FLAGS ${CSFLAGS} FOLDER ${ASSEMBLIES_TEST_FOLDER})
+cs_add_library(TestDriver SOURCES TestDriver.cs FLAGS ${CSFLAGS} FOLDER ${ASSEMBLIES_TEST_FOLDER})
 foreach(TEST_SOURCE ${TEST_SOURCES})
-  string(REGEX REPLACE "(\\.cs|\\.il)$" ".exe" TEST_EXE ${TEST_SOURCE})
-  cs_add_assembly(${TEST_EXE} SOURCES ${TEST_SOURCE} FLAGS ${CSFLAGS} LIBRARIES TestDriver.dll FOLDER ${ASSEMBLIES_TEST_FOLDER})
-  set(REGTESTS ${REGTESTS} ${TEST_EXE})
+  string(REGEX REPLACE "(\\.cs|\\.il)$" "" TEST_TARGET ${TEST_SOURCE})
+  cs_add_executable(${TEST_TARGET} SOURCES ${TEST_SOURCE} FLAGS ${CSFLAGS} LIBRARIES TestDriver FOLDER ${ASSEMBLIES_TEST_FOLDER})
+  set(REGTEST_TARGETS ${REGTEST_TARGETS} ${TEST_TARGET})
 endforeach()
 
 # TODO: We need Mono.Simd.dll to compile this
-# cs_add_assembly(basic-simd.exe SOURCES basic-simd.cs FLAGS ${CSFLAGS} LIBRARIES TestDriver.dll Mono.Simd.dll)
-# set(REGTESTS ${REGTESTS} basic-simd.exe)
+# cs_add_executable(basic-simd SOURCES basic-simd.cs FLAGS ${CSFLAGS} LIBRARIES TestDriver Mono.Simd.dll)
+# set(REGTEST_TARGETS ${REGTEST_TARGETS} basic-simd)
 
 if(NACL_CODEGEN)
   # TODO: We need Mono.Simd.dll to compile this
-  # cs_add_assembly(nacl.exe SOURCES nacl.cs FLAGS ${CSFLAGS} LIBRARIES TestDriver.dll Mono.Simd.dll)
-  # set(REGTESTS ${REGTESTS} nacl.exe)
+  # cs_add_executable(nacl SOURCES nacl.cs FLAGS ${CSFLAGS} LIBRARIES TestDriver Mono.Simd.dll)
+  # set(REGTEST_TARGETS ${REGTEST_TARGETS} nacl)
 endif()
 
 # TODO: We need ilasm to compile this
-# cs_add_assembly(generics-variant-types.dll SOURCES generics-variant-types.il)
-# cs_add_assembly(generics.exe SOURCES generics.cs FLAGS ${CSFLAGS} LIBRARIES TestDriver.dll generics-variant-types.dll System.Core.dll)
-# set(REGTESTS ${REGTESTS} generics.exe)
+# cs_add_library(generics-variant-types SOURCES generics-variant-types.il)
+# cs_add_executable(generics SOURCES generics.cs FLAGS ${CSFLAGS} LIBRARIES TestDriver generics-variant-types System.Core.dll)
+# set(REGTEST_TARGETS ${REGTEST_TARGETS} generics)
 
-# Join test assemblies with \0 as separator
-list(SORT REGTESTS)
-list(REVERSE REGTESTS)
-foreach(REGTEST ${REGTESTS})
-  set(TEST_ASSEMBLIES "${REGTEST}\\0${TEST_ASSEMBLIES}")
+foreach(REGTEST_TARGET ${REGTEST_TARGETS})
+  set(REGTEST_EXES ${REGTEST_EXES} ${REGTEST_TARGET}.exe)
 endforeach()
-set(TEST_ASSEMBLIES "${TEST_ASSEMBLIES}\\0")
 
 # gen-jit-regression-tests.exe generates Google Test methods by reflecting over the test methods in the test assemblies.
-cs_add_assembly(gen-jit-regression-tests.exe SOURCES gen-jit-regression-tests.cs FOLDER ${TOOLS_TEST_FOLDER})
+cs_add_executable(gen-jit-regression-tests SOURCES gen-jit-regression-tests.cs FOLDER ${TOOLS_TEST_FOLDER})
 
 set(ALL_OPTS
    0
@@ -628,17 +624,24 @@ foreach(OPTS ${ALL_OPTS})
   to_native_path(${GEN_JIT_REGRESSION_TEST_EXE} GEN_JIT_REGRESSION_TEST_EXE_NATIVE)
 
   add_custom_command(OUTPUT ${TEST_OUTPUT}
-    COMMAND ${MONO_WRAPPER} ${GEN_JIT_REGRESSION_TEST_EXE_NATIVE} ${TEST_OUTPUT_NATIVE} ${OPTS} ${REGTESTS}
-    DEPENDS mono-wrapper gen-jit-regression-tests.exe gen-jit-regression-tests.cs ${REGTESTS}
+    COMMAND ${MONO_WRAPPER} ${GEN_JIT_REGRESSION_TEST_EXE_NATIVE} ${TEST_OUTPUT_NATIVE} ${OPTS} ${REGTEST_EXES}
+    COMMAND ${CMAKE_COMMAND} -E touch ${TEST_OUTPUT}.tstamp
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    DEPENDS mono-wrapper gen-jit-regression-tests ${REGTEST_TARGETS}
     VERBATIM
   )
+
   add_executable(${TEST_NAME} jit-regression-tests.cpp jit-regression-tests.h ${TEST_OUTPUT})
   set_property(TARGET ${TEST_NAME} PROPERTY FOLDER ${JIT_TESTS_FOLDER})
-  target_link_libraries(${TEST_NAME} gtest monosgen-static)
+  target_link_libraries(${TEST_NAME} gtest)
+  if(SHARED_MONO)
+    target_link_libraries(${TEST_NAME} gtest monosgen)
+  else()
+    target_link_libraries(${TEST_NAME} gtest monosgen-static)
+  endif()
   if(CYGWIN)
     target_link_libraries(${TEST_NAME} -static)
   endif()
   target_compile_definitions(${TEST_NAME} PRIVATE -DCONFIG_DIR="${CONFIG_DIR}" -DASSEMBLY_DIR="${ASSEMBLY_DIR}" -DCOMPILE_OPTS=${COMPILE_OPTS})
   add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
-  add_dependencies(${TEST_NAME} gen-jit-regression-tests.exe ${REGTESTS})
 endforeach()
