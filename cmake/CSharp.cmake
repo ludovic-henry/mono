@@ -28,10 +28,9 @@ endif()
 if(NOT MCS_PATH_WORKS)
   message(STATUS "Check for working Mono C# compiler: ${MCS_PATH}")
   file(WRITE ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/TestCSharpCompiler.cs "public class Foo { public static int Main (string[] args) { return 0; } }")
-  execute_process(COMMAND ${MCS_PATH} 
-      -out:${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/TestCSharpCompiler.exe 
-      ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/TestCSharpCompiler.cs
-    RESULT_VARIABLE MCS_PATH_EXITCODE)
+  to_native_path(${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/TestCSharpCompiler.cs TEST_CSHARP_COMPILER_CS)
+  to_native_path(${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/TestCSharpCompiler.exe TEST_CSHARP_COMPILER_EXE)
+  execute_process(COMMAND ${MCS_PATH} -out:${TEST_CSHARP_COMPILER_EXE} ${TEST_CSHARP_COMPILER_CS} RESULT_VARIABLE MCS_PATH_EXITCODE ERROR_VARIABLE ERROR_IGNORED)
   if(MCS_PATH_EXITCODE EQUAL 0)
     set(MCS_PATH_WORKS YES)
     execute_process(COMMAND ${MCS_PATH} --version OUTPUT_VARIABLE MCS_PATH_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
