@@ -2,9 +2,9 @@
 #$(GLIB_CFLAGS)				\
 #-I$(top_srcdir)
 include_directories(
+  ${CMAKE_BINARY_DIR}
   ${CMAKE_SOURCE_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR}
-  ${CMAKE_BINARY_DIR}
   ${GLIB_INCLUDE_DIRECTORIES}
 )
 
