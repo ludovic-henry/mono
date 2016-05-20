@@ -493,11 +493,9 @@ if(HAVE_ZLIB)
   " "zlib.h" CHECK_SYS_ZLIB_VERSION)
 
   if(CHECK_SYS_ZLIB_VERSION)
-    message(STATUS "Using system zlib")
     set(ZLIB_MSG "system zlib")
     set(HAVE_SYS_ZLIB YES)
   else()
-    message(STATUS "Using embedded zlib")
     set(ZLIB_MSG "bundled zlib")
     set(HAVE_ZLIB NO)
   endif()
@@ -856,10 +854,12 @@ if(NOT HOST_WINDOWS)
   # *** version rev, the __GLIBC__ and __GLIBC_MINOR__ macros    ***
   # *** won't always indicate the interface sched_affinity has.  ***
   # ****************************************************************
-  message(STATUS "Checking for sched_setaffinity from glibc < 2.3.4")
-  check_c_snippet_compiles("
-    int mask = 1;
-    sched_setaffinity(0, &mask);" "sched.h" GLIBC_BEFORE_2_3_4_SCHED_SETAFFINITY)
+  if(NOT DEFINED GLIBC_BEFORE_2_3_4_SCHED_SETAFFINITY)
+    message(STATUS "Checking for sched_setaffinity from glibc < 2.3.4")
+    check_c_snippet_compiles("
+      int mask = 1;
+      sched_setaffinity(0, &mask);" "sched.h" GLIBC_BEFORE_2_3_4_SCHED_SETAFFINITY)
+  endif()
 
   # ******************************************************************
   # *** Check for large file support                               ***
@@ -883,6 +883,7 @@ if(NOT HOST_WINDOWS)
       unset(CMAKE_REQUIRED_DEFINITIONS)
     endif()
     unset(CMAKE_EXTRA_INCLUDE_FILES)
+    set(HAVE_LARGE_FILE_SUPPORT ${HAVE_LARGE_FILE_SUPPORT} CACHE INTERNAL "")
   endif()
 
   # *****************************
@@ -906,80 +907,106 @@ if(NOT HOST_WINDOWS)
   # *******************************
   # *** Checks for MSG_NOSIGNAL ***
   # *******************************
-  message(STATUS "Checking for MSG_NOSIGNAL")
-  check_c_snippet_compiles("int f = MSG_NOSIGNAL;" "sys/socket.h" HAVE_MSG_NOSIGNAL)
+  if(NOT DEFINED HAVE_MSG_NOSIGNAL)
+    message(STATUS "Checking for MSG_NOSIGNAL")
+    check_c_snippet_compiles("int f = MSG_NOSIGNAL;" "sys/socket.h" HAVE_MSG_NOSIGNAL)
+  endif()
 
   # *****************************
   # *** Checks for IPPROTO_IP ***
   # *****************************
-  message(STATUS "Checking for IPPROTO_IP")
-  check_c_snippet_compiles("int level = IPPROTO_IP;" "netinet/in.h" HAVE_IPPROTO_IP)
+  if(NOT DEFINED HAVE_IPPROTO_IP)
+    message(STATUS "Checking for IPPROTO_IP")
+    check_c_snippet_compiles("int level = IPPROTO_IP;" "netinet/in.h" HAVE_IPPROTO_IP)
+  endif()
 
   # *******************************
   # *** Checks for IPPROTO_IPV6 ***
   # *******************************
-  message(STATUS "Checking for IPPROTO_IPV6")
-  check_c_snippet_compiles("int level = IPPROTO_IPV6;" "netinet/in.h" HAVE_IPPROTO_IPV6)
+  if(NOT DEFINED HAVE_IPPROTO_IPV6)
+    message(STATUS "Checking for IPPROTO_IPV6")
+    check_c_snippet_compiles("int level = IPPROTO_IPV6;" "netinet/in.h" HAVE_IPPROTO_IPV6)
+  endif()
 
   # ******************************
   # *** Checks for IPPROTO_TCP ***
   # ******************************
-  message(STATUS "Checking for IPPROTO_TCP")
-  check_c_snippet_compiles("int level = IPPROTO_TCP;" "netinet/in.h" HAVE_IPPROTO_TCP)
+  if(NOT DEFINED HAVE_IPPROTO_TCP)
+    message(STATUS "Checking for IPPROTO_TCP")
+    check_c_snippet_compiles("int level = IPPROTO_TCP;" "netinet/in.h" HAVE_IPPROTO_TCP)
+  endif()
 
   # *****************************
   # *** Checks for SOL_IP     ***
   # *****************************
-  message(STATUS "Checking for SOL_IP")
-  check_c_snippet_compiles("int level = SOL_IP;" "netdb.h" HAVE_SOL_IP)
+  if(NOT DEFINED HAVE_SOL_IP)
+    message(STATUS "Checking for SOL_IP")
+    check_c_snippet_compiles("int level = SOL_IP;" "netdb.h" HAVE_SOL_IP)
+    endif()
 
   # *****************************
   # *** Checks for SOL_IPV6     ***
   # *****************************
-  message(STATUS "Checking for SOL_IPV6")
-  check_c_snippet_compiles("int level = SOL_IPV6;" "netdb.h" HAVE_SOL_IPV6)
+  if(NOT DEFINED HAVE_SOL_IPV6)
+    message(STATUS "Checking for SOL_IPV6")
+    check_c_snippet_compiles("int level = SOL_IPV6;" "netdb.h" HAVE_SOL_IPV6)
+  endif()
 
   # *****************************
   # *** Checks for SOL_TCP    ***
   # *****************************
-  message(STATUS "Checking for SOL_TCP")
-  check_c_snippet_compiles("int level = SOL_TCP;" "netdb.h" HAVE_SOL_TCP)
+  if(NOT DEFINED HAVE_SOL_TCP)
+    message(STATUS "Checking for SOL_TCP")
+    check_c_snippet_compiles("int level = SOL_TCP;" "netdb.h" HAVE_SOL_TCP)
+  endif()
 
   # *****************************
   # *** Checks for IP_PKTINFO ***
   # *****************************
-  message(STATUS "Checking for IP_PKTINFO")
-  check_c_snippet_compiles("int level = IP_PKTINFO;" "linux/in.h" HAVE_IP_PKTINFO)
+  if(NOT DEFINED HAVE_IP_PKTINFO)
+    message(STATUS "Checking for IP_PKTINFO")
+    check_c_snippet_compiles("int level = IP_PKTINFO;" "linux/in.h" HAVE_IP_PKTINFO)
+  endif()
 
   # *****************************
   # *** Checks for IPV6_PKTINFO ***
   # *****************************
-  message(STATUS "Checking for IPV6_PKTINFO")
-  check_c_snippet_compiles("int level = IPV6_PKTINFO;" "netdb.h" HAVE_IPV6_PKTINFO)
+  if(NOT DEFINED HAVE_IPV6_PKTINFO)
+    message(STATUS "Checking for IPV6_PKTINFO")
+    check_c_snippet_compiles("int level = IPV6_PKTINFO;" "netdb.h" HAVE_IPV6_PKTINFO)
+  endif()
 
   # **********************************
   # *** Checks for IP_DONTFRAG     ***
   # **********************************
-  message(STATUS "Checking for IP_DONTFRAG")
-  check_c_snippet_compiles("int level = IP_DONTFRAG;" "netinet/in.h" HAVE_IP_DONTFRAG)
+  if(NOT DEFINED HAVE_IP_DONTFRAG)
+    message(STATUS "Checking for IP_DONTFRAG")
+    check_c_snippet_compiles("int level = IP_DONTFRAG;" "netinet/in.h" HAVE_IP_DONTFRAG)
+  endif()
 
   # **********************************
   # *** Checks for IP_DONTFRAGMENT ***
   # **********************************
-  message(STATUS "Checking for IP_DONTFRAGMENT")
-  check_c_snippet_compiles("int level = IP_DONTFRAGMENT;" "Ws2ipdef.h" HAVE_IP_DONTFRAGMENT)
+  if(NOT DEFINED HAVE_IP_DONTFRAGMENT)
+    message(STATUS "Checking for IP_DONTFRAGMENT")
+    check_c_snippet_compiles("int level = IP_DONTFRAGMENT;" "Ws2ipdef.h" HAVE_IP_DONTFRAGMENT)
+  endif()
 
   # **********************************
   # *** Checks for IP_MTU_DISCOVER ***
   # **********************************
-  message(STATUS "Checking for IP_MTU_DISCOVER")
-  check_c_snippet_compiles("int level = IP_MTU_DISCOVER;" "linux/in.h" HAVE_IP_MTU_DISCOVER)
+  if(NOT DEFINED HAVE_IP_MTU_DISCOVER)
+    message(STATUS "Checking for IP_MTU_DISCOVER")
+    check_c_snippet_compiles("int level = IP_MTU_DISCOVER;" "linux/in.h" HAVE_IP_MTU_DISCOVER)
+  endif()
 
   # **********************************
   # *** Checks for  IP_PMTUDISC_DO ***
   # **********************************
-  message(STATUS "Checking for IP_PMTUDISC_DO")
-  check_c_snippet_compiles("int level = IP_PMTUDISC_DO;" "linux/in.h" HAVE_IP_PMTUDISC_DO)
+  if(NOT DEFINED HAVE_IP_PMTUDISC_DO)
+    message(STATUS "Checking for IP_PMTUDISC_DO")
+    check_c_snippet_compiles("int level = IP_PMTUDISC_DO;" "linux/in.h" HAVE_IP_PMTUDISC_DO)
+  endif()
 
   # *********************************
   # *** Check for struct ip_mreqn ***
@@ -1065,10 +1092,12 @@ if(NOT HOST_WINDOWS)
 
   check_include_files_ext(pthread.h pthread_np.h)
   check_functions_exists_ext(pthread_mutex_timedlock pthread_getattr_np pthread_attr_get_np pthread_setname_np pthread_kill)
-  message(STATUS "Checking for PTHREAD_MUTEX_RECURSIVE")
-  check_c_snippet_compiles("pthread_mutexattr_settype(NULL, PTHREAD_MUTEX_RECURSIVE);" "pthread.h" HAVE_PTHREAD_MUTEX_RECURSIVE)
-  if(NOT HAVE_PTHREAD_MUTEX_RECURSIVE)
-    message(FATAL_ERROR "Posix system lacks support for recursive mutexes")
+  if(NOT DEFINED HAVE_PTHREAD_MUTEX_RECURSIVE)
+    message(STATUS "Checking for PTHREAD_MUTEX_RECURSIVE")
+    check_c_snippet_compiles("pthread_mutexattr_settype(NULL, PTHREAD_MUTEX_RECURSIVE);" "pthread.h" HAVE_PTHREAD_MUTEX_RECURSIVE)
+    if(NOT HAVE_PTHREAD_MUTEX_RECURSIVE)
+      message(FATAL_ERROR "Posix system lacks support for recursive mutexes")
+    endif()
   endif()
   check_functions_exists_ext(pthread_attr_setstacksize pthread_attr_getstack pthread_attr_getstacksize pthread_get_stacksize_np pthread_get_stackaddr_np)
 
@@ -1099,109 +1128,113 @@ if(NOT HOST_WINDOWS)
   # **************************************
   # *** Checks for working sigaltstack ***
   # **************************************
-  if(NOT WITH_SIGALTSTACK)
-    message(STATUS "Checking for working sigaltstack - disabled")
-  elseif(CMAKE_CROSSCOMPILING)
-    message(STATUS "Checking for working sigaltstack - cross compiling, assuming yes")
-  else()
-    message(STATUS "Checking for working sigaltstack")
-    check_c_source_runs("
-            #include <stdio.h>
-            #include <stdlib.h>
-            #include <unistd.h>
-            #include <signal.h>
-            #include <pthread.h>
-            #include <sys/wait.h>
-            #if defined(__FreeBSD__) || defined(__NetBSD__)
-            #define SA_STACK SA_ONSTACK
-            #endif
-            static void
-            sigsegv_signal_handler (int _dummy, siginfo_t *info, void *context)
-            {
-                exit (0);
-            }
-
-            volatile char*__ptr = NULL;
-            static void *
-            loop (void *ignored)
-            {
-                *__ptr = 0;
-                return NULL;
-            }
-
-            static void
-            child ()
-            {
-                struct sigaction sa;
-            #ifdef __APPLE__
-                stack_t sas;
-            #else
-                struct sigaltstack sas;
-            #endif
-                pthread_t id;
-                pthread_attr_t attr;
-
-                sa.sa_sigaction = sigsegv_signal_handler;
-                sigemptyset (&sa.sa_mask);
-                sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
-                if (sigaction (SIGSEGV, &sa, NULL) == -1) {
-                    perror (\"sigaction\");
-                    return;
-                }
-
-                /* x86 darwin deliver segfaults using SIGBUS */
-                if (sigaction (SIGBUS, &sa, NULL) == -1) {
-                    perror (\"sigaction\");
-                    return;
-                }
-                sas.ss_sp = malloc (SIGSTKSZ);
-                sas.ss_size = SIGSTKSZ;
-                sas.ss_flags = 0;
-                if (sigaltstack (&sas, NULL) == -1) {
-                    perror (\"sigaltstack\");
-                    return;
-                }
-
-                pthread_attr_init (&attr);
-                if (pthread_create(&id, &attr, loop, &attr) != 0) {
-                    perror (\"pthread_create\");
-                    return;
-                }
-
-                sleep (100);
-            }
-
-            int
-            main ()
-            {
-                pid_t son;
-                int status;
-                int i;
-
-                son = fork ();
-                if (son == -1) {
-                    return 1;
-                }
-
-                if (son == 0) {
-                    child ();
-                    return 0;
-                }
-
-                for (i = 0; i < 300; ++i) {
-                    waitpid (son, &status, WNOHANG);
-                    if (WIFEXITED (status) && WEXITSTATUS (status) == 0)
-                        return 0;
-                    usleep (10000);
-                }
-
-                kill (son, SIGKILL);
-                return 1;
-            }" HAVE_WORKING_SIGALTSTACK)
-    if(HAVE_WORKING_SIGALTSTACK)
-      message(STATUS "Found working sigaltstack")
+  if(NOT DEFINED HAVE_WORKING_SIGALTSTACK)
+    if(NOT WITH_SIGALTSTACK)
+      message(STATUS "Checking for working sigaltstack - disabled")
+      set(HAVE_WORKING_SIGALTSTACK NO CACHE INTERNAL "")
+    elseif(CMAKE_CROSSCOMPILING)
+      message(STATUS "Checking for working sigaltstack - cross compiling, assuming yes")
+      set(HAVE_WORKING_SIGALTSTACK NO CACHE INTERNAL "")
     else()
-      set(WITH_SIGALTSTACK NO)
+      message(STATUS "Checking for working sigaltstack")
+      check_c_source_runs("
+              #include <stdio.h>
+              #include <stdlib.h>
+              #include <unistd.h>
+              #include <signal.h>
+              #include <pthread.h>
+              #include <sys/wait.h>
+              #if defined(__FreeBSD__) || defined(__NetBSD__)
+              #define SA_STACK SA_ONSTACK
+              #endif
+              static void
+              sigsegv_signal_handler (int _dummy, siginfo_t *info, void *context)
+              {
+                  exit (0);
+              }
+
+              volatile char*__ptr = NULL;
+              static void *
+              loop (void *ignored)
+              {
+                  *__ptr = 0;
+                  return NULL;
+              }
+
+              static void
+              child ()
+              {
+                  struct sigaction sa;
+              #ifdef __APPLE__
+                  stack_t sas;
+              #else
+                  struct sigaltstack sas;
+              #endif
+                  pthread_t id;
+                  pthread_attr_t attr;
+
+                  sa.sa_sigaction = sigsegv_signal_handler;
+                  sigemptyset (&sa.sa_mask);
+                  sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
+                  if (sigaction (SIGSEGV, &sa, NULL) == -1) {
+                      perror (\"sigaction\");
+                      return;
+                  }
+
+                  /* x86 darwin deliver segfaults using SIGBUS */
+                  if (sigaction (SIGBUS, &sa, NULL) == -1) {
+                      perror (\"sigaction\");
+                      return;
+                  }
+                  sas.ss_sp = malloc (SIGSTKSZ);
+                  sas.ss_size = SIGSTKSZ;
+                  sas.ss_flags = 0;
+                  if (sigaltstack (&sas, NULL) == -1) {
+                      perror (\"sigaltstack\");
+                      return;
+                  }
+
+                  pthread_attr_init (&attr);
+                  if (pthread_create(&id, &attr, loop, &attr) != 0) {
+                      perror (\"pthread_create\");
+                      return;
+                  }
+
+                  sleep (100);
+              }
+
+              int
+              main ()
+              {
+                  pid_t son;
+                  int status;
+                  int i;
+
+                  son = fork ();
+                  if (son == -1) {
+                      return 1;
+                  }
+
+                  if (son == 0) {
+                      child ();
+                      return 0;
+                  }
+
+                  for (i = 0; i < 300; ++i) {
+                      waitpid (son, &status, WNOHANG);
+                      if (WIFEXITED (status) && WEXITSTATUS (status) == 0)
+                          return 0;
+                      usleep (10000);
+                  }
+
+                  kill (son, SIGKILL);
+                  return 1;
+              }" HAVE_WORKING_SIGALTSTACK)
+      if(HAVE_WORKING_SIGALTSTACK)
+        message(STATUS "Found working sigaltstack")
+      else()
+        set(WITH_SIGALTSTACK NO)
+      endif()
     endif()
   endif()
 
@@ -1219,13 +1252,17 @@ if(NOT HOST_WINDOWS)
   # ********************************
   # *** Checks for timezone stuff **
   # ********************************
-  message(STATUS "Checking for tm_gmtoff in struct tm")
-  check_c_snippet_compiles("struct tm tm; tm.tm_gmtoff = 1;" "time.h" HAVE_TM_GMTOFF)
+  if(NOT DEFINED HAVE_TM_GMTOFF)
+    message(STATUS "Checking for tm_gmtoff in struct tm")
+    check_c_snippet_compiles("struct tm tm; tm.tm_gmtoff = 1;" "time.h" HAVE_TM_GMTOFF)
+  endif()
   if(NOT HAVE_TM_GMTOFF)
-    message(STATUS "Checking for timezone variable")
-    check_c_snippet_compiles("timezone = 1;" "time.h" HAVE_TIMEZONE)
-    if(NOT HAVE_TIMEZONE)
-      message(FATAL_ERROR "Unable to find a way to determine timezone")
+    if(NOT DEFINED HAVE_TIMEZONE)
+      message(STATUS "Checking for timezone variable")
+      check_c_snippet_compiles("timezone = 1;" "time.h" HAVE_TIMEZONE)
+      if(NOT HAVE_TIMEZONE)
+        message(FATAL_ERROR "Unable to find a way to determine timezone")
+      endif()
     endif()
   endif()
 
@@ -1291,30 +1328,38 @@ if(NOT HOST_WINDOWS)
   # **********************************
   # ***     Checks for sin_len     ***
   # **********************************
-  message(STATUS "Checking for sockaddr_in.sin_len")
-  check_c_snippet_compiles("
-      struct sockaddr_in saddr;
-      saddr.sin_len = sizeof (saddr);" "netinet/in.h" HAVE_SOCKADDR_IN_SIN_LEN)
+  if(NOT DEFINED HAVE_SOCKADDR_IN_SIN_LEN)
+    message(STATUS "Checking for sockaddr_in.sin_len")
+    check_c_snippet_compiles("
+        struct sockaddr_in saddr;
+        saddr.sin_len = sizeof (saddr);" "netinet/in.h" HAVE_SOCKADDR_IN_SIN_LEN)
+  endif()
 
   # **********************************
   # ***    Checks for sin6_len     ***
   # **********************************
-  message(STATUS "Checking for sockaddr_in6.sin6_len")
-  check_c_snippet_compiles("
-      struct sockaddr_in6 saddr6;
-      saddr6.sin6_len = sizeof (saddr6);" "netinet/in.h" HAVE_SOCKADDR_IN6_SIN_LEN)
+  if(NOT DEFINED HAVE_SOCKADDR_IN6_SIN_LEN)
+    message(STATUS "Checking for sockaddr_in6.sin6_len")
+    check_c_snippet_compiles("
+        struct sockaddr_in6 saddr6;
+        saddr6.sin6_len = sizeof (saddr6);" "netinet/in.h" HAVE_SOCKADDR_IN6_SIN_LEN)
+  endif()
 
   # **********************************
   # *** Check for getifaddrs       ***
   # **********************************
-  message(STATUS "Checking for getifaddrs")
-  check_c_snippet_compiles("getifaddrs(NULL);" "stdio.h;sys/types.h;sys/socket.h;ifaddrs.h" HAVE_GETIFADDRS)
+  if(NOT DEFINED HAVE_GETIFADDRS)
+    message(STATUS "Checking for getifaddrs")
+    check_c_snippet_compiles("getifaddrs(NULL);" "stdio.h;sys/types.h;sys/socket.h;ifaddrs.h" HAVE_GETIFADDRS)
+  endif()
 
   # **********************************
   # *** Check for if_nametoindex   ***
   # **********************************
-  message(STATUS "Checking for if_nametoindex")
-  check_c_snippet_compiles("if_nametoindex(NULL);" "stdio.h;sys/types.h;sys/socket.h" HAVE_IF_NAMETOINDEX)
+  if(NOT DEFINED HAVE_IF_NAMETOINDEX)
+    message(STATUS "Checking for if_nametoindex")
+    check_c_snippet_compiles("if_nametoindex(NULL);" "stdio.h;sys/types.h;sys/socket.h" HAVE_IF_NAMETOINDEX)
+  endif()
 
   # **********************************
   # *** Checks for MonoPosixHelper ***
@@ -1474,7 +1519,6 @@ if(HOST_WINDOWS)
   set(HAVE_CRYPT_RNG YES)
 else()
 
-  message(STATUS "Checking if usage of random device is requested")
   set(DISABLE_DEV_RANDOM NO CACHE BOOL "disable the use of the random device (enabled by default)")
 
   if(HOST_OPENBSD)

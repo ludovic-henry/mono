@@ -51,24 +51,28 @@ endif()
 
 # Check if the GCC builtin __sync_bool_compare_and_swap is available.
 # It is preferred in gc_locks.h for PPC as GCC 4.4 has a problem with the inline assembly there.
-message(STATUS "Checking for __sync_bool_compare_and_swap")
-check_c_source_compiles("
-        volatile unsigned int foo = 0;
-        int main(int argc, char** argv) {
-          unsigned int r1 = __sync_bool_compare_and_swap(&foo, 0, 1);
-          return 0;
-        }
-      " HAS___SYNC_BOOL_COMPARE_AND_SWAP)
+if(NOT DEFINED HAS___SYNC_BOOL_COMPARE_AND_SWAP)
+  message(STATUS "Checking for __sync_bool_compare_and_swap")
+  check_c_source_compiles("
+          volatile unsigned int foo = 0;
+          int main(int argc, char** argv) {
+            unsigned int r1 = __sync_bool_compare_and_swap(&foo, 0, 1);
+            return 0;
+          }
+        " HAS___SYNC_BOOL_COMPARE_AND_SWAP)
+endif()
 if(HAS___SYNC_BOOL_COMPARE_AND_SWAP)
   set(LIBGC_DEFINES ${LIBGC_DEFINES} -DHAS___SYNC_BOOL_COMPARE_AND_SWAP=1)
 endif()
 
-message(STATUS "Checking for xlc")
-check_c_snippet_compiles("
-        #ifndef __xlC__
-        # error
-        #endif
-      " "" COMPILER_XLC)
+if(NOT DEFINED COMPILER_XLC)
+  message(STATUS "Checking for xlc")
+  check_c_snippet_compiles("
+          #ifndef __xlC__
+          # error
+          #endif
+        " "" COMPILER_XLC)
+endif()
 if(COMPILER_XLC AND POWERPC_DARWIN)
   # the darwin stack-frame-walking code is completely broken on xlc
   set(LIBGC_DEFINES ${LIBGC_DEFINES} -DDARWIN_DONT_PARSE_STACK=1)
