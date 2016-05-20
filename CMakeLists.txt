@@ -544,8 +544,7 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
   set(CFLAGS "${CFLAGS} -DMONO_DLL_EXPORT")
   if(NOT DISABLE_VISIBILITY_HIDDEN)
     # Don't export any symbols by default
-    set(SHARED_CFLAGS "-fvisibility=hidden")
-    set(CFLAGS_FOR_EGLIB "${CFLAGS_FOR_EGLIB} -fvisibility=hidden")
+    set(CFLAGS "${CFLAGS} -fvisibility=hidden")
     set(CXXFLAGS "${CXXFLAGS} -fvisibility=hidden")
   endif()
 
