@@ -1,5 +1,55 @@
 include(ToNativePath)
 
+if(NOT MCS_PATH)
+  # Prefer the environment variable
+  if(NOT $ENV{MCS_PATH} STREQUAL "")
+    get_filename_component(MCS_PATH $ENV{MCS_PATH} PROGRAM PROGRAM_ARGS MCS_PATH_FLAGS)
+    if(NOT EXISTS ${MCS_PATH})
+      message(FATAL_ERROR "Could not find compiler set in environment variable MCS_PATH")
+    endif()
+  else()
+    set(MCS_PATH_NAME mcs)
+    set(CANDIDATE_PATHS $ENV{MONO_HOME}/bin)
+    if(WIN32)
+      set(MCS_PATH_NAME mcs.bat)
+      set(CANDIDATE_PATHS ${CANDIDATE_PATHS} "C:/Program Files (x86)/Mono/bin")
+    elseif(CYGWIN)
+      set(MCS_PATH_NAME mcs.bat)
+      set(CANDIDATE_PATHS ${CANDIDATE_PATHS} "/cygdrive/c/Program Files (x86)/Mono/bin")
+    endif()
+    find_program(MCS_PATH NAMES ${MCS_PATH_NAME} PATHS ${CANDIDATE_PATHS})
+    if(NOT EXISTS ${MCS_PATH})
+      message(FATAL_ERROR "Mono C# compiler could not be located")
+    endif()
+  endif()
+  set(MCS_PATH "${MCS_PATH}" CACHE FILEPATH "Mono C# compiler path")
+endif()
+
+if(NOT MCS_PATH_WORKS)
+  message(STATUS "Check for working Mono C# compiler: ${MCS_PATH}")
+  file(WRITE ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/TestCSharpCompiler.cs "public class Foo { public static int Main (string[] args) { return 0; } }")
+  execute_process(COMMAND ${MCS_PATH} 
+      -out:${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/TestCSharpCompiler.exe 
+      ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/TestCSharpCompiler.cs
+    RESULT_VARIABLE MCS_PATH_EXITCODE)
+  if(MCS_PATH_EXITCODE EQUAL 0)
+    set(MCS_PATH_WORKS YES)
+    execute_process(COMMAND ${MCS_PATH} --version OUTPUT_VARIABLE MCS_PATH_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
+    string(REGEX REPLACE "Mono C# compiler version ([0-9.]+)" "\\1" MCS_PATH_VERSION "${MCS_PATH_VERSION}")
+  endif()
+  if(NOT MCS_PATH_WORKS)
+    message(STATUS "Check for working Mono C# compiler: ${MCS_PATH} -- broken")
+    message(FATAL_ERROR "The Mono C# compiler \"${MCS_PATH}\" is not able to compile a simple test program.")
+  elseif(MCS_PATH_VERSION VERSION_LESS "4.0")
+    message(STATUS "Check for working Mono C# compiler: ${MCS_PATH} -- unsupported version")
+    message(FATAL_ERROR "Unsupported Mono C# compiler version ${MCS_PATH_VERSION}. Expected >= 4.0.")
+  else()
+    message(STATUS "Check for working Mono C# compiler: ${MCS_PATH} -- works")
+  endif()
+
+  set(MCS_PATH_WORKS YES CACHE INTERNAL "")
+endif()
+
 function(_cs_add_assembly FUNC TARGET TYPE)
   set(CURR_LIST)
   set(FLAGS)
@@ -51,8 +101,9 @@ function(_cs_add_assembly FUNC TARGET TYPE)
   endforeach()
 
   add_custom_command(OUTPUT ${TARGET_FILE}
-    COMMAND ${MCS_WRAPPER} ${OPTS} ${SOURCES}
-    DEPENDS mcs-wrapper ${DEPENDS} ${SOURCES}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}
+    COMMAND ${MCS_PATH} ${OPTS} ${SOURCES}
+    DEPENDS ${DEPENDS} ${SOURCES}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     COMMENT "Compiling assembly ${TARGET}.${TYPE}"
     VERBATIM)

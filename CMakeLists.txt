@@ -2201,7 +2201,7 @@ set(MONOLITE_BUILD 4491 CACHE STRING "The monolite build to download when ENABLE
 set(BUILD_MCS ${ENABLE_MCS_BUILD})
 
 if(NOT BUILD_MCS)
-  # We need a working mcs to build the tests. This downloads a monolite build.
+  # We need working mscorlib.dll, System.dll, etc to run the tests. This downloads a monolite build containing the necessary DLLs.
   # TODO: Download the monolite tarball best corresponding to the current source tree.
 
   set(MONOLITE_DOWNLOAD_URL "https://jenkins.mono-project.com/job/build-source-tarball-mono/${MONOLITE_BUILD}/Azure/processDownloadRequest/${MONOLITE_BUILD}/monolite-146-latest.tar.gz")
@@ -2223,13 +2223,11 @@ if(NOT BUILD_MCS)
     )
   endif()
 
-  set(MCS_EXE "${MONOLITE_DIST_PATH}/basic.exe")
   set(MONO_PATH "${MONOLITE_DIST_PATH}")
-  set(MCS_MSG "Using Mono C\# compiler from monolite build ${MONOLITE_BUILD}")
+  set(MONO_PATH_MSG "Using core DLLs from monolite build ${MONOLITE_BUILD} to run low-level tests")
 else()
-  set(MCS_EXE "${CMAKE_SOURCE_DIR}/mcs/class/lib/build/mcs.exe")
   set(MONO_PATH "${CMAKE_SOURCE_DIR}/mcs/class/lib/net_4_x")
-  set(MCS_MSG "Using internal Mono C\# compiler")
+  set(MONO_PATH_MSG "Using internal core DLLs to run low-level tests")
 endif()
 
 if(SUPPORT_SGEN)
@@ -2265,25 +2263,6 @@ add_custom_command(
 )
 add_custom_target(mono-wrapper ALL DEPENDS mono-config ${MONO_WRAPPER})
 
-set(MCS_WRAPPER_NAME "mcs-wrapper.sh")
-if(HOST_WINDOWS AND NOT CYGWIN)
-  set(MCS_WRAPPER_NAME "mcs-wrapper.bat")
-endif()
-set(MCS_WRAPPER "${CMAKE_BINARY_DIR}/mono/mini/${CMAKE_CFG_INTDIR}/${MCS_WRAPPER_NAME}")
-add_custom_command(
-  OUTPUT ${MCS_WRAPPER}
-  COMMAND ${CMAKE_COMMAND}
-    -DMONO_PATH=${MONO_PATH}
-    -DMONO_EXECUTABLE=${MONO_EXECUTABLE}
-    -DMONO_CFG_DIR=${MONO_CFG_DIR}
-    -DFILE=${MCS_WRAPPER}
-    -DEXE=${MCS_EXE}
-    -P "${CMAKE_SOURCE_DIR}/cmake/GenerateMonoWrapper.cmake"
-  DEPENDS ${MONO_EXECUTABLE_TARGET}
-  VERBATIM
-)
-add_custom_target(mcs-wrapper ALL DEPENDS mono-config ${MCS_WRAPPER})
-
 #SUBDIRS = po $(libgc_dir) eglib mono $(ikvm_native_dir) support data runtime scripts man samples msvc $(docs_dir) acceptance-tests
 #add_subdirectory(po)
 #add_subdirectory(libgc)
@@ -2294,7 +2273,6 @@ add_subdirectory(runtime)
 
 message(STATUS "
   Engine:
-    MCS:             ${MCS_MSG}
     Host:            ${HOST_TRIPLE}
     Target:          ${TARGET}
     GC:	             ${GC_MSG}
@@ -2306,6 +2284,7 @@ message(STATUS "
     LLVM Back End:   ${ENABLE_LLVM} (dynamically loaded: ${ENABLE_LOADEDLLVM})
 
   Libraries:
+    Core DLLs:       ${MONO_PATH_MSG}
     .NET 4.6:        ${WITH_PROFILE4_X}
     Xamarin.Android: ${WITH_MONODROID}
     Xamarin.iOS:     ${WITH_MONOTOUCH}
