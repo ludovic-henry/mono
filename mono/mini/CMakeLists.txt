@@ -527,107 +527,47 @@ cs_add_library(TestDriver SOURCES TestDriver.cs FLAGS ${CSFLAGS} FOLDER ${ASSEMB
 foreach(TEST_SOURCE ${TEST_SOURCES})
   string(REGEX REPLACE "\\.cs$" "" TEST_TARGET ${TEST_SOURCE})
   cs_add_executable(${TEST_TARGET} SOURCES ${TEST_SOURCE} FLAGS ${CSFLAGS} LIBRARIES TestDriver FOLDER ${ASSEMBLIES_TEST_FOLDER})
-  set(REGTEST_TARGETS ${REGTEST_TARGETS} ${TEST_TARGET})
 endforeach()
 
 cs_add_executable(iltests SOURCES iltests.il FOLDER ${ASSEMBLIES_TEST_FOLDER})
-set(REGTEST_TARGETS ${REGTEST_TARGETS} iltests)
+set(TEST_SOURCES ${TEST_SOURCES} iltests.il)
 
 # TODO: We need Mono.Simd.dll to compile this
 # cs_add_executable(basic-simd SOURCES basic-simd.cs FLAGS ${CSFLAGS} LIBRARIES TestDriver Mono.Simd.dll FOLDER ${ASSEMBLIES_TEST_FOLDER})
-# set(REGTEST_TARGETS ${REGTEST_TARGETS} basic-simd)
+# set(TEST_SOURCES ${TEST_SOURCES} basic-simd.cs)
 
 if(NACL_CODEGEN)
   # TODO: We need Mono.Simd.dll to compile this
   # cs_add_executable(nacl SOURCES nacl.cs FLAGS ${CSFLAGS} LIBRARIES TestDriver Mono.Simd.dll FOLDER ${ASSEMBLIES_TEST_FOLDER})
-  # set(REGTEST_TARGETS ${REGTEST_TARGETS} nacl)
+  # set(TEST_SOURCES ${TEST_SOURCES} nacl.cs)
 endif()
 
 cs_add_library(generics-variant-types SOURCES generics-variant-types.il FOLDER ${ASSEMBLIES_TEST_FOLDER})
 cs_add_executable(generics SOURCES generics.cs FLAGS ${CSFLAGS} LIBRARIES TestDriver generics-variant-types System.Core.dll FOLDER ${ASSEMBLIES_TEST_FOLDER})
-set(REGTEST_TARGETS ${REGTEST_TARGETS} generics)
-
-foreach(REGTEST_TARGET ${REGTEST_TARGETS})
-  set(REGTEST_EXES ${REGTEST_EXES} ${REGTEST_TARGET}.exe)
-endforeach()
+set(TEST_SOURCES ${TEST_SOURCES} generics.cs)
 
 # gen-jit-regression-tests.exe generates Google Test methods by reflecting over the test methods in the test assemblies.
-cs_add_executable(gen-jit-regression-tests SOURCES gen-jit-regression-tests.cs FOLDER ${TOOLS_TEST_FOLDER})
-
-set(ALL_OPTS
-   0
-   peephole
-   branch
-   cfold
-   fcmov
-   alias_analysis
-)
-if(NOT DISABLE_SIMD)
-  set(ALL_OPTS ${ALL_OPTS}
-    simd
-    sse2
-    simd+sse2
-  )
+if(DISABLE_SIMD)
+  set(GEN_JIT_REGRESSION_TEST_CSFLAGS -define:DISABLE_SIMD)
 endif()
-set(ALL_OPTS ${ALL_OPTS}
-  branch+peephole+intrins
-  branch+peephole+intrins+alias_analysis
-  branch+peephole+linears
-  branch+peephole+linears+copyprop
-  branch+peephole+linears+cfold
-  branch+peephole+linears+copyprop+consprop+deadce
-  branch+peephole+linears+copyprop+consprop+deadce+alias_analysis
-  branch+peephole+linears+copyprop+consprop+deadce+loop+inline+intrins
-  branch+peephole+linears+copyprop+consprop+deadce+loop+inline+intrins+tailc
-  branch+peephole+linears+copyprop+consprop+deadce+loop+inline+intrins+ssa
-  branch+peephole+linears+copyprop+consprop+deadce+loop+inline+intrins+exception
-  branch+peephole+linears+copyprop+consprop+deadce+loop+inline+intrins+exception+cmov
-  branch+peephole+linears+copyprop+consprop+deadce+loop+inline+intrins+exception+abcrem
-  branch+peephole+linears+copyprop+consprop+deadce+loop+inline+intrins+abcrem
-  branch+peephole+linears+copyprop+consprop+deadce+loop+inline+intrins+abcrem+shared
-  branch+peephole+linears+consprop+copyprop+deadce+loop+inline+intrins+exception+gshared+cmov+simd+alias_analysis+aot+cfold
-)
+cs_add_executable(gen-jit-regression-tests SOURCES gen-jit-regression-tests.cs FLAGS ${GEN_JIT_REGRESSION_TEST_CSFLAGS} FOLDER ${TOOLS_TEST_FOLDER})
 
 to_native_path(${MONO_CFG_DIR} CONFIG_DIR)
 to_native_path(${MONO_PATH} ASSEMBLY_DIR)
 string(REPLACE "\\" "\\\\" CONFIG_DIR ${CONFIG_DIR})
 string(REPLACE "\\" "\\\\" ASSEMBLY_DIR ${ASSEMBLY_DIR})
 
-set(N 1)
-foreach(OPTS ${ALL_OPTS})
-  if(HOST_WINDOWS)
-    # Windows has some ridiculous limits on path length
-    if(N LESS 10)
-      set(TEST_NAME "jit-test-0${N}")
-    else()
-      set(TEST_NAME "jit-test-${N}")
-    endif()
-    math(EXPR N "${N} + 1")
-  else()
-    set(TEST_NAME "jit-test-${OPTS}")
-    if(OPTS STREQUAL "0")
-      set(TEST_NAME "jit-test-noopts")
-    endif()
-  endif()
-
-  if(OPTS STREQUAL "0")
-    set(COMPILE_OPTS "0")
-  else()
-    string(REPLACE "+" "|MONO_OPT_" COMPILE_OPTS ${OPTS})
-    string(TOUPPER ${COMPILE_OPTS} COMPILE_OPTS)
-    set(COMPILE_OPTS "MONO_OPT_${COMPILE_OPTS}")
-  endif()
-
+foreach(TEST_SOURCE ${TEST_SOURCES})
+  string(REGEX REPLACE "\\.(cs|il)$" "" TEST_TARGET ${TEST_SOURCE})
+  set(TEST_NAME "jit-test-${TEST_TARGET}")
   set(TEST_OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/${TEST_NAME}.cpp)
   set(GEN_JIT_REGRESSION_TEST_EXE ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/gen-jit-regression-tests.exe)
   to_native_path(${TEST_OUTPUT} TEST_OUTPUT_NATIVE)
   to_native_path(${GEN_JIT_REGRESSION_TEST_EXE} GEN_JIT_REGRESSION_TEST_EXE_NATIVE)
-
   add_custom_command(OUTPUT ${TEST_OUTPUT}
-    COMMAND ${MONO_WRAPPER} ${GEN_JIT_REGRESSION_TEST_EXE_NATIVE} ${TEST_OUTPUT_NATIVE} ${OPTS} ${REGTEST_EXES}
-    COMMAND ${CMAKE_COMMAND} -E touch ${TEST_OUTPUT}.tstamp
+    COMMAND ${SYSTEM_MONO_EXE} ${GEN_JIT_REGRESSION_TEST_EXE_NATIVE} ${TEST_TARGET}.exe ${TEST_OUTPUT_NATIVE}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    DEPENDS mono-wrapper gen-jit-regression-tests ${REGTEST_TARGETS}
+    DEPENDS gen-jit-regression-tests ${TEST_TARGET} ${TEST_SOURCE}
     VERBATIM
   )
 
@@ -642,6 +582,9 @@ foreach(OPTS ${ALL_OPTS})
   if(CYGWIN)
     target_link_libraries(${TEST_NAME} -static)
   endif()
-  target_compile_definitions(${TEST_NAME} PRIVATE -DCONFIG_DIR="${CONFIG_DIR}" -DASSEMBLY_DIR="${ASSEMBLY_DIR}" -DCOMPILE_OPTS=${COMPILE_OPTS})
+  target_compile_definitions(${TEST_NAME} PRIVATE -DCONFIG_DIR="${CONFIG_DIR}" -DASSEMBLY_DIR="${ASSEMBLY_DIR}")
+  if(MSVC)
+    target_compile_options(${TEST_NAME} PRIVATE "/bigobj")
+  endif()
   add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
 endforeach()

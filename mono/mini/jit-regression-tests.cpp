@@ -6,9 +6,6 @@
 #ifndef CONFIG_DIR
 #error CONFIG_DIR not defined
 #endif
-#ifndef COMPILE_OPTS
-#error COMPILE_OPTS not defined
-#endif
 
 typedef int(*TestMethod) (void);
 
@@ -56,17 +53,26 @@ MonoClass *TestLoader::GetMonoClass()
 	return clazz;
 }
 
-BaseTest::BaseTest(const char *assemblyName, const char *className)
+BaseTest::BaseTest(const char *assemblyName, const char *className, int optimizations)
 {
 	this->loader = TestLoader::GetLoader(assemblyName, className);
+	this->optimizations = optimizations;
 }
 void BaseTest::RunTest(const char *methodName)
 {
+	/* fixme: ugly hack - delete all previously compiled methods */
+	if (domain_jit_info (domain)) {
+		g_hash_table_destroy (domain_jit_info (domain)->jit_trampoline_hash);
+		domain_jit_info (domain)->jit_trampoline_hash = g_hash_table_new (mono_aligned_addr_hash, NULL);
+		mono_internal_hash_table_destroy (&(domain->jit_code_hash));
+		mono_jit_code_hash_init (&(domain->jit_code_hash));
+	}
+	
 	ASSERT_TRUE(strncmp(methodName, "test_", 5) == 0);
 	int expected = atoi(&methodName[5]);
 	MonoMethod *method = mono_class_get_method_from_name(this->loader->GetMonoClass(), methodName, 0);
 	ASSERT_TRUE(method != NULL);
-	MonoCompile *compile = mini_method_compile(method, COMPILE_OPTS, domain, JIT_FLAG_RUN_CCTORS, 0, -1);
+	MonoCompile *compile = mini_method_compile(method, this->optimizations, domain, JIT_FLAG_RUN_CCTORS, 0, -1);
 	ASSERT_TRUE(compile != NULL && compile->exception_type == MONO_EXCEPTION_NONE);
 	TestMethod func = (TestMethod) mono_create_ftnptr(domain, (gpointer) compile->native_code);
 	ASSERT_TRUE(func != NULL);
