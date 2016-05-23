@@ -520,32 +520,32 @@ set(TEST_SOURCES
   basic.cs
   exceptions.cs
   devirtualization.cs
-  # TODO: We need ilasm to compile this
-  # iltests.il
 )
 
 set(CSFLAGS "-unsafe" "-nowarn:0219,0169,0414,0649")
 cs_add_library(TestDriver SOURCES TestDriver.cs FLAGS ${CSFLAGS} FOLDER ${ASSEMBLIES_TEST_FOLDER})
 foreach(TEST_SOURCE ${TEST_SOURCES})
-  string(REGEX REPLACE "(\\.cs|\\.il)$" "" TEST_TARGET ${TEST_SOURCE})
+  string(REGEX REPLACE "\\.cs$" "" TEST_TARGET ${TEST_SOURCE})
   cs_add_executable(${TEST_TARGET} SOURCES ${TEST_SOURCE} FLAGS ${CSFLAGS} LIBRARIES TestDriver FOLDER ${ASSEMBLIES_TEST_FOLDER})
   set(REGTEST_TARGETS ${REGTEST_TARGETS} ${TEST_TARGET})
 endforeach()
 
+cs_add_executable(iltests SOURCES iltests.il FOLDER ${ASSEMBLIES_TEST_FOLDER})
+set(REGTEST_TARGETS ${REGTEST_TARGETS} iltests)
+
 # TODO: We need Mono.Simd.dll to compile this
-# cs_add_executable(basic-simd SOURCES basic-simd.cs FLAGS ${CSFLAGS} LIBRARIES TestDriver Mono.Simd.dll)
+# cs_add_executable(basic-simd SOURCES basic-simd.cs FLAGS ${CSFLAGS} LIBRARIES TestDriver Mono.Simd.dll FOLDER ${ASSEMBLIES_TEST_FOLDER})
 # set(REGTEST_TARGETS ${REGTEST_TARGETS} basic-simd)
 
 if(NACL_CODEGEN)
   # TODO: We need Mono.Simd.dll to compile this
-  # cs_add_executable(nacl SOURCES nacl.cs FLAGS ${CSFLAGS} LIBRARIES TestDriver Mono.Simd.dll)
+  # cs_add_executable(nacl SOURCES nacl.cs FLAGS ${CSFLAGS} LIBRARIES TestDriver Mono.Simd.dll FOLDER ${ASSEMBLIES_TEST_FOLDER})
   # set(REGTEST_TARGETS ${REGTEST_TARGETS} nacl)
 endif()
 
-# TODO: We need ilasm to compile this
-# cs_add_library(generics-variant-types SOURCES generics-variant-types.il)
-# cs_add_executable(generics SOURCES generics.cs FLAGS ${CSFLAGS} LIBRARIES TestDriver generics-variant-types System.Core.dll)
-# set(REGTEST_TARGETS ${REGTEST_TARGETS} generics)
+cs_add_library(generics-variant-types SOURCES generics-variant-types.il FOLDER ${ASSEMBLIES_TEST_FOLDER})
+cs_add_executable(generics SOURCES generics.cs FLAGS ${CSFLAGS} LIBRARIES TestDriver generics-variant-types System.Core.dll FOLDER ${ASSEMBLIES_TEST_FOLDER})
+set(REGTEST_TARGETS ${REGTEST_TARGETS} generics)
 
 foreach(REGTEST_TARGET ${REGTEST_TARGETS})
   set(REGTEST_EXES ${REGTEST_EXES} ${REGTEST_TARGET}.exe)

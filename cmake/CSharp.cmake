@@ -1,28 +1,40 @@
 include(ToNativePath)
 
-if(NOT MCS_PATH)
+function(find_mono_tool NAME ENV_VAR RESULT_VARIABLE)
   # Prefer the environment variable
-  if(NOT $ENV{MCS_PATH} STREQUAL "")
-    get_filename_component(MCS_PATH $ENV{MCS_PATH} PROGRAM PROGRAM_ARGS MCS_PATH_FLAGS)
-    if(NOT EXISTS ${MCS_PATH})
-      message(FATAL_ERROR "Could not find compiler set in environment variable MCS_PATH")
+  if(NOT $ENV{${ENV_VAR}} STREQUAL "")
+    get_filename_component(X_PATH $ENV{${ENV_VAR}} PROGRAM PROGRAM_ARGS FLAGS)
+    if(NOT EXISTS ${X_PATH})
+      message(FATAL_ERROR "Could not find Mono ${NAME} path in environment variable ${ENV_VAR}")
     endif()
   else()
-    set(MCS_PATH_NAME mcs)
-    set(CANDIDATE_PATHS $ENV{MONO_HOME}/bin)
+    if(NOT $ENV{MONO_HOME} STREQUAL "")
+      set(CANDIDATE_PATHS $ENV{MONO_HOME}/bin)
+    endif()
     if(WIN32)
-      set(MCS_PATH_NAME mcs.bat)
+      set(EXT .bat)
       set(CANDIDATE_PATHS ${CANDIDATE_PATHS} "C:/Program Files (x86)/Mono/bin")
     elseif(CYGWIN)
-      set(MCS_PATH_NAME mcs.bat)
+      set(EXT .bat)
       set(CANDIDATE_PATHS ${CANDIDATE_PATHS} "/cygdrive/c/Program Files (x86)/Mono/bin")
     endif()
-    find_program(MCS_PATH NAMES ${MCS_PATH_NAME} PATHS ${CANDIDATE_PATHS})
-    if(NOT EXISTS ${MCS_PATH})
-      message(FATAL_ERROR "Mono C# compiler could not be located")
+    find_program(X_PATH NAMES ${NAME}${EXT} PATHS ${CANDIDATE_PATHS})
+    if(NOT EXISTS ${X_PATH})
+      message(FATAL_ERROR "Mono ${NAME} could not be located")
     endif()
   endif()
+  set("${RESULT_VARIABLE}" ${X_PATH} PARENT_SCOPE)
+  unset(X_PATH CACHE)
+endfunction()
+
+if(NOT MCS_PATH)
+  find_mono_tool(mcs MCS_PATH MCS_PATH)
   set(MCS_PATH "${MCS_PATH}" CACHE FILEPATH "Mono C# compiler path")
+endif()
+
+if(NOT ILASM_PATH)
+  find_mono_tool(ilasm ILASM_PATH ILASM_PATH)
+  set(ILASM_PATH "${ILASM_PATH}" CACHE FILEPATH "Mono IL assembler path")
 endif()
 
 if(NOT MCS_PATH_WORKS)
@@ -42,11 +54,21 @@ if(NOT MCS_PATH_WORKS)
   elseif(MCS_PATH_VERSION VERSION_LESS "4.0")
     message(STATUS "Check for working Mono C# compiler: ${MCS_PATH} -- unsupported version")
     message(FATAL_ERROR "Unsupported Mono C# compiler version ${MCS_PATH_VERSION}. Expected >= 4.0.")
-  else()
-    message(STATUS "Check for working Mono C# compiler: ${MCS_PATH} -- works")
   endif()
 
+  message(STATUS "Check for working Mono C# compiler: ${MCS_PATH} -- works")
   set(MCS_PATH_WORKS YES CACHE INTERNAL "")
+endif()
+
+if(NOT ILASM_PATH_WORKS)
+  message(STATUS "Check for working Mono IL assembler: ${ILASM_PATH}")
+  execute_process(COMMAND ${ILASM_PATH} --about RESULT_VARIABLE ILASM_PATH_EXITCODE OUTPUT_VARIABLE OUTPUT_IGNORED ERROR_VARIABLE ERROR_IGNORED)
+  if(NOT ILASM_PATH_EXITCODE EQUAL 0)
+    message(STATUS "Check for working Mono IL assembler: ${ILASM_PATH} -- broken")
+    message(FATAL_ERROR "ilasm command at ${ILASM_PATH} failed with exit code ${ILASM_PATH_EXITCODE}.")
+  endif()
+  message(STATUS "Check for working Mono IL assembler: ${ILASM_PATH} -- works")
+  set(ILASM_PATH_WORKS YES CACHE INTERNAL "")
 endif()
 
 function(_cs_add_assembly FUNC TARGET TYPE)
@@ -78,11 +100,33 @@ function(_cs_add_assembly FUNC TARGET TYPE)
     endif()
   endforeach()
 
+  # Check whether the input files are .cs files or .il files. We don't support mixing.
+  foreach(SOURCE ${SOURCES})
+    if(SOURCE MATCHES "\\.(cs|CS)$")
+      set(CS_SOURCES ${CS_SOURCES} ${SOURCE})
+    elseif(SOURCE MATCHES "\\.(il|IL)$")
+      set(IL_SOURCES ${IL_SOURCES} ${SOURCE})
+    else()
+      message(FATAL_ERROR "Cannot build assembly ${TARGET}.${TYPE}. Unrecognized file type for source ${SOURCE}.")
+    endif()
+  endforeach()
+
+  if(CS_SOURCES AND IL_SOURCES)
+    message(FATAL_ERROR "Cannot build assembly ${TARGET}.${TYPE}. Mixing .cs and .il files in the same assembly is not supported.")
+  endif()
+  if(IL_SOURCES AND LIBRARIES)
+    message(FATAL_ERROR "Cannot build assembly ${TARGET}.${TYPE}. ilasm does not support linking against DLLs.")
+  endif()
+
   set(TARGET_FILE "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/${TARGET}.${TYPE}")
   to_native_path(${TARGET_FILE} TARGET_FILE_NATIVE)
   set(OPTS -out:${TARGET_FILE_NATIVE} ${FLAGS})
   if("${TYPE}" MATCHES "dll")
-    set(OPTS ${OPTS} -target:library)
+    if(CS_SOURCES)
+      set(OPTS ${OPTS} -target:library)
+    else()
+      set(OPTS ${OPTS} -dll)
+    endif()
   endif()
   foreach(LIB ${LIBRARIES})
     if(TARGET ${LIB})
@@ -99,13 +143,23 @@ function(_cs_add_assembly FUNC TARGET TYPE)
     endif()
   endforeach()
 
-  add_custom_command(OUTPUT ${TARGET_FILE}
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}
-    COMMAND ${MCS_PATH} ${OPTS} ${SOURCES}
-    DEPENDS ${DEPENDS} ${SOURCES}
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    COMMENT "Compiling assembly ${TARGET}.${TYPE}"
-    VERBATIM)
+  if(CS_SOURCES)
+    add_custom_command(OUTPUT ${TARGET_FILE}
+      COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}
+      COMMAND ${MCS_PATH} ${OPTS} ${SOURCES}
+      DEPENDS ${DEPENDS} ${SOURCES}
+      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+      COMMENT "Compiling assembly ${TARGET}.${TYPE}"
+      VERBATIM)
+  else()
+    add_custom_command(OUTPUT ${TARGET_FILE}
+      COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}
+      COMMAND ${ILASM_PATH} ${OPTS} ${SOURCES}
+      DEPENDS ${DEPENDS} ${SOURCES}
+      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+      COMMENT "Compiling assembly ${TARGET}.${TYPE}"
+      VERBATIM)
+  endif()
   add_custom_target(${TARGET} DEPENDS ${TARGET_FILE} SOURCES ${SOURCES})
   set_target_properties(${TARGET} PROPERTIES "TARGET_FILE" ${TARGET_FILE})
   if(FOLDER)
