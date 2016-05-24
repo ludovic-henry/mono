@@ -221,6 +221,8 @@ if(TARGET_S390X)
 endif()
 
 add_library(monoutils_objects OBJECT ${SOURCES})
+set_property(TARGET monoutils_objects PROPERTY FOLDER "Libraries")
+set_property(TARGET monoutils_objects PROPERTY PROJECT_LABEL "monoutils (objects)")
 add_library(monoutils INTERFACE)
 target_sources(monoutils INTERFACE $<TARGET_OBJECTS:monoutils_objects> $<TARGET_OBJECTS:monoutils_objects>)
 target_link_object_libraries(monoutils eglib)
@@ -238,6 +240,8 @@ if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/empty.c")
   file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/empty.c" "")
 endif()
 add_library(monoutils-static STATIC "${CMAKE_CURRENT_BINARY_DIR}/empty.c")
+set_property(TARGET monoutils-static PROPERTY FOLDER "Libraries")
+set_property(TARGET monoutils-static PROPERTY PROJECT_LABEL "monoutils (static)")
 target_link_libraries(monoutils-static PRIVATE monoutils)
 
 #libmonoutilsincludedir = $(includedir)/mono-$(API_VER)/mono/utils

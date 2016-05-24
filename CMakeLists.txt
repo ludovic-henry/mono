@@ -60,6 +60,8 @@ if(MINGW)
 endif()
 add_subdirectory(external/googletest)
 include_directories(${gtest_SOURCE_DIR}/include)
+set_property(TARGET gtest PROPERTY FOLDER "Tests/Google Test")
+set_property(TARGET gtest_main PROPERTY FOLDER "Tests/Google Test")
 
 enable_testing()
 
@@ -2285,6 +2287,7 @@ add_custom_command(OUTPUT etc/mono/2.0/machine.config COMMAND cmake -E copy ${CM
 add_custom_command(OUTPUT etc/mono/4.0/machine.config COMMAND cmake -E copy ${CMAKE_SOURCE_DIR}/data/net_4_0/machine.config ${CMAKE_BINARY_DIR}/etc/mono/4.0/machine.config DEPENDS data/net_4_0/machine.config)
 add_custom_command(OUTPUT etc/mono/4.5/machine.config COMMAND cmake -E copy ${CMAKE_SOURCE_DIR}/data/net_4_5/machine.config ${CMAKE_BINARY_DIR}/etc/mono/4.5/machine.config DEPENDS data/net_4_5/machine.config)
 add_custom_target(mono-config ALL DEPENDS etc/mono/2.0/machine.config etc/mono/4.0/machine.config etc/mono/4.5/machine.config)
+set_property(TARGET mono-config PROPERTY FOLDER "Other")
 
 set(MONO_CFG_DIR ${CMAKE_BINARY_DIR}/etc)
 
@@ -2305,6 +2308,7 @@ add_custom_command(
   VERBATIM
 )
 add_custom_target(mono-wrapper ALL DEPENDS mono-config ${MONO_WRAPPER})
+set_property(TARGET mono-wrapper PROPERTY FOLDER "Tools")
 
 #SUBDIRS = po $(libgc_dir) eglib mono $(ikvm_native_dir) support data runtime scripts man samples msvc $(docs_dir) acceptance-tests
 #add_subdirectory(po)

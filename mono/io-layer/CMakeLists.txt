@@ -111,6 +111,8 @@ if(HOST_WIN32)
 else()
   add_library(wapi_objects OBJECT ${OTHER_SRC} ${OTHER_H})
 endif()
+set_property(TARGET wapi_objects PROPERTY FOLDER "Libraries")
+set_property(TARGET wapi_objects PROPERTY PROJECT_LABEL "wapi (objects)")
 add_library(wapi INTERFACE)
 target_sources(wapi INTERFACE $<TARGET_OBJECTS:wapi_objects>)
 

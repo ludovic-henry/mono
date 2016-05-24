@@ -69,6 +69,8 @@ set(SOURCES
 
 # NOTE: Renamed to monogcsgen to avoid conflict with the monosgen target defined in mini/
 add_library(monogcsgen_objects OBJECT ${SOURCES})
+set_property(TARGET monogcsgen_objects PROPERTY FOLDER "Libraries")
+set_property(TARGET monogcsgen_objects PROPERTY PROJECT_LABEL "monogcsgen (objects)")
 target_compile_definitions(monogcsgen_objects PRIVATE ${SGEN_DEFINES})
 add_library(monogcsgen INTERFACE)
 target_sources(monogcsgen INTERFACE $<TARGET_OBJECTS:monogcsgen_objects>)

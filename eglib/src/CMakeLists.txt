@@ -69,6 +69,8 @@ else()
 endif()
 
 add_library(eglib_objects OBJECT ${SOURCES})
+set_property(TARGET eglib_objects PROPERTY PROJECT_LABEL "eglib (objects)")
+set_property(TARGET eglib_objects PROPERTY FOLDER "Libraries")
 add_library(eglib INTERFACE)
 target_sources(eglib INTERFACE $<TARGET_OBJECTS:eglib_objects>)
 if(HAVE_LIBICONV)

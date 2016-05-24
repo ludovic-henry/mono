@@ -128,6 +128,8 @@ if(TARGET_IA64)
 endif()
 
 add_library(monogcboehm_objects OBJECT ${SOURCES})
+set_property(TARGET monogcboehm_objects PROPERTY FOLDER "Libraries")
+set_property(TARGET monogcboehm_objects PROPERTY PROJECT_LABEL "monogcboehm (objects)")
 target_compile_definitions(monogcboehm_objects PRIVATE ${LIBGC_DEFINES} ${LIBGC_COMPILE_DEFINITIONS})
 target_compile_options(monogcboehm_objects PRIVATE ${LIBGC_COMPILE_OPTIONS})
 add_library(monogcboehm INTERFACE)
