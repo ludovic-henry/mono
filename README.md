@@ -101,6 +101,54 @@ You can verify your installation by using the mono-test-install
 script, it can diagnose some common problems with Mono's install.
 Failure to follow these steps may result in a broken installation. 
 
+Building using CMake (WIP)
+--------------------------
+
+Building the Mono C# compiler and the base class library with CMake is not yet
+supported. For now you need to set `-DENABLE_MCS_BUILD=NO` when invoking CMake
+as demonstrated below.
+
+### OS X (using the Unix Makefiles generator)
+
+    mkdir build
+    cd build/
+    cmake -DENABLE_MCS_BUILD=NO <path/to/mono/sources>
+    make
+    make test
+
+### OS X Xcode project
+
+    mkdir build
+    cd build/
+    cmake -GXcode -DENABLE_MCS_BUILD=NO <path/to/mono/sources>
+    open mono.xcodeproject
+
+### OS X CLion project
+
+CLion can open CMake based projects directly. Just point CLion at the mono
+source folder. Then inside CLion, open the CMake tool window, open CMake
+Settings and add `-DENABLE_MCS_BUILD=NO` to the CMake options.
+
+### Visual Studio 2015 Win x64
+
+    md build
+    cd build
+    cmake -G"Visual Studio 14 2015 Win64" -DENABLE_MCS_BUILD=NO <path\to\mono\sources>
+    mono.sln
+
+### Cygwin with Mingw-w64 64-bit (using the Unix Makefiles generator)
+
+Make sure to install the `mingw64` Cygwin packages:
+
+    mingw64-x86_64-runtime mingw64-x86_64-binutils mingw64-x86_64-gcc-core
+    mingw64-x86_64-gcc-g++ mingw64-x86_64-pthreads mingw64-x86_64-w32api
+
+    mkdir build
+    cd build/
+    CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ cmake -DENABLE_MCS_BUILD=NO <path/to/mono/sources>
+    make
+    make test
+
 Using Mono
 ==========
 
