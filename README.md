@@ -143,6 +143,8 @@ Make sure to install the `mingw64` Cygwin packages:
     mingw64-x86_64-runtime mingw64-x86_64-binutils mingw64-x86_64-gcc-core
     mingw64-x86_64-gcc-g++ mingw64-x86_64-pthreads mingw64-x86_64-w32api
 
+To build mono run
+
     mkdir build
     cd build/
     CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ cmake -DENABLE_MCS_BUILD=NO <path/to/mono/sources>
