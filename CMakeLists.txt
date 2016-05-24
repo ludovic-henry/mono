@@ -601,11 +601,7 @@ endif()
 set(WITH_SIGALTSTACK YES CACHE BOOL "Enable/disable support for sigaltstack (defaults to yes)")
 
 set(STATIC_MONO YES CACHE BOOL "Link mono statically to libmono (faster) (defaults to yes)")
-if(MSVC)
-  set(SHARED_MONO NO)
-else()
-  set(SHARED_MONO YES CACHE BOOL "Build a shared libmono library (defaults to yes)")
-endif()
+set(SHARED_MONO YES CACHE BOOL "Build a shared libmono library (defaults to yes)")
 # Same as --with-shared_mono=no
 set(DISABLE_LIBRARIES NO CACHE BOOL "Disable the build of libmono")
 
