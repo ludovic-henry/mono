@@ -253,7 +253,7 @@ namespace System
 
 		static void PollingThread ()
 		{
-			IntPtr backend = IntPtr.Zero;
+			IOSelectorBackend backend = InitializeBackend ();
 
 			try {
 				BackendInitialize (wakeup_pipes_rd.SafeFileHandle, out backend);
@@ -374,36 +374,47 @@ namespace System
 			}
 		}
 
-		static void BackendInitialize (SafeHandle wakeup_pipe, out IntPtr backend)
+		[MethodImplAttribute(MethodImplOptions.InternalCall)]
+		static void bool PlatformSupportEpoll ();
+
+		[MethodImplAttribute(MethodImplOptions.InternalCall)]
+		static void bool PlatformSupportKqueue ();
+
+		static IOSelectorBackend InitializeBackend ()
 		{
-			bool release = false;
-			try {
-				wakeup_pipe.DangerousAddRef (ref release);
-				try {
-				} finally {
-					/* It shouldn't be interrupted by a ThreadAbortException, as that could leak the `backend` resource */
-					backend = BackendInitialize (wakeup_pipe.DangerousGetHandle ());
-				}
-			} finally {
-				if (release)
-					wakeup_pipe.DangerousRelease ();
-			}
+			
 		}
 
-		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		static extern IntPtr BackendInitialize (IntPtr wakeup_pipes_handle);
+		// static void BackendInitialize (SafeHandle wakeup_pipe, out IntPtr backend)
+		// {
+		// 	bool release = false;
+		// 	try {
+		// 		wakeup_pipe.DangerousAddRef (ref release);
+		// 		try {
+		// 		} finally {
+		// 			/* It shouldn't be interrupted by a ThreadAbortException, as that could leak the `backend` resource */
+		// 			backend = BackendInitialize (wakeup_pipe.DangerousGetHandle ());
+		// 		}
+		// 	} finally {
+		// 		if (release)
+		// 			wakeup_pipe.DangerousRelease ();
+		// 	}
+		// }
 
-		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		static extern void BackendCleanup (IntPtr backend);
+		// [MethodImplAttribute(MethodImplOptions.InternalCall)]
+		// static extern IntPtr BackendInitialize (IntPtr wakeup_pipes_handle);
 
-		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		static extern void BackendAddHandle (IntPtr backend, IntPtr handle, int operations, bool is_new);
+		// [MethodImplAttribute(MethodImplOptions.InternalCall)]
+		// static extern void BackendCleanup (IntPtr backend);
 
-		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		static extern void BackendRemoveHandle (IntPtr backend, IntPtr handle);
+		// [MethodImplAttribute(MethodImplOptions.InternalCall)]
+		// static extern void BackendAddHandle (IntPtr backend, IntPtr handle, int operations, bool is_new);
 
-		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		static extern int BackendPoll (IntPtr backend, BackendEvent[] events);
+		// [MethodImplAttribute(MethodImplOptions.InternalCall)]
+		// static extern void BackendRemoveHandle (IntPtr backend, IntPtr handle);
+
+		// [MethodImplAttribute(MethodImplOptions.InternalCall)]
+		// static extern int BackendPoll (IntPtr backend, BackendEvent[] events);
 
 		class Update : IDisposable {
 			public UpdateType type;
