@@ -132,12 +132,29 @@ mono_threads_suspend_free (MonoThreadInfo *info)
 
 #if defined (HOST_WIN32)
 
+void
+mono_threads_platform_register (MonoThreadInfo *info)
+{
+	HANDLE thread_handle;
+
+	thread_handle = GetCurrentThread ();
+	g_assert (thread_handle);
+
+	/* The handle returned by GetCurrentThread () is a pseudo handle, so it can't
+	 * be used to refer to the thread from other threads for things like aborting. */
+	DuplicateHandle (GetCurrentProcess (), thread_handle, GetCurrentProcess (), &thread_handle, THREAD_ALL_ACCESS, TRUE, 0);
+
+	g_assert (!info->handle);
+	info->handle = thread_handle;
+}
+
 typedef struct {
 	LPTHREAD_START_ROUTINE start_routine;
 	void *arg;
 	MonoCoopSem registered;
 	gboolean suspend;
 	HANDLE suspend_event;
+	HANDLE handle;
 } ThreadStartInfo;
 
 static DWORD WINAPI
@@ -145,7 +162,6 @@ inner_start_thread (LPVOID arg)
 {
 	ThreadStartInfo *start_info = arg;
 	void *t_arg = start_info->arg;
-	int post_result;
 	LPTHREAD_START_ROUTINE start_func = start_info->start_routine;
 	DWORD result;
 	gboolean suspend = start_info->suspend;
@@ -155,6 +171,8 @@ inner_start_thread (LPVOID arg)
 	info = mono_thread_info_attach (&result);
 	info->runtime_thread = TRUE;
 	info->create_suspended = suspend;
+
+	start_info->handle = info->handle;
 
 	mono_coop_sem_post (&(start_info->registered));
 
@@ -173,43 +191,44 @@ inner_start_thread (LPVOID arg)
 HANDLE
 mono_threads_platform_create_thread (MonoThreadStart start_routine, gpointer arg, MonoThreadParm *tp, MonoNativeThreadId *out_tid)
 {
-	ThreadStartInfo *start_info;
+	ThreadStartInfo start_info;
 	HANDLE result;
 	DWORD thread_id;
 	guint32 creation_flags = tp->creation_flags;
 	int res;
 
-	start_info = g_malloc0 (sizeof (ThreadStartInfo));
-	if (!start_info)
-		return NULL;
-	mono_coop_sem_init (&(start_info->registered), 0);
-	start_info->arg = arg;
-	start_info->start_routine = start_routine;
-	start_info->suspend = creation_flags & CREATE_SUSPENDED;
+	memset (&start_info, 0, sizeof (start_info));
+	mono_coop_sem_init (&(start_info.registered), 0);
+	start_info.arg = arg;
+	start_info.start_routine = start_routine;
+	start_info.suspend = creation_flags & CREATE_SUSPENDED;
 	creation_flags &= ~CREATE_SUSPENDED;
-	if (start_info->suspend) {
-		start_info->suspend_event = CreateEvent (NULL, TRUE, FALSE, NULL);
-		if (!start_info->suspend_event)
+	if (start_info.suspend) {
+		start_info.suspend_event = CreateEvent (NULL, TRUE, FALSE, NULL);
+		if (!start_info.suspend_event)
 			return NULL;
 	}
 
-	result = CreateThread (NULL, tp->stack_size, inner_start_thread, start_info, creation_flags, &thread_id);
+	result = CreateThread (NULL, tp->stack_size, inner_start_thread, &start_info, creation_flags, &thread_id);
 	if (result) {
-		res = mono_coop_sem_wait (&(start_info->registered), MONO_SEM_FLAGS_NONE);
+		res = mono_coop_sem_wait (&(start_info.registered), MONO_SEM_FLAGS_NONE);
 		g_assert (res != -1);
 
-		if (start_info->suspend) {
-			g_assert (SuspendThread (result) != (DWORD)-1);
-			SetEvent (start_info->suspend_event);
+		/* A new handle has been opened when attaching
+		 * the thread, so we don't need this one */
+		CloseHandle (result);
+
+		if (start_info.suspend) {
+			g_assert (SuspendThread (start_info.handle) != (DWORD)-1);
+			SetEvent (start_info.suspend_event);
 		}
-	} else if (start_info->suspend) {
-		CloseHandle (start_info->suspend_event);
+	} else if (start_info.suspend) {
+		CloseHandle (start_info.suspend_event);
 	}
 	if (out_tid)
 		*out_tid = thread_id;
-	mono_coop_sem_destroy (&(start_info->registered));
-	g_free (start_info);
-	return result;
+	mono_coop_sem_destroy (&(start_info.registered));
+	return start_info.handle;
 }
 
 
