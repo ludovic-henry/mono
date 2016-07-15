@@ -87,11 +87,6 @@ mono_threads_platform_register (MonoThreadInfo *info)
 		return;
 	}
 
-	/* We need to keep the handle alive, as long as the corresponding managed
-	 * thread object is alive. The handle is going to be unref when calling
-	 * the finalizer on the MonoThreadInternal object */
-	mono_w32handle_ref (thread_handle);
-
 	g_assert (!info->handle);
 	info->handle = thread_handle;
 }
@@ -275,6 +270,14 @@ mono_native_thread_set_name (MonoNativeThreadId tid, const char *name)
 		pthread_setname_np (tid, n);
 	}
 #endif
+}
+
+gpointer
+mono_threads_platform_duplicate_handle (MonoThreadInfo *info)
+{
+	g_assert (info->handle);
+	mono_w32handle_ref (info->handle);
+	return info->handle;
 }
 
 void

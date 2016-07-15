@@ -1649,10 +1649,9 @@ mono_thread_info_set_exited (THREAD_INFO_TYPE *info)
 }
 
 gpointer
-mono_thread_info_get_handle (THREAD_INFO_TYPE *info)
+mono_thread_info_duplicate_handle (THREAD_INFO_TYPE *info)
 {
-	g_assert (info->handle);
-	return info->handle;
+	return mono_threads_platform_duplicate_handle (info);
 }
 
 void

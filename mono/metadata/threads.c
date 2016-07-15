@@ -882,7 +882,7 @@ create_thread (MonoThread *thread, MonoInternalThread *internal, StartInfo *star
 		return FALSE;
 	}
 
-	internal->handle = mono_thread_info_get_handle (thread_info);
+	internal->handle = mono_thread_info_duplicate_handle (thread_info);
 	internal->tid = MONO_NATIVE_THREAD_ID_TO_UINT (tid);
 
 	THREAD_DEBUG (g_message ("%s: Started thread ID %"G_GSIZE_FORMAT" (handle %p)", __func__, tid, internal->handle));
@@ -1026,7 +1026,7 @@ mono_thread_attach_full (MonoDomain *domain, gboolean force_attach)
 	tid=mono_native_thread_id_get ();
 
 	thread = create_internal_thread ();
-	thread->handle = mono_thread_info_get_handle (info);
+	thread->handle = mono_thread_info_duplicate_handle (info);
 	thread->tid = MONO_NATIVE_THREAD_ID_TO_UINT (tid);
 	thread->stack_ptr = &tid;
 

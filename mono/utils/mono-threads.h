@@ -556,6 +556,7 @@ void mono_threads_platform_get_stack_bounds (guint8 **staddr, size_t *stsize);
 gboolean mono_threads_platform_yield (void);
 void mono_threads_platform_exit (int exit_code);
 HANDLE mono_threads_platform_open_thread_handle (HANDLE handle, MonoNativeThreadId tid);
+gpointer mono_threads_platform_duplicate_handle (THREAD_INFO_TYPE *info);
 void mono_threads_platform_set_exited (THREAD_INFO_TYPE *info);
 void mono_threads_platform_describe (THREAD_INFO_TYPE *info, GString *text);
 void mono_threads_platform_own_mutex (THREAD_INFO_TYPE *info, gpointer mutex_handle);
@@ -678,7 +679,7 @@ gboolean
 mono_thread_info_is_current (THREAD_INFO_TYPE *info);
 
 gpointer
-mono_thread_info_get_handle (THREAD_INFO_TYPE *info);
+mono_thread_info_duplicate_handle (THREAD_INFO_TYPE *info);
 
 void
 mono_thread_info_describe (THREAD_INFO_TYPE *info, GString *text);

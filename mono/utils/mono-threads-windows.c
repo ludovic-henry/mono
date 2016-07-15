@@ -290,6 +290,19 @@ mono_native_thread_set_name (MonoNativeThreadId tid, const char *name)
 #endif
 }
 
+gpointer
+mono_threads_platform_duplicate_handle (MonoThreadInfo *info)
+{
+	HANDLE thread_handle;
+
+	g_assert (info->handle);
+
+	/* Create a new handle that's going to be used for managed */
+	DuplicateHandle (GetCurrentProcess (), info->handle, GetCurrentProcess (), &thread_handle, THREAD_ALL_ACCESS, TRUE, 0);
+
+	return thread_handle;
+}
+
 void
 mono_threads_platform_set_exited (MonoThreadInfo *info)
 {
