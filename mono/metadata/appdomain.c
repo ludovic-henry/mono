@@ -2464,18 +2464,6 @@ mono_domain_unload (MonoDomain *domain)
 	mono_domain_try_unload (domain, &exc);
 }
 
-static guint32
-guarded_wait (HANDLE handle, guint32 timeout, gboolean alertable)
-{
-	guint32 result;
-
-	MONO_ENTER_GC_SAFE;
-	result = WaitForSingleObjectEx (handle, timeout, alertable);
-	MONO_EXIT_GC_SAFE;
-
-	return result;
-}
-
 /*
  * mono_domain_unload:
  * @domain: The domain to unload
@@ -2499,7 +2487,7 @@ void
 mono_domain_try_unload (MonoDomain *domain, MonoObject **exc)
 {
 	MonoError error;
-	HANDLE thread_handle;
+	MonoThreadInfo *thread_info;
 	MonoAppDomainState prev_state;
 	MonoMethod *method;
 	unload_data *thread_data;
@@ -2565,22 +2553,22 @@ mono_domain_try_unload (MonoDomain *domain, MonoObject **exc)
 	tp.priority = MONO_THREAD_PRIORITY_NORMAL;
 	tp.stack_size = 0;
 	tp.creation_flags = CREATE_SUSPENDED;
-	thread_handle = mono_threads_create_thread (unload_thread_main, thread_data, &tp, &tid);
-	if (thread_handle == NULL)
+	thread_info = mono_threads_create_thread (unload_thread_main, thread_data, &tp, &tid);
+	if (thread_info == NULL)
 		return;
 	mono_thread_info_resume (tid);
 
 	/* Wait for the thread */	
-	while (!thread_data->done && guarded_wait (thread_handle, INFINITE, TRUE) == WAIT_IO_COMPLETION) {
+	while (!thread_data->done && mono_thread_info_join (thread_info, INFINITE, TRUE) == MONO_THREAD_INFO_JOIN_RET_ALERTED) {
 		if (mono_thread_internal_has_appdomain_ref (mono_thread_internal_current (), domain) && (mono_thread_interruption_requested ())) {
 			/* The unload thread tries to abort us */
 			/* The icall wrapper will execute the abort */
-			CloseHandle (thread_handle);
+			CloseHandle (mono_thread_info_get_handle (thread_info));
 			unload_data_unref (thread_data);
 			return;
 		}
 	}
-	CloseHandle (thread_handle);
+	CloseHandle (mono_thread_info_get_handle (thread_info));
 
 	if (thread_data->failure_reason) {
 		/* Roll back the state change */

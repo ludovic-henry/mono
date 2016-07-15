@@ -667,7 +667,7 @@ static MonoGHashTable *tid_to_thread_obj;
 
 static MonoNativeThreadId debugger_thread_id;
 
-static HANDLE debugger_thread_handle;
+static MonoThreadInfo *debugger_thread_info;
 
 static int log_level;
 
@@ -1632,8 +1632,8 @@ start_debugger_thread (void)
 	tp.priority = MONO_THREAD_PRIORITY_NORMAL;
 	tp.stack_size = 0;
 	tp.creation_flags = 0;
-	debugger_thread_handle = mono_threads_create_thread (debugger_thread, NULL, &tp, NULL);
-	g_assert (debugger_thread_handle);
+	debugger_thread_info = mono_threads_create_thread (debugger_thread, NULL, &tp, NULL);
+	g_assert (debugger_thread_info);
 }
 
 /*

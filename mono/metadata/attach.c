@@ -94,7 +94,7 @@ static char *ipc_filename;
 
 static char *server_uri;
 
-static HANDLE receiver_thread_handle;
+static MonoThreadInfo* receiver_thread_info;
 
 static gboolean stop_receiver_thread;
 
@@ -259,8 +259,8 @@ mono_attach_cleanup (void)
 		close (conn_fd);
 
 	/* Wait for the receiver thread to exit */
-	if (receiver_thread_handle)
-		WaitForSingleObjectEx (receiver_thread_handle, 0, FALSE);
+	if (receiver_thread_info)
+		mono_thread_info_join (receiver_thread_info, 0, FALSE);
 }
 
 static int
@@ -485,8 +485,8 @@ transport_start_receive (void)
 	tp.priority = MONO_THREAD_PRIORITY_NORMAL;
 	tp.stack_size = 0;
 	tp.creation_flags = 0;
-	receiver_thread_handle = mono_threads_create_thread (receiver_thread, NULL, &tp, NULL);
-	g_assert (receiver_thread_handle);
+	receiver_thread_info = mono_threads_create_thread (receiver_thread, NULL, &tp, NULL);
+	g_assert (receiver_thread_info);
 }
 
 static gsize WINAPI

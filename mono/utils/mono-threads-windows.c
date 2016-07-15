@@ -325,6 +325,29 @@ mono_threads_platform_set_priority (MonoThreadInfo *info, MonoThreadPriority pri
 	return SetThreadPriority (info->handle, priority - 2);
 }
 
+MonoThreadInfoJoinRet
+mono_threads_platform_join (MonoThreadInfo *info, guint32 timeout, gboolean alertable)
+{
+	guint32 res;
+
+	g_assert (info->handle);
+
+	MONO_ENTER_GC_SAFE;
+	res = WaitForSingleObjectEx (info->handle, timeout, alertable);
+	MONO_EXIT_GC_SAFE;
+
+	switch (res) {
+	case WAIT_OBJECT_0:
+		return MONO_THREAD_INFO_JOIN_RET_SUCCESS;
+	case WAIT_IO_COMPLETION:
+		return MONO_THREAD_INFO_JOIN_RET_ALERTED;
+	case WAIT_TIMEOUT:
+		return MONO_THREAD_INFO_JOIN_RET_TIMEDOUT;
+	default:
+		g_error ("%s: WaitForSingleObjectEx failed with error %d", __func__, res);
+	}
+}
+
 void
 mono_threads_platform_init (void)
 {

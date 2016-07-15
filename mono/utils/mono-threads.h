@@ -464,7 +464,7 @@ mono_thread_info_describe_interrupt_token (THREAD_INFO_TYPE *info, GString *text
 gboolean
 mono_thread_info_is_live (THREAD_INFO_TYPE *info);
 
-HANDLE
+MonoThreadInfo*
 mono_threads_create_thread (MonoThreadStart start, gpointer arg, MonoThreadParm *tp, MonoNativeThreadId *out_tid);
 
 int
@@ -475,6 +475,15 @@ mono_threads_open_thread_handle (HANDLE handle, MonoNativeThreadId tid);
 
 MONO_API void
 mono_threads_attach_tools_thread (void);
+
+typedef enum {
+	MONO_THREAD_INFO_JOIN_RET_SUCCESS  =  0,
+	MONO_THREAD_INFO_JOIN_RET_ALERTED  = -1,
+	MONO_THREAD_INFO_JOIN_RET_TIMEDOUT = -2,
+} MonoThreadInfoJoinRet;
+
+MonoThreadInfoJoinRet
+mono_thread_info_join (THREAD_INFO_TYPE *info, guint32 timeout, gboolean alertable);
 
 
 #if !defined(HOST_WIN32)
@@ -547,6 +556,7 @@ void mono_threads_platform_own_mutex (THREAD_INFO_TYPE *info, gpointer mutex_han
 void mono_threads_platform_disown_mutex (THREAD_INFO_TYPE *info, gpointer mutex_handle);
 MonoThreadPriority mono_threads_platform_get_priority (THREAD_INFO_TYPE *info);
 gboolean mono_threads_platform_set_priority (THREAD_INFO_TYPE *info, MonoThreadPriority priority);
+MonoThreadInfoJoinRet mono_threads_platform_join (THREAD_INFO_TYPE *info, guint32 timeout, gboolean alertable);
 
 void mono_threads_coop_begin_global_suspend (void);
 void mono_threads_coop_end_global_suspend (void);

@@ -825,7 +825,7 @@ static gboolean
 create_thread (MonoThread *thread, MonoInternalThread *internal, StartInfo *start_info, gboolean threadpool_thread, guint32 stack_size,
 			   MonoError *error)
 {
-	HANDLE thread_handle;
+	MonoThreadInfo *thread_info;
 	MonoNativeThreadId tid;
 	MonoThreadParm tp;
 
@@ -870,9 +870,9 @@ create_thread (MonoThread *thread, MonoInternalThread *internal, StartInfo *star
 	tp.stack_size = stack_size;
 	tp.creation_flags = CREATE_SUSPENDED;
 
-	thread_handle = mono_threads_create_thread (start_wrapper, start_info, &tp, &tid);
+	thread_info = mono_threads_create_thread (start_wrapper, start_info, &tp, &tid);
 
-	if (thread_handle == NULL) {
+	if (thread_info == NULL) {
 		/* The thread couldn't be created, so set an exception */
 		mono_threads_lock ();
 		mono_g_hash_table_remove (threads_starting_up, thread);
@@ -881,10 +881,11 @@ create_thread (MonoThread *thread, MonoInternalThread *internal, StartInfo *star
 		mono_error_set_execution_engine (error, "Couldn't create thread. Error 0x%x", GetLastError());
 		return FALSE;
 	}
-	THREAD_DEBUG (g_message ("%s: Started thread ID %"G_GSIZE_FORMAT" (handle %p)", __func__, tid, thread_handle));
 
-	internal->handle = thread_handle;
+	internal->handle = mono_thread_info_get_handle (thread_info);
 	internal->tid = MONO_NATIVE_THREAD_ID_TO_UINT (tid);
+
+	THREAD_DEBUG (g_message ("%s: Started thread ID %"G_GSIZE_FORMAT" (handle %p)", __func__, tid, internal->handle));
 
 	internal->threadpool_thread = threadpool_thread;
 	if (threadpool_thread)

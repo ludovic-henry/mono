@@ -1184,11 +1184,16 @@ inner_start_thread (gpointer data)
 
 /*
  * mono_threads_create_thread:
+ *   @start: the function to execute
+ *   @arg: the argument to pass to the function to execute
+ *   @tp: some additionnal parameters
+ *   @out_tid: the tid of the newly created thread
+ *   @return: the newly created MonoThreadInfo*, or NULL on error
  *
- *   Create a new thread executing START with argument ARG. Store its id into OUT_TID.
- * Returns: a windows or io-layer handle for the thread.
+ * Create a new thread executing START with argument ARG. Store its id into OUT_TID.
+ *
  */
-HANDLE
+MonoThreadInfo*
 mono_threads_create_thread (MonoThreadStart start, gpointer arg, MonoThreadParm *tp, MonoNativeThreadId *out_tid)
 {
 	CreateThreadData thread_data;
@@ -1213,8 +1218,7 @@ mono_threads_create_thread (MonoThreadStart start, gpointer arg, MonoThreadParm 
 
 	mono_coop_sem_destroy (&thread_data.registered);
 
-	return mono_thread_info_get_handle (thread_data.info);
-
+	return thread_data.info;
 }
 
 /*
@@ -1679,4 +1683,10 @@ gboolean
 mono_thread_info_set_priority (MonoThreadInfo *info, MonoThreadPriority priority)
 {
 	return mono_threads_platform_set_priority (info, priority);
+}
+
+MonoThreadInfoJoinRet
+mono_thread_info_join (MonoThreadInfo *info, guint32 timeout, gboolean alertable)
+{
+	return mono_threads_platform_join (info, timeout, alertable);
 }
