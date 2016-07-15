@@ -143,13 +143,9 @@ mono_threads_platform_yield (void)
 void
 mono_threads_platform_exit (int exit_code)
 {
-	MonoThreadInfo *current = mono_thread_info_current ();
-
 #if defined(__native_client__)
 	nacl_shutdown_gc_thread();
 #endif
-
-	mono_threads_platform_set_exited (current);
 
 	mono_thread_info_detach ();
 
@@ -290,11 +286,10 @@ mono_threads_platform_set_exited (MonoThreadInfo *info)
 
 	g_assert (info->handle);
 
-	if (mono_w32handle_issignalled (info->handle) || mono_w32handle_get_type (info->handle) == MONO_W32HANDLE_UNUSED) {
-		/* We must have already deliberately finished
-		 * with this thread, so don't do any more now */
-		return;
-	}
+	if (mono_w32handle_issignalled (info->handle))
+		g_error ("%s: thread %p has already exited, it's handle is signalled", __func__, mono_thread_info_get_tid (info));
+	if (mono_w32handle_get_type (info->handle) == MONO_W32HANDLE_UNUSED)
+		g_error ("%s: thread %p has already exited, it's handle type is 'unused'", __func__, mono_thread_info_get_tid (info));
 
 	pid = wapi_getpid ();
 	tid = pthread_self ();
