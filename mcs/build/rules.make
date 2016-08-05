@@ -24,6 +24,7 @@ Q=$(if $(V),,@)
 # echo -e "\\t" does not work on some systems, so use 5 spaces
 Q_MCS=$(if $(V),,@echo "MCS     [$(intermediate)$(PROFILE)] $(notdir $(@))";)
 Q_AOT=$(if $(V),,@echo "AOT     [$(intermediate)$(PROFILE)] $(notdir $(@))";)
+Q_STRIP=$(if $(V),,@echo "STRIP   [$(intermediate)$(PROFILE)] $(notdir $(@))";)
 
 ifndef BUILD_TOOLS_PROFILE
 BUILD_TOOLS_PROFILE = build
@@ -169,6 +170,9 @@ do-all-aot:
 	$(MAKE) do-all TOP_LEVEL_DO=do-all
 	$(MAKE) aot-all-profile
 
+do-all-strip: do-all-aot
+	$(MAKE) strip-all-profile
+
 # When we recursively call $(MAKE) aot-all-profile
 # we will have created this directory, and so will
 # be able to evaluate the .dylibs to make
@@ -184,6 +188,13 @@ aot-all-profile: $(patsubst %,%$(PLATFORM_AOT_SUFFIX),$(AOT_PROFILE_ASSEMBLIES))
 	@ mkdir -p $*_bitcode_tmp
 	$(Q_AOT) MONO_PATH="$(dir $*)" $(RUNTIME) $(RUNTIME_FLAGS) $(AOT_BUILD_FLAGS),temp-path=$*_bitcode_tmp --verbose $* > $@.aot-log
 	@ rm -rf $*_bitcode_tmp
+
+# This can run in parallel
+.PHONY: strip-all-profile
+strip-all-profile: $(patsubst %,%.strip-stamp,$(filter-out %mscorlib.dll %System.dll %Mono.Cecil.dll %Mono.Cecil.Mdb.dll %nunit.util.dll %nunit.core.dll %nunit.framework.extensions.dll %nunit-console-runner.dll %nunit.core.extensions.dll %nunit.framework.dll %nunit.mocks.dll %nunit.core.interfaces.dll %.exe,$(AOT_PROFILE_ASSEMBLIES)))
+
+%.strip-stamp: %
+	$(Q_STRIP) MONO_PATH="$(dir $*)" $(RUNTIME) $(RUNTIME_FLAGS) $(dir $*)mono-cil-strip.exe $* >> $(dir $*)$(PROFILE)_strip.log
 
 endif #ifneq ("$(wildcard $(topdir)/class/lib/$(PROFILE))","")
 
