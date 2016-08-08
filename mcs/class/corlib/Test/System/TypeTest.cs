@@ -1822,7 +1822,7 @@ namespace MonoTests.System
 			Assert.AreEqual ("System.String[*]", t.ToString ());
 		}
 
-#if MONO_COM
+#if FEATURE_COMINTEROP
 		[Test]
 		public void TypeFromCLSID ()
 		{

@@ -155,7 +155,7 @@ namespace System {
         public virtual Type MakeArrayType() { throw new NotSupportedException(); }
         public virtual Type MakeArrayType(int rank) { throw new NotSupportedException(); }
 
-#if FEATURE_COMINTEROP || MONO_COM || MOBILE_LEGACY
+#if FEATURE_COMINTEROP || MOBILE_LEGACY
         ////////////////////////////////////////////////////////////////////////////////
         // This will return a class based upon the progID.  This is provided for 
         // COM classic support.  Program ID's are not used in COM+ because they 
@@ -1249,7 +1249,7 @@ namespace System {
             get {return IsCOMObjectImpl();}
         }
 
-#if FEATURE_COMINTEROP || MONO_COM
+#if FEATURE_COMINTEROP
         internal bool IsWindowsRuntimeObject {
             [Pure]
             get { return IsWindowsRuntimeObjectImpl(); }
@@ -1313,7 +1313,7 @@ namespace System {
         // Protected routine to determine if this class represents a COM object
         abstract protected bool IsCOMObjectImpl();
 
-#if FEATURE_COMINTEROP || MONO_COM
+#if FEATURE_COMINTEROP
         // Protected routine to determine if this class represents a Windows Runtime object
         virtual internal bool IsWindowsRuntimeObjectImpl() {
             throw new NotImplementedException();
