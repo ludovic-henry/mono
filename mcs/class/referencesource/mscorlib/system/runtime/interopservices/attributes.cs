@@ -1,6 +1,3 @@
-#if MONO_COM
-#define FEATURE_COMINTEROP
-#endif
 // ==++==
 // 
 //   Copyright (c) Microsoft Corporation.  All rights reserved.

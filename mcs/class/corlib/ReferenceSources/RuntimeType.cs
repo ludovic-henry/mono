@@ -32,7 +32,7 @@ using System.Threading;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Globalization;
-#if MONO_COM
+#if FEATURE_COMINTEROP
 using System.Reflection.Emit;
 #endif
 using System.Diagnostics.Contracts;
@@ -567,14 +567,14 @@ namespace System
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]
 		internal extern void GetPacking (out int packing, out int size);
 
-#if MONO_COM
+#if FEATURE_COMINTEROP
 		private static Dictionary<Guid, Type> clsid_types;
 		private static AssemblyBuilder clsid_assemblybuilder;
 #endif
 
 		internal static Type GetTypeFromCLSIDImpl(Guid clsid, String server, bool throwOnError)
 		{
-#if MONO_COM
+#if FEATURE_COMINTEROP
 			Type result;
 
 			if (clsid_types == null)

@@ -608,7 +608,7 @@ namespace System {
                                                                    activationAttributes,
                                                                    null);
         }
-#if FEATURE_COMINTEROP || MONO_COM || MOBILE_LEGACY
+#if FEATURE_COMINTEROP || MOBILE_LEGACY
 
 #if FEATURE_CLICKONCE || MOBILE_LEGACY
 #if FEATURE_CLICKONCE || MONO_FEATURE_MULTIPLE_APPDOMAINS
