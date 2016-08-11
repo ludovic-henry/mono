@@ -770,9 +770,10 @@ AC_ARG_WITH(monotouch_watch, [  --with-monotouch_watch=yes,no   If you want to b
 AC_ARG_WITH(monotouch_tv,    [  --with-monotouch_tv=yes,no      If you want to build the Xamarin.TVOS assemblies (defaults to no)],   [], [with_monotouch_tv=default])
 AC_ARG_WITH(bitcode,         [  --with-bitcode=yes,no           If bitcode is enabled (defaults to no)],                              [], [with_bitcode=default])
 AC_ARG_WITH(xammac,          [  --with-xammac=yes,no            If you want to build the Xamarin.Mac assemblies (defaults to no)],    [], [with_xammac=default])
+AC_ARG_WITH(mobile,          [  --with-mobile=yes,no            If you want to build the mobile assemblies (defaults to no)],         [], [with_mobile=default])
 AC_ARG_WITH(mobile_static,   [  --with-mobile_static=yes,no     If you want to build the mobile_static assemblies (defaults to no)],  [], [with_mobile_static=default])
 
-AC_ARG_WITH(runtime_preset, [  --with-runtime_preset=net_4_x,all,mobile_static,bitcode_mobile_static   Which default profile to build (defaults to net_4_x)],  [], [with_runtime_preset=net_4_x])
+AC_ARG_WITH(runtime_preset, [  --with-runtime_preset=net_4_x,all,mobile,mobile_static,bitcode_mobile_static   Which default profile to build (defaults to net_4_x)],  [], [with_runtime_preset=net_4_x])
 
 dnl
 dnl Profile defaults
@@ -786,6 +787,7 @@ with_monotouch_default=no
 with_monotouch_watch_default=no
 with_monotouch_tv_default=no
 with_xammac_default=no
+with_mobile_default=no
 with_mobile_static_default=no
 
 with_bitcode_default=no
@@ -879,6 +881,9 @@ fi
 if test "x$with_xammac" = "xdefault"; then
    with_xammac=$with_xammac_default
 fi
+if test "x$with_mobile" = "xdefault"; then
+   with_mobile=$with_mobile_default
+fi
 if test "x$with_mobile_static" = "xdefault"; then
    with_mobile_static=$with_mobile_static_default
 fi
@@ -890,6 +895,7 @@ AM_CONDITIONAL(INSTALL_MONOTOUCH_WATCH, [test "x$with_monotouch_watch" != "xno"]
 AM_CONDITIONAL(INSTALL_MONOTOUCH_TV, [test "x$with_monotouch_tv" != "xno"])
 AM_CONDITIONAL(BITCODE, test "x$with_bitcode" = "xyes")
 AM_CONDITIONAL(INSTALL_XAMMAC, [test "x$with_xammac" != "xno"])
+AM_CONDITIONAL(INSTALL_MOBILE, [test "x$with_mobile" != "xno"])
 AM_CONDITIONAL(INSTALL_MOBILE_STATIC, [test "x$with_mobile_static" != "xno"])
 
 AC_SUBST(INSTALL_MOBILE_STATIC)
@@ -903,6 +909,9 @@ if test -z "$INSTALL_MONOTOUCH_TRUE"; then :
 fi
 if test -z "$INSTALL_XAMMAC_TRUE"; then :
    default_profile=xammac
+fi
+if test -z "$INSTALL_MOBILE_TRUE"; then :
+   default_profile=mobile
 fi
 if test -z "$INSTALL_MOBILE_STATIC_TRUE"; then :
    default_profile=mobile_static
@@ -4431,6 +4440,7 @@ echo "
 	Xamarin.WatchOS: $with_monotouch_watch
 	Xamarin.TVOS:    $with_monotouch_tv
 	Xamarin.Mac:     $with_xammac
+	mobile:          $with_mobile
 	mobile_static:   $with_mobile_static
 	JNI support:     $jdk_headers_found
 	libgdiplus:      $libgdiplus_msg
