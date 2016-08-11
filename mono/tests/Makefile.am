@@ -1,6 +1,6 @@
 SUBDIRS = assemblyresolve gc-descriptors
 
-if INSTALL_MOBILE_STATIC
+ifneq $($(or INSTALL_MOBILE_STATIC,INSTALL_MOBILE),)
 FEATUREFUL_RUNTIME_TEST =  
 else
 FEATUREFUL_RUNTIME_TEST = test-appdomain-unload
@@ -48,6 +48,10 @@ MKBUNDLE = \
 
 if INSTALL_MOBILE_STATIC
 PROFILE_MCS_FLAGS = -d:MOBILE,MOBILE_STATIC,MOBILE_LEGACY 
+else
+if INSTALL_MOBILE
+PROFILE_MCS_FLAGS = -d:MOBILE,MOBILE_LEGACY 
+endif
 endif
 
 MCS_NO_LIB = $(RUNTIME) $(mcs_topdir)/class/lib/build/mcs.exe -unsafe -debug \
@@ -60,7 +64,7 @@ MCS = $(MCS_NO_LIB) -lib:$(CLASS)
 
 ILASM = $(RUNTIME) $(CLASS)/ilasm.exe
 
-if INSTALL_MOBILE_STATIC
+ifneq $($(or INSTALL_MOBILE_STATIC,INSTALL_MOBILE),)
 TEST_RUNNER = ./test-runner.exe --runtime $(top_builddir)/runtime/mono-wrapper --mono-path "$(CLASS)" --aot-run-flags "$(AOT_RUN_FLAGS)" --aot-build-flags "$(AOT_BUILD_FLAGS)"
 else
 TEST_RUNNER = ./test-runner.exe --runtime $(top_builddir)/runtime/mono-wrapper --mono-path "$(CLASS)"
@@ -84,62 +88,64 @@ STRESS_TESTS_SRC=	\
 	process-stress.cs	\
 	assembly-load-stress.cs
 
-BASE_TEST_MOBILE_STATIC_NOT_SUPPORTED= \
-	remoting4.cs		# Needs remoting support \
+BASE_TEST_MOBILE_NOT_SUPPORTED= \
+	appdomain-async-invoke.cs	# Needs appdomain support \
+	appdomain-client.cs	# Needs appdomain support \
+	appdomain-exit.cs	# Needs appdomain support \
+	appdomain-thread-abort.cs	# Needs appdomain support \
+	appdomain-unload-callback.cs	# Needs appdomain support \
+	appdomain-unload-doesnot-raise-pending-events.cs	# Needs appdomain support \
+	appdomain-unload.cs # Needs appdomain support \
+	appdomain.cs        # Needs appdomain support \
+	appdomain1.cs		# Needs appdomain support \
+	appdomain2.cs		# Needs appdomain support \
+	assemblyresolve_event2.2.cs	# Needs appdomain support \
+	bug-36848.cs   # Needs AppDomains / TranparentProxy \
+	bug-48015.cs # Needs AppDomains / TranparentProxy \
+	bug-544446.cs	# Needs AppDomains / TranparentProxy \
+	bug-80307.cs	# Need System.Web \
+	cominterop.cs	# Needs COM \
+	cross-domain.cs # Needs AppDomains \
+	delegate9.cs # Needs AppDomains \
+	generic-marshalbyref.2.cs # Needs AppDomains \
+	generic-unloading.2.cs # Needs AppDomains \
+	generic-xdomain.2.cs # Needs AppDomains \
+	marshal-valuetypes.cs	# Needs AppDomains \
+	monitor.cs # Needs AppDomains \
 	remoting1.cs		# Needs remoting support \
 	remoting2.cs		# Needs remoting support \
 	remoting3.cs		# Needs remoting support \
+	remoting4.cs		# Needs remoting support \
 	remoting5.cs		# Needs remoting support \
-	appdomain.cs        # Needs appdomain support \
-	appdomain-client.cs	# Needs appdomain support \
-	appdomain-unload.cs # Needs appdomain support \
-	appdomain-async-invoke.cs	# Needs appdomain support \
-	appdomain-thread-abort.cs	# Needs appdomain support \
-	appdomain1.cs		# Needs appdomain support \
-	appdomain2.cs		# Needs appdomain support \
-	appdomain-exit.cs	# Needs appdomain support \
-	assemblyresolve_event2.2.cs	# Needs appdomain support \
-	appdomain-unload-callback.cs	# Needs appdomain support \
-	appdomain-unload-doesnot-raise-pending-events.cs	# Needs appdomain support \
+	stackframes-async.2.cs # Needs AppDomains \
+	thread6.cs # On MOBILE, ThreadAbortException doesn't have necessary field for this test \
+	threadpool-exceptions7.cs # Needs AppDomains \
+	transparentproxy.cs # Needs AppDomains / TranparentProxy \
 	unload-appdomain-on-shutdown.cs # Needs appdomain support \
-	bug-47295.cs # Needs SRE \
-	loader.cs # Needs SRE \
-	pinvoke2.cs # Needs SRE \
-	generic-type-builder.2.cs	# Needs SRE \
-	dynamic-generic-size.cs	# Needs SRE \
-	cominterop.cs	# Needs COM \
-	dynamic-method-access.2.cs	# Need SRE \
-	dynamic-method-finalize.2.cs	# Need SRE \
-	dynamic-method-stack-traces.cs # Need SRE\
-	generic_type_definition.2.cs	# Need SRE \
+	xdomain-threads.cs	# Needs AppDomains
+
+BASE_TEST_MOBILE_STATIC_NOT_SUPPORTED= \
+	assembly_append_ordering.cs # Need SRE \
+	bug-322722_dyn_method_throw.2.cs	# Need SRE \
+	bug-322722_patch_bx.2.cs	# Need SRE\
 	bug-333798-tb.2.cs	# Need SRE \
 	bug-335131.2.cs	# Need SRE \
-	bug-322722_patch_bx.2.cs	# Need SRE\
-	bug-322722_dyn_method_throw.2.cs	# Need SRE \
-	bug-389886-2.cs	# Need SRE \
 	bug-349190.2.cs	# Need SRE \
+	bug-389886-2.cs	# Need SRE \
+	bug-389886-3.cs	# Need SRE \
 	bug-389886-sre-generic-interface-instances.cs	# Need SRE \
 	bug-462592.cs	# Need SRE \
+	bug-47295.cs # Needs SRE \
 	bug-575941.cs	# Need SRE \
-	bug-389886-3.cs	# Need SRE \
+	dynamic-generic-size.cs	# Needs SRE \
+	dynamic-method-access.2.cs	# Need SRE \
+	dynamic-method-finalize.2.cs	# Need SRE \
 	dynamic-method-resurrection.cs	# Need SRE \
-	bug-80307.cs	# Need System.Web \
-	assembly_append_ordering.cs # Need SRE \
-	bug-544446.cs	# Needs AppDomains / TranparentProxy \
-	bug-36848.cs   # Needs AppDomains / TranparentProxy \
-	generic-marshalbyref.2.cs # Needs AppDomains \
-	stackframes-async.2.cs # Needs AppDomains \
-	transparentproxy.cs # Needs AppDomains / TranparentProxy \
-	bug-48015.cs # Needs AppDomains / TranparentProxy \
-	delegate9.cs # Needs AppDomains \
-	marshal-valuetypes.cs	# Needs AppDomains \
-	xdomain-threads.cs	# Needs AppDomains \
-	monitor.cs # Needs AppDomains \
-	generic-xdomain.2.cs # Needs AppDomains \
-	threadpool-exceptions7.cs # Needs AppDomains \
-	cross-domain.cs # Needs AppDomains \
-	generic-unloading.2.cs # Needs AppDomains \
-	thread6.cs # On MOBILE, ThreadAbortException doesn't have necessary field for this test
+	dynamic-method-stack-traces.cs # Need SRE\
+	generic-type-builder.2.cs	# Needs SRE \
+	generic_type_definition.2.cs	# Need SRE \
+	loader.cs # Needs SRE \
+	pinvoke2.cs # Needs SRE
 
 # Disabled until ?mcs is fixed
 #	bug-331958.cs
@@ -470,9 +476,16 @@ if INSTALL_MOBILE_STATIC
 BASE_TEST_CS_SRC= \
 	$(BASE_TEST_CS_SRC_UNIVERSAL)
 else
+if INSTALL_MOBILE
 BASE_TEST_CS_SRC= \
-	$(BASE_TEST_MOBILE_STATIC_NOT_SUPPORTED) \
-	$(BASE_TEST_CS_SRC_UNIVERSAL)
+	$(BASE_TEST_CS_SRC_UNIVERSAL) \
+	$(BASE_TEST_MOBILE_STATIC_NOT_SUPPORTED)
+else
+BASE_TEST_CS_SRC= \
+	$(BASE_TEST_CS_SRC_UNIVERSAL) \
+	$(BASE_TEST_MOBILE_NOT_SUPPORTED) \
+	$(BASE_TEST_MOBILE_STATIC_NOT_SUPPORTED)
+endif
 endif
 
 TEST_CS_SRC_DIST=	\

@@ -67,16 +67,18 @@ mobile_static_dirs := \
 	Mono.Simd			\
 	$(pcl_facade_dirs)
 
-mobile_dynamic_dirs := \
+mobile_dirs := \
+	$(mobile_static_dirs)
+
+xammac_dirs := \
 	$(mobile_common_dirs)	\
 	Mono.CompilerServices.SymbolWriter	\
 	$(pcl_facade_dirs)
 
-xammac_dirs := \
-	$(mobile_dynamic_dirs)
-
 monodroid_dirs := \
-	$(mobile_dynamic_dirs)
+	$(mobile_common_dirs)	\
+	Mono.CompilerServices.SymbolWriter	\
+	$(pcl_facade_dirs)
 
 monotouch_dirs := \
 	$(mobile_static_dirs)
@@ -311,7 +313,7 @@ monotouch_runtime_SUBDIRS := $(monotouch_runtime_dirs)
 monotouch_watch_runtime_SUBDIRS := $(monotouch_watch_runtime_dirs)
 monotouch_tv_runtime_SUBDIRS := $(monotouch_tv_runtime_dirs)
 mobile_static_SUBDIRS := $(mobile_static_dirs)
-mobile_SUBDIRS := $(mobile_dynamic_dirs)
+mobile_SUBDIRS := $(mobile_dirs)
 xammac_SUBDIRS := $(xammac_dirs)
 xammac_net_4_5_SUBDIRS := $(xammac_4_5_dirs)
 binary_reference_assemblies_SUBDIRS := reference-assemblies
@@ -322,7 +324,7 @@ xbuild_14_SUBDIRS := $(xbuild_4_0_dirs) Microsoft.NuGet.Build.Tasks
 
 include ../build/rules.make
 
-SUBDIRS = $(mobile_static_dirs) $(mobile_dynamic_dirs) $(monotouch_dirs) $(monodroid_dirs) $(xammac_dirs) $(net_4_x_dirs) $(net_4_x_parallel_dirs) $(xammac_net_4_5_SUBDIRS)
+SUBDIRS = $(mobile_static_dirs) $(mobile_dirs) $(monotouch_dirs) $(monodroid_dirs) $(xammac_dirs) $(net_4_x_dirs) $(net_4_x_parallel_dirs) $(xammac_net_4_5_SUBDIRS)
 
 DIST_ONLY_SUBDIRS = dlr aot-compiler reference-assemblies $(xbuild_4_0_dirs) Microsoft.NuGet.Build.Tasks
 
