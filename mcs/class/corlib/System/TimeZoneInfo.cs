@@ -149,7 +149,7 @@ namespace System
 			return true;
 		}
 
-#if !MOBILE || MOBILE_STATIC
+#if !MONODROID && !MONOTOUCH && !XAMMAC
 		static TimeZoneInfo CreateLocal ()
 		{
 #if !MOBILE_STATIC
@@ -237,7 +237,7 @@ namespace System
 			throw new NotImplementedException ("This method is not implemented for this platform");
 #endif
 		}
-#endif
+#endif // !MONODROID && !MONOTOUCH && !XAMMAC
 
 		string standardDisplayName;
 		public string StandardName {
@@ -273,7 +273,7 @@ namespace System
 #endif
 		private AdjustmentRule [] adjustmentRules;
 
-#if !NET_2_1 || MOBILE_STATIC
+#if !NET_2_1 || !MOBILE_STATIC
 		/// <summary>
 		/// Determine whether windows of not (taken Stephane Delcroix's code)
 		/// </summary>

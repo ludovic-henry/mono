@@ -60,12 +60,22 @@ namespace Microsoft.Win32
 			throw new PlatformNotSupportedException ();
 		}
 
+		public object GetValue (string name)
+		{
+			throw new PlatformNotSupportedException ();
+		}
+
 		public object GetValue (string name, object defaultValue)
 		{
 			throw new PlatformNotSupportedException ();
 		}
 
 		public static object GetValue (string keyName, string valueName, object defaultValue)
+		{
+			throw new PlatformNotSupportedException ();
+		}
+
+		public string[] GetSubKeyNames()
 		{
 			throw new PlatformNotSupportedException ();
 		}
