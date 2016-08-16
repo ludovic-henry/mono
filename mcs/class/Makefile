@@ -72,6 +72,8 @@ mobile_static_dirs := \
 mobile_dynamic_dirs := \
 	$(mobile_common_dirs)	\
 	Mono.CompilerServices.SymbolWriter	\
+	PEAPI	\
+	Mono.Simd			\
 	$(pcl_facade_dirs)
 
 xammac_dirs := \

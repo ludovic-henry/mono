@@ -66,7 +66,7 @@ DEFAULT_REFERENCES =
 
 TEST_LIB_REFS = System.Core System
 
-ifndef MOBILE_STATIC
+ifndef MOBILE_PROFILE
 TEST_LIB_REFS += Mono.Posix
 endif
 
