@@ -898,6 +898,7 @@ AM_CONDITIONAL(INSTALL_XAMMAC, [test "x$with_xammac" != "xno"])
 AM_CONDITIONAL(INSTALL_MOBILE, [test "x$with_mobile" != "xno"])
 AM_CONDITIONAL(INSTALL_MOBILE_STATIC, [test "x$with_mobile_static" != "xno"])
 
+AC_SUBST(INSTALL_MOBILE)
 AC_SUBST(INSTALL_MOBILE_STATIC)
 
 default_profile=net_4_x

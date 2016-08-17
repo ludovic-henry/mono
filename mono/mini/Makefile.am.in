@@ -763,9 +763,15 @@ FULLAOT_LIBS= \
 	Mono.Dynamic.Interpreter.dll \
 	$(FULLAOT_LIBS_UNIVERSAL)
 else
+if INSTALL_MOBILE
+FULLAOT_LIBS= \
+	Mono.Dynamic.Interpreter.dll \
+	$(FULLAOT_LIBS_UNIVERSAL)
+else
 FULLAOT_LIBS= \
 	$(FULLAOT_LIBS_UNIVERSAL) \
 	$(FULLAOT_LIBS_MOBILE_STATIC_BLACKLIST)
+endif
 endif
 
 FULLAOT_TMP_DIR=$(top_builddir)/mono/mini/fullaot-tmp

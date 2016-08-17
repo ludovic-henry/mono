@@ -50,6 +50,10 @@ if INSTALL_MOBILE_STATIC
 PROFILE_MCS_FLAGS = -d:MOBILE,MOBILE_STATIC,MOBILE_LEGACY 
 endif
 
+if INSTALL_MOBILE
+PROFILE_MCS_FLAGS = -d:MOBILE,MOBILE_DYNAMIC,MOBILE_LEGACY 
+endif
+
 MCS_NO_LIB = $(RUNTIME) $(mcs_topdir)/class/lib/build/mcs.exe -unsafe -debug \
 	-noconfig -nologo \
 	-nowarn:0162 -nowarn:0168 -nowarn:0219 -nowarn:0414 -nowarn:0618 \
@@ -60,10 +64,14 @@ MCS = $(MCS_NO_LIB) -lib:$(CLASS)
 
 ILASM = $(RUNTIME) $(CLASS)/ilasm.exe
 
-if INSTALL_MOBILE_STATIC
-TEST_RUNNER = ./test-runner.exe --runtime $(top_builddir)/runtime/mono-wrapper --mono-path "$(CLASS)" --aot-run-flags "$(AOT_RUN_FLAGS)" --aot-build-flags "$(AOT_BUILD_FLAGS)"
-else
 TEST_RUNNER = ./test-runner.exe --runtime $(top_builddir)/runtime/mono-wrapper --mono-path "$(CLASS)"
+
+if INSTALL_MOBILE_STATIC
+TEST_RUNNER += --aot-run-flags "$(AOT_RUN_FLAGS)" --aot-build-flags "$(AOT_BUILD_FLAGS)"
+endif
+
+if INSTALL_MOBILE
+TEST_RUNNER += --aot-run-flags "$(AOT_RUN_FLAGS)" --aot-build-flags "$(AOT_BUILD_FLAGS)"
 endif
 
 
@@ -846,7 +854,9 @@ EXTRA_DIST=test-driver test-runner.cs $(TEST_CS_SRC_DIST) $(TEST_IL_SRC) \
 	$(ILASM) -out:$@ $<
 
 if !INSTALL_MOBILE_STATIC
+if !INSTALL_MOBILE
 TEST_DRIVER_HARD_KILL_FEATURE=-r:Mono.Posix.dll
+endif
 endif
 
 if INSTALL_MOBILE_STATIC
