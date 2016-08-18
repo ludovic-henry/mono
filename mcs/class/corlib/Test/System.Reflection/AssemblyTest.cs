@@ -269,7 +269,7 @@ namespace MonoTests.System.Reflection
 			Assert.IsNull (corlib_test.EntryPoint, "EntryPoint");
 			Assert.IsNull (corlib_test.Evidence, "Evidence");
 #elif MOBILE
-			Assert.IsNotNull (corlib_test.EntryPoint, "EntryPoint");
+			Assert.IsNull (corlib_test.EntryPoint, "EntryPoint");
 			Assert.IsNull (corlib_test.Evidence, "Evidence");
 #else
 			Assert.IsNull (corlib_test.EntryPoint, "EntryPoint");

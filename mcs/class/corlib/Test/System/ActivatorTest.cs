@@ -415,6 +415,9 @@ namespace MonoTests.System {
 		[ExpectedException (typeof (ArgumentNullException))]
 		public void GetObject_UrlNull ()
 		{
+#if MOBILE
+			Assert.Ignore ("ReferenceSource code does not throw ArgumentNullException")
+#endif
 			Activator.GetObject (typeof (COMTest), null);
 		}
 #endif
