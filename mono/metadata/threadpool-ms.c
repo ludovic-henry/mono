@@ -681,8 +681,10 @@ worker_thread (gpointer data)
 				retire = TRUE;
 
 			mono_thread_clr_state (thread, (MonoThreadState)~ThreadState_Background);
-			if (!mono_thread_test_state (thread , ThreadState_Background))
-				ves_icall_System_Threading_Thread_SetState (thread, ThreadState_Background);
+			if (!mono_thread_test_state (thread , ThreadState_Background)) {
+				mono_thread_set_state (thread, ThreadState_Background);
+				ves_icall_System_Threading_InternalThread_OnBackgroundStateChange ();
+			}
 
 			mono_domain_set (mono_get_root_domain (), TRUE);
 		}

@@ -97,6 +97,7 @@ HANDLE ves_icall_System_Threading_Events_OpenEvent_internal (MonoString *name, g
 gpointer ves_icall_System_Threading_InternalThread_StartThread (MonoInternalThread *internal, MonoThread *thread, MonoObject *start);
 void ves_icall_System_Threading_InternalThread_Lock (MonoInternalThread *internal, MonoBoolean *locked);
 void ves_icall_System_Threading_InternalThread_Unlock (MonoInternalThread *internal);
+void ves_icall_System_Threading_InternalThread_OnBackgroundStateChange (void);
 
 gint32 ves_icall_System_Threading_WaitHandle_WaitAll_internal(MonoArray *mono_handles, gint32 ms);
 gint32 ves_icall_System_Threading_WaitHandle_WaitAny_internal(MonoArray *mono_handles, gint32 ms);
@@ -143,9 +144,6 @@ void ves_icall_System_Threading_Thread_ResetAbort (MonoThread *this_obj);
 MonoObject* ves_icall_System_Threading_Thread_GetAbortExceptionState (MonoThread *thread);
 void ves_icall_System_Threading_Thread_Suspend (MonoThread *this_obj);
 void ves_icall_System_Threading_Thread_Resume (MonoThread *thread);
-void ves_icall_System_Threading_Thread_ClrState (MonoInternalThread *thread, guint32 state);
-void ves_icall_System_Threading_Thread_SetState (MonoInternalThread *thread, guint32 state);
-guint32 ves_icall_System_Threading_Thread_GetState (MonoInternalThread *thread);
 
 gint8 ves_icall_System_Threading_Thread_VolatileRead1 (void *ptr);
 gint16 ves_icall_System_Threading_Thread_VolatileRead2 (void *ptr);

@@ -102,8 +102,33 @@ namespace System.Threading {
 
 		internal ThreadState State {
 			get { return state; }
-			set { state = value; }
+			set {
+				bool locked = false;
+				try {
+					Lock (ref locked);
+					state = value;
+				} finally {
+					if (locked)
+						Unlock ();
+				}
+
+				if ((value & ThreadState.Background) != 0)
+					OnBackgroundStateChange ();
+			}
 		}
+
+		internal ThreadState LocklessState {
+			get { return state; }
+			set {
+				state = value;
+
+				if ((value & ThreadState.Background) != 0)
+					OnBackgroundStateChange ();
+			}
+		}
+
+		[MethodImplAttribute(MethodImplOptions.InternalCall)]
+		extern static void OnBackgroundStateChange ();
 
 		// Closes the system thread handle
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]
@@ -360,7 +385,7 @@ namespace System.Threading {
 
 		public bool IsAlive {
 			get {
-				ThreadState curstate = GetState (Internal);
+				ThreadState curstate = Internal.State;
 				
 				if((curstate & ThreadState.Aborted) != 0 ||
 				   (curstate & ThreadState.Stopped) != 0 ||
@@ -374,7 +399,7 @@ namespace System.Threading {
 
 		public bool IsBackground {
 			get {
-				ThreadState thread_state = GetState (Internal);
+				ThreadState thread_state = Internal.State;
 				if ((thread_state & ThreadState.Stopped) != 0)
 					throw new ThreadStateException ("Thread is dead; state can not be accessed.");
 
@@ -383,9 +408,9 @@ namespace System.Threading {
 			
 			set {
 				if (value) {
-					SetState (Internal, ThreadState.Background);
+					Internal.State |=  ThreadState.Background;
 				} else {
-					ClrState (Internal, ThreadState.Background);
+					Internal.State &= ~ThreadState.Background;
 				}
 			}
 		}
@@ -413,7 +438,7 @@ namespace System.Threading {
 
 		public ThreadState ThreadState {
 			get {
-				return GetState (Internal);
+				return Internal.State;
 			}
 		}
 
@@ -499,7 +524,7 @@ namespace System.Threading {
 				if (handle == IntPtr.Zero)
 					throw new SystemException ("Thread creation failed.");
 
-				Internal.State &= ~ThreadState.Unstarted;
+				Internal.LocklessState &= ~ThreadState.Unstarted;
 			} finally {
 				if (locked)
 					Internal.Unlock ();
@@ -507,15 +532,6 @@ namespace System.Threading {
 
 			m_ThreadStartArg = null;
 		}
-
-		[MethodImplAttribute (MethodImplOptions.InternalCall)]
-		extern private static void SetState (InternalThread thread, ThreadState set);
-
-		[MethodImplAttribute (MethodImplOptions.InternalCall)]
-		extern private static void ClrState (InternalThread thread, ThreadState clr);
-
-		[MethodImplAttribute (MethodImplOptions.InternalCall)]
-		extern private static ThreadState GetState (InternalThread thread);
 
 		[MethodImplAttribute (MethodImplOptions.InternalCall)]
 		extern public static byte VolatileRead (ref byte address);

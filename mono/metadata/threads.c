@@ -2134,48 +2134,6 @@ ves_icall_System_Threading_Thread_MemoryBarrier (void)
 	mono_memory_barrier ();
 }
 
-void
-ves_icall_System_Threading_Thread_ClrState (MonoInternalThread* this_obj, guint32 state)
-{
-	mono_thread_clr_state (this_obj, (MonoThreadState)state);
-
-	if (state & ThreadState_Background) {
-		/* If the thread changes the background mode, the main thread has to
-		 * be notified, since it has to rebuild the list of threads to
-		 * wait for.
-		 */
-		SetEvent (background_change_event);
-	}
-}
-
-void
-ves_icall_System_Threading_Thread_SetState (MonoInternalThread* this_obj, guint32 state)
-{
-	mono_thread_set_state (this_obj, (MonoThreadState)state);
-	
-	if (state & ThreadState_Background) {
-		/* If the thread changes the background mode, the main thread has to
-		 * be notified, since it has to rebuild the list of threads to
-		 * wait for.
-		 */
-		SetEvent (background_change_event);
-	}
-}
-
-guint32
-ves_icall_System_Threading_Thread_GetState (MonoInternalThread* this_obj)
-{
-	guint32 state;
-
-	LOCK_THREAD (this_obj);
-	
-	state = this_obj->state;
-
-	UNLOCK_THREAD (this_obj);
-	
-	return state;
-}
-
 void ves_icall_System_Threading_Thread_Interrupt_internal (MonoThread *this_obj)
 {
 	MonoInternalThread *current;
@@ -5224,4 +5182,13 @@ ves_icall_System_Threading_InternalThread_StartThread (MonoInternalThread *inter
 	}
 
 	return internal->handle;
+}
+
+void
+ves_icall_System_Threading_InternalThread_OnBackgroundStateChange (void)
+{
+	/* If the thread changes the background mode, the main thread has to
+	 * be notified, since it has to rebuild the list of threads to
+	 * wait for. */
+	SetEvent (background_change_event);
 }
