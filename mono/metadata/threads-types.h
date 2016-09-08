@@ -69,7 +69,6 @@ MonoInternalThread* mono_thread_create_internal (MonoDomain *domain, gpointer fu
 void mono_threads_install_cleanup (MonoThreadCleanupFunc func);
 
 void ves_icall_System_Threading_Thread_ConstructInternalThread (MonoThread *this_obj);
-HANDLE ves_icall_System_Threading_Thread_Thread_internal(MonoThread *this_obj, MonoObject *start);
 void ves_icall_System_Threading_InternalThread_Thread_free_internal(MonoInternalThread *this_obj, HANDLE thread);
 void ves_icall_System_Threading_Thread_Sleep_internal(gint32 ms);
 gboolean ves_icall_System_Threading_Thread_Join_internal(MonoThread *this_obj, int ms);
@@ -94,6 +93,10 @@ gboolean ves_icall_System_Threading_Events_SetEvent_internal (HANDLE handle);
 gboolean ves_icall_System_Threading_Events_ResetEvent_internal (HANDLE handle);
 void ves_icall_System_Threading_Events_CloseEvent_internal (HANDLE handle);
 HANDLE ves_icall_System_Threading_Events_OpenEvent_internal (MonoString *name, gint32 rights, gint32 *error);
+
+gpointer ves_icall_System_Threading_InternalThread_StartThread (MonoInternalThread *internal, MonoThread *thread, MonoObject *start);
+void ves_icall_System_Threading_InternalThread_Lock (MonoInternalThread *internal, MonoBoolean *locked);
+void ves_icall_System_Threading_InternalThread_Unlock (MonoInternalThread *internal);
 
 gint32 ves_icall_System_Threading_WaitHandle_WaitAll_internal(MonoArray *mono_handles, gint32 ms);
 gint32 ves_icall_System_Threading_WaitHandle_WaitAny_internal(MonoArray *mono_handles, gint32 ms);

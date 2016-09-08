@@ -100,9 +100,23 @@ namespace System.Threading {
 		#endregion
 #pragma warning restore 169, 414, 649
 
+		internal ThreadState State {
+			get { return state; }
+			set { state = value; }
+		}
+
 		// Closes the system thread handle
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]
 		private extern void Thread_free_internal(IntPtr handle);
+
+		[MethodImplAttribute(MethodImplOptions.InternalCall)]
+		internal extern void Lock (ref bool locked);
+
+		[MethodImplAttribute(MethodImplOptions.InternalCall)]
+		internal extern void Unlock ();
+
+		[MethodImplAttribute(MethodImplOptions.InternalCall)]
+		internal extern IntPtr StartThread (Thread thread, MulticastDelegate start);
 
 		[ReliabilityContract (Consistency.WillNotCorruptState, Cer.Success)]
 		~InternalThread() {
@@ -305,10 +319,6 @@ namespace System.Threading {
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]
 		public extern static int GetDomainID();
 
-		// Returns the system thread handle
-		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		private extern IntPtr Thread_internal (MulticastDelegate start);
-
 		private Thread (InternalThread it) {
 			internal_thread = it;
 		}
@@ -476,9 +486,24 @@ namespace System.Threading {
 			Internal._serialized_principal = CurrentThread.Internal._serialized_principal;
 #endif
 
-			// Thread_internal creates and starts the new thread, 
-			if (Thread_internal(m_Delegate) == IntPtr.Zero)
-				throw new SystemException ("Thread creation failed.");
+			bool locked = false;
+			try {
+				Internal.Lock (ref locked);
+
+				if ((Internal.State & ThreadState.Unstarted) == 0)
+					throw new ThreadStateException ("Thread has already been started.");
+				if ((Internal.State & ThreadState.Aborted) != 0)
+					return;
+
+				IntPtr handle = Internal.StartThread (this, m_Delegate);
+				if (handle == IntPtr.Zero)
+					throw new SystemException ("Thread creation failed.");
+
+				Internal.State &= ~ThreadState.Unstarted;
+			} finally {
+				if (locked)
+					Internal.Unlock ();
+			}
 
 			m_ThreadStartArg = null;
 		}

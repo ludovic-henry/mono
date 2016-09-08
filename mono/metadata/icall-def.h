@@ -902,7 +902,10 @@ ICALL(ILOCK_21, "Increment(long&)", ves_icall_System_Threading_Interlocked_Incre
 ICALL(ILOCK_22, "Read(long&)", ves_icall_System_Threading_Interlocked_Read_Long)
 
 ICALL_TYPE(ITHREAD, "System.Threading.InternalThread", ITHREAD_1)
-ICALL(ITHREAD_1, "Thread_free_internal", ves_icall_System_Threading_InternalThread_Thread_free_internal)
+ICALL(ITHREAD_1, "Lock", ves_icall_System_Threading_InternalThread_Lock)
+ICALL(ITHREAD_2, "StartThread", ves_icall_System_Threading_InternalThread_StartThread)
+ICALL(ITHREAD_3, "Thread_free_internal", ves_icall_System_Threading_InternalThread_Thread_free_internal)
+ICALL(ITHREAD_4, "Unlock", ves_icall_System_Threading_InternalThread_Unlock)
 
 ICALL_TYPE(MONIT, "System.Threading.Monitor", MONIT_8)
 ICALL(MONIT_8, "Enter", mono_monitor_enter)
@@ -956,7 +959,6 @@ ICALL(THREAD_22, "SleepInternal", ves_icall_System_Threading_Thread_Sleep_intern
 ICALL(THREAD_54, "SpinWait_nop", ves_icall_System_Threading_Thread_SpinWait_nop)
 ICALL(THREAD_23, "SuspendInternal", ves_icall_System_Threading_Thread_Suspend)
 ICALL(THREAD_56, "SystemMaxStackStize", mono_threads_get_max_stack_size)
-ICALL(THREAD_25, "Thread_internal", ves_icall_System_Threading_Thread_Thread_internal)
 ICALL(THREAD_26, "VolatileRead(byte&)", ves_icall_System_Threading_Thread_VolatileRead1)
 ICALL(THREAD_27, "VolatileRead(double&)", ves_icall_System_Threading_Thread_VolatileReadDouble)
 ICALL(THREAD_28, "VolatileRead(int&)", ves_icall_System_Threading_Thread_VolatileRead4)

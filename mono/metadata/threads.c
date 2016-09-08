@@ -1199,48 +1199,6 @@ ves_icall_System_Threading_Thread_ConstructInternalThread (MonoThread *this_obj)
 	InterlockedCompareExchangePointer ((volatile gpointer *)&this_obj->internal_thread, internal, NULL);
 }
 
-HANDLE
-ves_icall_System_Threading_Thread_Thread_internal (MonoThread *this_obj,
-												   MonoObject *start)
-{
-	MonoError error;
-	MonoInternalThread *internal;
-	gboolean res;
-
-	THREAD_DEBUG (g_message("%s: Trying to start a new thread: this (%p) start (%p)", __func__, this_obj, start));
-
-	if (!this_obj->internal_thread)
-		ves_icall_System_Threading_Thread_ConstructInternalThread (this_obj);
-	internal = this_obj->internal_thread;
-
-	LOCK_THREAD (internal);
-
-	if ((internal->state & ThreadState_Unstarted) == 0) {
-		UNLOCK_THREAD (internal);
-		mono_set_pending_exception (mono_get_exception_thread_state ("Thread has already been started."));
-		return NULL;
-	}
-
-	if ((internal->state & ThreadState_Aborted) != 0) {
-		UNLOCK_THREAD (internal);
-		return this_obj;
-	}
-
-	res = create_thread (this_obj, internal, start, NULL, NULL, FALSE, 0, &error);
-	if (!res) {
-		mono_error_cleanup (&error);
-		UNLOCK_THREAD (internal);
-		return NULL;
-	}
-
-	internal->state &= ~ThreadState_Unstarted;
-
-	THREAD_DEBUG (g_message ("%s: Started thread ID %"G_GSIZE_FORMAT" (handle %p)", __func__, tid, thread));
-
-	UNLOCK_THREAD (internal);
-	return internal->handle;
-}
-
 /*
  * This is called from the finalizer of the internal thread object.
  */
@@ -5240,4 +5198,30 @@ mono_thread_try_resume_interruption (void)
 		return NULL;
 
 	return mono_thread_resume_interruption ();
+}
+
+void
+ves_icall_System_Threading_InternalThread_Lock (MonoInternalThread *internal, MonoBoolean *locked)
+{
+	lock_thread (internal);
+	*locked = TRUE;
+}
+
+void
+ves_icall_System_Threading_InternalThread_Unlock (MonoInternalThread *internal)
+{
+	unlock_thread (internal);
+}
+
+gpointer
+ves_icall_System_Threading_InternalThread_StartThread (MonoInternalThread *internal, MonoThread *thread, MonoObject *start)
+{
+	MonoError error;
+	gboolean res = create_thread (thread, internal, start, NULL, NULL, FALSE, 0, &error);
+	if (!res) {
+		mono_error_cleanup (&error);
+		return NULL;
+	}
+
+	return internal->handle;
 }
