@@ -2255,31 +2255,6 @@ mono_thread_internal_abort (MonoInternalThread *thread)
 }
 
 void
-ves_icall_System_Threading_Thread_ResetAbort (MonoThread *this_obj)
-{
-	MonoInternalThread *thread = mono_thread_internal_current ();
-	gboolean was_aborting;
-
-	LOCK_THREAD (thread);
-	was_aborting = thread->state & ThreadState_AbortRequested;
-	thread->state &= ~ThreadState_AbortRequested;
-	UNLOCK_THREAD (thread);
-
-	if (!was_aborting) {
-		const char *msg = "Unable to reset abort because no abort was requested";
-		mono_set_pending_exception (mono_get_exception_thread_state (msg));
-		return;
-	}
-	thread->abort_exc = NULL;
-	if (thread->abort_state_handle) {
-		mono_gchandle_free (thread->abort_state_handle);
-		/* This is actually not necessary - the handle
-		   only counts if the exception is set */
-		thread->abort_state_handle = 0;
-	}
-}
-
-void
 mono_thread_internal_reset_abort (MonoInternalThread *thread)
 {
 	LOCK_THREAD (thread);

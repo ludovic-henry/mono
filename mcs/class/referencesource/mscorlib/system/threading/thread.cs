@@ -558,7 +558,7 @@ namespace System.Threading {
         [MethodImplAttribute(MethodImplOptions.InternalCall)]
         private extern void AbortInternal();
 #endif
-#if (!FEATURE_CORECLR && !MONO) || MONO_FEATURE_THREAD_ABORT
+#if !MONO
         /*=========================================================================
         ** Resets a thread abort.
         ** Should be called by trusted code only

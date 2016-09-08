@@ -804,6 +804,9 @@ mono_init_internal (const char *filename, const char *exe_filename, const char *
 	mono_defaults.threadpool_perform_wait_callback_method = mono_class_get_method_from_name (
 		mono_defaults.threadpool_wait_callback_class, "PerformWaitCallback", 0);
 
+	mono_defaults.thread_reset_abort_method = mono_class_get_method_from_name (
+		mono_defaults.thread_class, "ResetAbort", 0);
+
 	domain->friendly_name = g_path_get_basename (filename);
 
 	mono_profiler_appdomain_name (domain, domain->friendly_name);

@@ -57,8 +57,8 @@ namespace System.Threading {
 		private IntPtr name;
 		private int name_len; 
 		private ThreadState state;
-		private object abort_exc;
-		private int abort_state_handle;
+		private ThreadAbortException abort_exc;
+		private GCHandle abort_state_handle;
 		/* thread_id is only accessed from unmanaged code */
 		internal Int64 thread_id;
 		
@@ -125,6 +125,16 @@ namespace System.Threading {
 				if ((value & ThreadState.Background) != 0)
 					OnBackgroundStateChange ();
 			}
+		}
+
+		internal ThreadAbortException AbortException {
+			get { return abort_exc; }
+			set { abort_exc = value; }
+		}
+
+		internal GCHandle AbortReasonHandle {
+			get { return abort_state_handle; }
+			set { abort_state_handle = value; }
 		}
 
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]
@@ -467,8 +477,26 @@ namespace System.Threading {
 			}
 		}
 
-		void ClearAbortReason ()
+		public static void ResetAbort()
 		{
+			Thread thread = Thread.CurrentThread;
+
+			bool locked = false;
+			try {
+				thread.Internal.Lock (ref locked);
+
+				if ((thread.Internal.LocklessState & ThreadState.AbortRequested) == 0)
+					throw new ThreadStateException(Environment.GetResourceString("ThreadState_NoAbortRequested"));
+
+				thread.Internal.LocklessState &= ~ThreadState.AbortRequested;
+			} finally {
+				if (locked)
+					thread.Internal.Unlock ();
+			}
+
+			thread.Internal.AbortException = null;
+			if (thread.Internal.AbortReasonHandle.IsAllocated)
+				thread.Internal.AbortReasonHandle.Free ();
 		}
 #else
 		[Obsolete ("Thread.Abort is not supported on the current platform.", true)]
