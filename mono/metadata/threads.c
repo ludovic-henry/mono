@@ -548,7 +548,6 @@ new_thread_with_internal (MonoDomain *domain, MonoInternalThread *internal)
 	MonoThread *thread;
 
 	thread = create_thread_object (domain);
-	thread->priority = MONO_THREAD_PRIORITY_NORMAL;
 
 	MONO_OBJECT_SETREF (thread, internal_thread, internal);
 
@@ -577,13 +576,9 @@ create_internal_thread (void)
 		MONO_GC_REGISTER_ROOT_PINNING (thread->thread_pinning_ref, MONO_ROOT_SOURCE_THREADING, "thread pinning reference");
 	}
 
-	return thread;
-}
+	thread->priority = MONO_THREAD_PRIORITY_NORMAL;
 
-static MonoThreadPriority
-mono_thread_internal_get_priority (MonoInternalThread *internal)
-{
-	return mono_thread_info_get_priority ((MonoThreadInfo*) internal->thread_info);
+	return thread;
 }
 
 static void
@@ -719,7 +714,7 @@ static guint32 WINAPI start_wrapper_internal(StartInfo *start_info, gsize *stack
 	}
 
 	LOCK_THREAD (internal);
-	mono_thread_internal_set_priority (internal, thread->priority);
+	mono_thread_internal_set_priority (internal, internal->priority);
 	UNLOCK_THREAD (internal);
 
 	tid = internal->tid;
@@ -970,7 +965,6 @@ mono_thread_create_internal (MonoDomain *domain, gpointer func, gpointer arg, gb
 	mono_error_init (error);
 
 	thread = create_thread_object (domain);
-	thread->priority = MONO_THREAD_PRIORITY_NORMAL;
 
 	internal = create_internal_thread ();
 
@@ -1423,11 +1417,9 @@ ves_icall_System_Threading_Thread_GetPriority (MonoThread *this_obj)
 	MonoInternalThread *internal = this_obj->internal_thread;
 
 	LOCK_THREAD (internal);
-	if (internal->handle != NULL)
-		priority = mono_thread_internal_get_priority (internal);
-	else
-		priority = this_obj->priority;
+	priority = internal->priority;
 	UNLOCK_THREAD (internal);
+
 	return priority;
 }
 
@@ -1444,9 +1436,9 @@ ves_icall_System_Threading_Thread_SetPriority (MonoThread *this_obj, int priorit
 	MonoInternalThread *internal = this_obj->internal_thread;
 
 	LOCK_THREAD (internal);
-	this_obj->priority = priority;
+	internal->priority = priority;
 	if (internal->handle != NULL)
-		mono_thread_internal_set_priority (internal, this_obj->priority);
+		mono_thread_internal_set_priority (internal, priority);
 	UNLOCK_THREAD (internal);
 }
 
