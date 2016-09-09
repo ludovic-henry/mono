@@ -780,9 +780,7 @@ static guint32 WINAPI start_wrapper_internal(StartInfo *start_info, gsize *stack
 		return 0;
 	}
 
-	LOCK_THREAD (internal);
 	mono_thread_internal_set_priority (internal, internal->priority);
-	UNLOCK_THREAD (internal);
 
 	tid = internal->tid;
 
@@ -1424,45 +1422,6 @@ ves_icall_System_Threading_Thread_SetName_internal (MonoInternalThread *this_obj
 	MonoError error;
 	mono_thread_set_name_internal (this_obj, name, TRUE, &error);
 	mono_error_set_pending_exception (&error);
-}
-
-/*
- * ves_icall_System_Threading_Thread_GetPriority_internal:
- * @param this_obj: The MonoInternalThread on which to operate.
- *
- * Gets the priority of the given thread.
- * @return: The priority of the given thread.
- */
-int
-ves_icall_System_Threading_Thread_GetPriority (MonoThread *this_obj)
-{
-	gint32 priority;
-	MonoInternalThread *internal = this_obj->internal_thread;
-
-	LOCK_THREAD (internal);
-	priority = internal->priority;
-	UNLOCK_THREAD (internal);
-
-	return priority;
-}
-
-/* 
- * ves_icall_System_Threading_Thread_SetPriority_internal:
- * @param this_obj: The MonoInternalThread on which to operate.
- * @param priority: The priority to set.
- *
- * Sets the priority of the given thread.
- */
-void
-ves_icall_System_Threading_Thread_SetPriority (MonoThread *this_obj, int priority)
-{
-	MonoInternalThread *internal = this_obj->internal_thread;
-
-	LOCK_THREAD (internal);
-	internal->priority = priority;
-	if (internal->handle != NULL)
-		mono_thread_internal_set_priority (internal, priority);
-	UNLOCK_THREAD (internal);
 }
 
 /* If the array is already in the requested domain, we just return it,
@@ -5166,4 +5125,10 @@ ves_icall_System_Threading_InternalThread_OnBackgroundStateChange (void)
 	 * be notified, since it has to rebuild the list of threads to
 	 * wait for. */
 	SetEvent (background_change_event);
+}
+
+void
+ves_icall_System_Threading_InternalThread_UpdateNativePriority (MonoInternalThread *internal)
+{
+	mono_thread_internal_set_priority (internal, internal->priority);
 }

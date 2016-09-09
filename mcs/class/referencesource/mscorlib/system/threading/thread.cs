@@ -649,6 +649,7 @@ namespace System.Threading {
             [HostProtection(SelfAffectingThreading=true)]
             set { SetPriorityNative((int)value); }
         }
+#if !MONO
         [System.Security.SecurityCritical]  // auto-generated
         [ResourceExposure(ResourceScope.None)]
         [MethodImplAttribute(MethodImplOptions.InternalCall)]
@@ -657,7 +658,6 @@ namespace System.Threading {
         [ResourceExposure(ResourceScope.None)]
         [MethodImplAttribute(MethodImplOptions.InternalCall)]
         private extern void SetPriorityNative(int priority);
-#if !MONO
         /*=========================================================================
         ** Returns true if the thread has been started and is not dead.
         =========================================================================*/

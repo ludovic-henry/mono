@@ -137,6 +137,31 @@ namespace System.Threading {
 			set { abort_state_handle = value; }
 		}
 
+		internal ThreadPriority Priority {
+			get {
+				bool locked = false;
+				try {
+					Lock (ref locked);
+					return (ThreadPriority) priority;
+				} finally {
+					if (locked)
+						Unlock ();
+				}
+			}
+			set {
+				bool locked = false;
+				try {
+					Lock (ref locked);
+					priority = (int) value;
+					if (system_thread_handle != IntPtr.Zero)
+						UpdateNativePriority ();
+				} finally {
+					if (locked)
+						Unlock ();
+				}
+			}
+		}
+
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]
 		extern static void OnBackgroundStateChange ();
 
@@ -152,6 +177,9 @@ namespace System.Threading {
 
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]
 		internal extern IntPtr StartThread (Thread thread, MulticastDelegate start);
+
+		[MethodImplAttribute(MethodImplOptions.InternalCall)]
+		extern void UpdateNativePriority ();
 
 		[ReliabilityContract (Consistency.WillNotCorruptState, Cer.Success)]
 		~InternalThread() {
@@ -766,5 +794,15 @@ namespace System.Threading {
 			throw new PlatformNotSupportedException ("Thread.Resume is not supported on the current platform.");
 		}
 #endif
+
+		int GetPriorityNative()
+		{
+			return (int) Internal.Priority;
+		}
+
+		void SetPriorityNative(int priority)
+		{
+			Internal.Priority = (ThreadPriority) priority;
+		}
 	}
 }

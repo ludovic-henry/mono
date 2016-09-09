@@ -76,8 +76,6 @@ gint32 ves_icall_System_Threading_Thread_GetDomainID (void);
 gboolean ves_icall_System_Threading_Thread_Yield (void);
 MonoString* ves_icall_System_Threading_Thread_GetName_internal (MonoInternalThread *this_obj);
 void ves_icall_System_Threading_Thread_SetName_internal (MonoInternalThread *this_obj, MonoString *name);
-int ves_icall_System_Threading_Thread_GetPriority (MonoThread *this_obj);
-void ves_icall_System_Threading_Thread_SetPriority (MonoThread *this_obj, int priority);
 MonoObject* ves_icall_System_Threading_Thread_GetCachedCurrentCulture (MonoInternalThread *this_obj);
 void ves_icall_System_Threading_Thread_SetCachedCurrentCulture (MonoThread *this_obj, MonoObject *culture);
 MonoObject* ves_icall_System_Threading_Thread_GetCachedCurrentUICulture (MonoInternalThread *this_obj);
@@ -97,6 +95,7 @@ HANDLE ves_icall_System_Threading_Events_OpenEvent_internal (MonoString *name, g
 gpointer ves_icall_System_Threading_InternalThread_StartThread (MonoInternalThread *internal, MonoThread *thread, MonoObject *start);
 void ves_icall_System_Threading_InternalThread_Lock (MonoInternalThread *internal, MonoBoolean *locked);
 void ves_icall_System_Threading_InternalThread_Unlock (MonoInternalThread *internal);
+void ves_icall_System_Threading_InternalThread_UpdateNativePriority (MonoInternalThread *internal);
 void ves_icall_System_Threading_InternalThread_OnBackgroundStateChange (void);
 
 gint32 ves_icall_System_Threading_WaitHandle_WaitAll_internal(MonoArray *mono_handles, gint32 ms);
