@@ -154,7 +154,7 @@ namespace System.Threading {
 					Lock (ref locked);
 					priority = (int) value;
 					if (system_thread_handle != IntPtr.Zero)
-						UpdateNativePriority ();
+						SetPriorityNative ((int) value);
 				} finally {
 					if (locked)
 						Unlock ();
@@ -163,23 +163,109 @@ namespace System.Threading {
 		}
 
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]
+		extern void SetPriorityNative (int priority);
+
+		[MethodImplAttribute(MethodImplOptions.InternalCall)]
 		extern static void OnBackgroundStateChange ();
 
 		// Closes the system thread handle
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		private extern void Thread_free_internal(IntPtr handle);
+		extern void Thread_free_internal(IntPtr handle);
 
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		internal extern void Lock (ref bool locked);
+		extern void Lock (ref bool locked);
 
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		internal extern void Unlock ();
+		extern void Unlock ();
 
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		internal extern IntPtr StartThread (Thread thread, MulticastDelegate start);
+		extern static void IsShuttingDown ();
 
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		extern void UpdateNativePriority ();
+		extern IntPtr StartThreadNative (Thread thread, MulticastDelegate start);
+
+		internal void IntPtr StartThread (Thread thread, MulticastDelegate start)
+		{
+			bool locked = false;
+			try {
+				Lock (ref locked);
+
+				if ((State & ThreadState.Unstarted) == 0)
+					throw new ThreadStateException ("Thread has already been started.");
+				if ((State & ThreadState.Aborted) != 0)
+					return;
+
+				IntPtr handle = StartThreadNative (this, m_Delegate);
+				if (handle == IntPtr.Zero)
+					throw new SystemException ("Thread creation failed.");
+
+				LocklessState &= ~ThreadState.Unstarted;
+			} finally {
+				if (locked)
+					Unlock ();
+			}
+		}
+
+		internal void Abort (object state)
+		{
+			bool locked = false;
+			try {
+				Lock (ref locked);
+
+				if ((LocklessState & ThreadState.AbortRequested) != 0
+					 || (LocklessState & ThreadState.StopRequested) != 0
+					 || (LocklessState & ThreadState.Stopped) != 0) {
+					return;
+				}
+
+				if ((LocklessState & ThreadState.Unstarted) != 0) {
+					LocklessState |= ThreadState.Aborted;
+					return;
+				}
+
+				LocklessState |= ThreadState.AbortRequested;
+
+				if (AbortReasonHandle.IsAllocated)
+					AbortReasonHandle.Free ();
+
+				if (state != null)
+					AbortReasonHandle = GCHandle.Alloc (state);
+
+				if (!IsShuttingDown)
+					Resume ();
+			} finally {
+				if (locked)
+					Unlock ();
+			}
+
+			Abort ();
+		}
+
+		[MethodImplAttribute(MethodImplOptions.InternalCall)]
+		extern void Abort ();
+
+		internal void ResetAbort ()
+		{
+			bool locked = false;
+			try {
+				Lock (ref locked);
+
+				if ((LocklessState & ThreadState.AbortRequested) == 0)
+					throw new ThreadStateException(Environment.GetResourceString("ThreadState_NoAbortRequested"));
+
+				LocklessState &= ~ThreadState.AbortRequested;
+			} finally {
+				if (locked)
+					Unlock ();
+			}
+
+			AbortException = null;
+			if (AbortReasonHandle.IsAllocated)
+				AbortReasonHandle.Free ();
+		}
+
+		[MethodImplAttribute(MethodImplOptions.InternalCall)]
+		extern void Resume ();
 
 		[ReliabilityContract (Consistency.WillNotCorruptState, Cer.Success)]
 		~InternalThread() {
@@ -507,24 +593,7 @@ namespace System.Threading {
 
 		public static void ResetAbort()
 		{
-			Thread thread = Thread.CurrentThread;
-
-			bool locked = false;
-			try {
-				thread.Internal.Lock (ref locked);
-
-				if ((thread.Internal.LocklessState & ThreadState.AbortRequested) == 0)
-					throw new ThreadStateException(Environment.GetResourceString("ThreadState_NoAbortRequested"));
-
-				thread.Internal.LocklessState &= ~ThreadState.AbortRequested;
-			} finally {
-				if (locked)
-					thread.Internal.Unlock ();
-			}
-
-			thread.Internal.AbortException = null;
-			if (thread.Internal.AbortReasonHandle.IsAllocated)
-				thread.Internal.AbortReasonHandle.Free ();
+			Thread.CurrentThread.Internal.ResetAbort ();
 		}
 #else
 		[Obsolete ("Thread.Abort is not supported on the current platform.", true)]
@@ -567,24 +636,7 @@ namespace System.Threading {
 			Internal._serialized_principal = CurrentThread.Internal._serialized_principal;
 #endif
 
-			bool locked = false;
-			try {
-				Internal.Lock (ref locked);
-
-				if ((Internal.State & ThreadState.Unstarted) == 0)
-					throw new ThreadStateException ("Thread has already been started.");
-				if ((Internal.State & ThreadState.Aborted) != 0)
-					return;
-
-				IntPtr handle = Internal.StartThread (this, m_Delegate);
-				if (handle == IntPtr.Zero)
-					throw new SystemException ("Thread creation failed.");
-
-				Internal.LocklessState &= ~ThreadState.Unstarted;
-			} finally {
-				if (locked)
-					Internal.Unlock ();
-			}
+			Internal.StartThread (this, m_Delegate);
 
 			m_ThreadStartArg = null;
 		}

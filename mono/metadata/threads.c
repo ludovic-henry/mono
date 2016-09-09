@@ -80,8 +80,8 @@ extern int tkill (pid_t tid, int signal);
 
 #define SPIN_UNLOCK(i) i = 0
 
-#define LOCK_THREAD(thread) lock_thread((thread))
-#define UNLOCK_THREAD(thread) unlock_thread((thread))
+#define LOCK_THREAD(thread) mono_coop_mutex_lock ((thread)->synch_cs)
+#define UNLOCK_THREAD(thread) mono_coop_mutex_unlock ((thread)->synch_cs)
 
 typedef union {
 	gint32 ival;
@@ -259,42 +259,6 @@ thread_get_tid (MonoInternalThread *thread)
 {
 	/* We store the tid as a guint64 to keep the object layout constant between platforms */
 	return MONO_UINT_TO_NATIVE_THREAD_ID (thread->tid);
-}
-
-static void ensure_synch_cs_set (MonoInternalThread *thread)
-{
-	MonoCoopMutex *synch_cs;
-
-	if (thread->synch_cs != NULL) {
-		return;
-	}
-
-	synch_cs = g_new0 (MonoCoopMutex, 1);
-	mono_coop_mutex_init_recursive (synch_cs);
-
-	if (InterlockedCompareExchangePointer ((gpointer *)&thread->synch_cs,
-					       synch_cs, NULL) != NULL) {
-		/* Another thread must have installed this CS */
-		mono_coop_mutex_destroy (synch_cs);
-		g_free (synch_cs);
-	}
-}
-
-static inline void
-lock_thread (MonoInternalThread *thread)
-{
-	if (!thread->synch_cs)
-		ensure_synch_cs_set (thread);
-
-	g_assert (thread->synch_cs);
-
-	mono_coop_mutex_lock (thread->synch_cs);
-}
-
-static inline void
-unlock_thread (MonoInternalThread *thread)
-{
-	mono_coop_mutex_unlock (thread->synch_cs);
 }
 
 static inline gboolean
@@ -2140,23 +2104,23 @@ mono_thread_current_check_pending_interrupt (void)
 	return throw_;
 }
 
-static gboolean
-request_thread_abort (MonoInternalThread *thread, MonoObject *state)
+void
+ves_icall_System_Threading_InternalThread_Abort (MonoInternalThread *thread, MonoObject *state)
 {
 	LOCK_THREAD (thread);
-	
+
 	if ((thread->state & ThreadState_AbortRequested) != 0 || 
 		(thread->state & ThreadState_StopRequested) != 0 ||
 		(thread->state & ThreadState_Stopped) != 0)
 	{
 		UNLOCK_THREAD (thread);
-		return FALSE;
+		return;
 	}
 
 	if ((thread->state & ThreadState_Unstarted) != 0) {
 		thread->state |= ThreadState_Aborted;
 		UNLOCK_THREAD (thread);
-		return FALSE;
+		return;
 	}
 
 	thread->state |= ThreadState_AbortRequested;
@@ -2178,14 +2142,6 @@ request_thread_abort (MonoInternalThread *thread, MonoObject *state)
 		mono_thread_resume (thread);
 
 	UNLOCK_THREAD (thread);
-	return TRUE;
-}
-
-void
-ves_icall_System_Threading_Thread_Abort (MonoInternalThread *thread, MonoObject *state)
-{
-	if (!request_thread_abort (thread, state))
-		return;
 
 	if (thread == mono_thread_internal_current ()) {
 		MonoError error;
@@ -2204,13 +2160,16 @@ ves_icall_System_Threading_Thread_Abort (MonoInternalThread *thread, MonoObject 
  * @thread MUST NOT be the current thread.
  */
 void
-mono_thread_internal_abort (MonoInternalThread *thread)
+mono_thread_internal_abort (MonoInternalThread *internal)
 {
-	g_assert (thread != mono_thread_internal_current ());
+	static MonoMethod *internal_thread_abort_method = NULL;
+	MonoError error;
 
-	if (!request_thread_abort (thread, NULL))
-		return;
-	async_abort_internal (thread, TRUE);
+	if (!internal_thread_abort_method)
+		internal_thread_abort_method = mono_class_get_method_from_name (mono_defaults.internal_thread_class, "Abort", 1);
+
+	mono_runtime_invoke_checked (internal_thread_abort_method, internal, NULL, &error);
+	mono_error_assert_ok (&error);
 }
 
 void
@@ -5106,7 +5065,7 @@ ves_icall_System_Threading_InternalThread_Unlock (MonoInternalThread *internal)
 }
 
 gpointer
-ves_icall_System_Threading_InternalThread_StartThread (MonoInternalThread *internal, MonoThread *thread, MonoObject *start)
+ves_icall_System_Threading_InternalThread_StartThreadNative (MonoInternalThread *internal, MonoThread *thread, MonoObject *start)
 {
 	MonoError error;
 	gboolean res = create_thread (thread, internal, start, NULL, NULL, FALSE, 0, &error);
@@ -5128,7 +5087,7 @@ ves_icall_System_Threading_InternalThread_OnBackgroundStateChange (void)
 }
 
 void
-ves_icall_System_Threading_InternalThread_UpdateNativePriority (MonoInternalThread *internal)
+ves_icall_System_Threading_InternalThread_SetPriorityNative (MonoInternalThread *internal, gint32 priority)
 {
-	mono_thread_internal_set_priority (internal, internal->priority);
+	mono_thread_internal_set_priority (internal, (MonoThreadPriority) priority);
 }

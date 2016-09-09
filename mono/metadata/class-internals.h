@@ -1117,6 +1117,7 @@ typedef struct {
 	MonoClass *threadpool_wait_callback_class;
 	MonoMethod *threadpool_perform_wait_callback_method;
 	MonoMethod *thread_reset_abort_method;
+	MonoMethod *thread_abort_method;
 } MonoDefaults;
 
 #ifdef DISABLE_REMOTING

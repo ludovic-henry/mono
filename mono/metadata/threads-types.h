@@ -92,10 +92,10 @@ gboolean ves_icall_System_Threading_Events_ResetEvent_internal (HANDLE handle);
 void ves_icall_System_Threading_Events_CloseEvent_internal (HANDLE handle);
 HANDLE ves_icall_System_Threading_Events_OpenEvent_internal (MonoString *name, gint32 rights, gint32 *error);
 
-gpointer ves_icall_System_Threading_InternalThread_StartThread (MonoInternalThread *internal, MonoThread *thread, MonoObject *start);
+gpointer ves_icall_System_Threading_InternalThread_StartThreadNative (MonoInternalThread *internal, MonoThread *thread, MonoObject *start);
 void ves_icall_System_Threading_InternalThread_Lock (MonoInternalThread *internal, MonoBoolean *locked);
 void ves_icall_System_Threading_InternalThread_Unlock (MonoInternalThread *internal);
-void ves_icall_System_Threading_InternalThread_UpdateNativePriority (MonoInternalThread *internal);
+void ves_icall_System_Threading_InternalThread_SetPriorityNative (MonoInternalThread *internal, gint32 priority);
 void ves_icall_System_Threading_InternalThread_OnBackgroundStateChange (void);
 
 gint32 ves_icall_System_Threading_WaitHandle_WaitAll_internal(MonoArray *mono_handles, gint32 ms);
