@@ -40,6 +40,7 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Reflection;
 using System.IO;
 using System.Net.Configuration;
@@ -82,6 +83,9 @@ namespace System.Net.Sockets
 		internal SemaphoreSlim ReadSem = new SemaphoreSlim (1, 1);
 		internal SemaphoreSlim WriteSem = new SemaphoreSlim (1, 1);
 
+		internal CancellationTokenSource ReadCTS = new CancellationTokenSource ();
+		internal CancellationTokenSource WriteCTS = new CancellationTokenSource ();
+
 		internal bool is_blocking = true;
 		internal bool is_bound;
 
@@ -90,6 +94,10 @@ namespace System.Net.Sockets
 
 		int m_IntCleanedUp;
 		internal bool connect_in_progress;
+
+		internal SafeSocketHandle SafeHandle {
+			get { return m_Handle; }
+		}
 
 #region Constructors
 
@@ -583,7 +591,13 @@ namespace System.Net.Sockets
 
 			InitSocketAsyncEventArgs (e, AcceptAsyncCallback, e, SocketOperation.Accept);
 
-			QueueIOSelectorJob (ReadSem, e.socket_async_result.Handle, new IOSelectorJob (IOOperation.Read, BeginAcceptCallback, e.socket_async_result));
+			IntPtr handle = e.socket_async_result.Handle;
+			IOSelectorJob job = new IOSelectorJob (IOOperation.Read, BeginAcceptCallback, e.socket_async_result);
+
+			ReadSem.WaitAsync (ReadCTS.Token).ContinueWith (t => {
+				if (!t.IsCanceled)
+					IOSelector.Add (handle, job);
+			});
 
 			return true;
 		}
@@ -607,20 +621,6 @@ namespace System.Net.Sockets
 			}
 		});
 
-		public IAsyncResult BeginAccept(AsyncCallback callback, object state)
-		{
-			ThrowIfDisposedAndClosed ();
-
-			if (!is_bound || !is_listening)
-				throw new InvalidOperationException ();
-
-			SocketAsyncResult sockares = new SocketAsyncResult (this, callback, state, SocketOperation.Accept);
-
-			QueueIOSelectorJob (ReadSem, sockares.Handle, new IOSelectorJob (IOOperation.Read, BeginAcceptCallback, sockares));
-
-			return sockares;
-		}
-
 		static IOAsyncCallback BeginAcceptCallback = new IOAsyncCallback (ares => {
 			SocketAsyncResult sockares = (SocketAsyncResult) ares;
 			Socket acc_socket = null;
@@ -639,6 +639,42 @@ namespace System.Net.Sockets
 			sockares.Complete (acc_socket);
 		});
 
+		public IAsyncResult BeginAccept(AsyncCallback callback, object state)
+		{
+			ThrowIfDisposedAndClosed ();
+
+			if (!is_bound || !is_listening)
+				throw new InvalidOperationException ();
+
+			return new AcceptSocketTaskAsyncResult (callback, state, DoBeginAccept);
+		}
+
+		async Task<Socket> DoBeginAccept (AcceptSocketTaskAsyncResult sockares)
+		{
+			await ReadSem.WaitAsync (ReadCTS.Token);
+
+			try {
+				await IOSelector.ReadAsync (m_Handle, ReadCTS.Token);
+
+				int nativeError;
+				SafeSocketHandle safeHandle = Accept_internal (m_Handle, out nativeError, is_blocking);
+
+				SocketError error = (SocketError) nativeError;
+				if (error != SocketError.Success) {
+					if (is_closed)
+						error = SocketError.Interrupted;
+					throw new SocketException (error);
+				}
+
+				return new Socket (AddressFamily, SocketType, ProtocolType, safeHandle) {
+					seed_endpoint = this.seed_endpoint,
+					Blocking = this.Blocking,
+				};
+			} finally {
+				ReadSem.Release ();
+			}
+		}
+
 		public IAsyncResult BeginAccept (Socket acceptSocket, int receiveSize, AsyncCallback callback, object state)
 		{
 			ThrowIfDisposedAndClosed ();
@@ -647,7 +683,7 @@ namespace System.Net.Sockets
 				throw new ArgumentOutOfRangeException ("receiveSize", "receiveSize is less than zero");
 
 			if (acceptSocket != null) {
-				ThrowIfDisposedAndClosed (acceptSocket);
+				acceptSocket.ThrowIfDisposedAndClosed ();
 
 				if (acceptSocket.IsBound)
 					throw new InvalidOperationException ();
@@ -661,53 +697,67 @@ namespace System.Net.Sockets
 					throw new SocketException ((int)SocketError.InvalidArgument);
 			}
 
-			SocketAsyncResult sockares = new SocketAsyncResult (this, callback, state, SocketOperation.AcceptReceive) {
-				Buffer = new byte [receiveSize],
-				Offset = 0,
-				Size = receiveSize,
-				SockFlags = SocketFlags.None,
-				AcceptSocket = acceptSocket,
-			};
-
-			QueueIOSelectorJob (ReadSem, sockares.Handle, new IOSelectorJob (IOOperation.Read, BeginAcceptReceiveCallback, sockares));
-
-			return sockares;
+			return new AcceptSocketTaskAsyncResult (
+				acceptSocket, receiveSize, callback, state, DoBeginAcceptReceive);
 		}
 
-		static IOAsyncCallback BeginAcceptReceiveCallback = new IOAsyncCallback (ares => {
-			SocketAsyncResult sockares = (SocketAsyncResult) ares;
-			Socket acc_socket = null;
+		async Task<Socket> DoBeginAcceptReceive (AcceptSocketTaskAsyncResult sockares)
+		{
+			Socket socket;
+
+			await ReadSem.WaitAsync (ReadCTS.Token);
 
 			try {
+				await IOSelector.ReadAsync (m_Handle, ReadCTS.Token);
+
+				sockares.Buffer = new byte [sockares.ReceiveSize];
+
+				int nativeError;
+				SafeSocketHandle safeHandle = Accept_internal (m_Handle, out nativeError, is_blocking);
+
+				SocketError error = (SocketError) nativeError;
+				if (error != SocketError.Success) {
+					if (is_closed)
+						error = SocketError.Interrupted;
+					throw new SocketException (error);
+				}
+
 				if (sockares.AcceptSocket == null) {
-					acc_socket = sockares.socket.Accept ();
+					socket = new Socket (AddressFamily, SocketType, ProtocolType, safeHandle);
 				} else {
-					acc_socket = sockares.AcceptSocket;
-					sockares.socket.Accept (acc_socket);
+					socket = sockares.AcceptSocket;
+					socket.addressFamily = AddressFamily;
+					socket.socketType = SocketType;
+					socket.protocolType = ProtocolType;
+					socket.m_Handle = safeHandle;
+					socket.is_connected = true;
+					socket.seed_endpoint = seed_endpoint;
+					socket.Blocking = Blocking;
 				}
-			} catch (Exception e) {
-				sockares.Complete (e);
-				return;
+			} finally {
+				ReadSem.Release ();
 			}
 
-			/* It seems the MS runtime special-cases 0-length requested receive data.  See bug 464201. */
-			int total = 0;
-			if (sockares.Size > 0) {
+			if (sockares.ReceiveSize > 0) {
+				await socket.ReadSem.WaitAsync (socket.ReadCTS.Token);
+
 				try {
-					SocketError error;
-					total = acc_socket.Receive (sockares.Buffer, sockares.Offset, sockares.Size, sockares.SockFlags, out error);
-					if (error != 0) {
-						sockares.Complete (new SocketException ((int) error));
-						return;
-					}
-				} catch (Exception e) {
-					sockares.Complete (e);
-					return;
+					await IOSelector.ReadAsync (socket.m_Handle, socket.ReadCTS.Token);
+
+					int nativeError;
+					sockares.Buffer = new byte [sockares.ReceiveSize];
+					sockares.BytesTransferred = Receive_internal (socket.m_Handle, sockares.Buffer, 0, sockares.ReceiveSize, SocketFlags.None, out nativeError, is_blocking);
+
+					SocketError error = (SocketError) nativeError;
+					if (error != SocketError.Success)
+						throw new SocketException (error);
+				} finally {
+					socket.ReadSem.Release ();
 				}
 			}
 
-			sockares.Complete (acc_socket, total);
-		});
+			return socket;
+		}
 
 		public Socket EndAccept (IAsyncResult result)
 		{
@@ -720,17 +770,37 @@ namespace System.Net.Sockets
 		{
 			ThrowIfDisposedAndClosed ();
 
-			SocketAsyncResult sockares = ValidateEndIAsyncResult (asyncResult, "EndAccept", "asyncResult");
-
-			if (!sockares.IsCompleted)
-				sockares.AsyncWaitHandle.WaitOne ();
-
-			sockares.CheckIfThrowDelayedException ();
+			AcceptSocketTaskAsyncResult sockares =
+				ValidateEndIAsyncResult<AcceptSocketTaskAsyncResult, Socket> (asyncResult, nameof (EndAccept), nameof (asyncResult));
 
 			buffer = sockares.Buffer;
-			bytesTransferred = sockares.Total;
+			bytesTransferred = sockares.BytesTransferred;
 
-			return sockares.AcceptedSocket;
+			return sockares.Result;
+		}
+
+		class AcceptSocketTaskAsyncResult : SocketTaskAsyncResult<Socket>
+		{
+			public Socket AcceptSocket;
+			public int ReceiveSize;
+			public byte[] Buffer;
+			public int BytesTransferred;
+
+			public AcceptSocketTaskAsyncResult (AsyncCallback callback, object state, Func<AcceptSocketTaskAsyncResult, Task<Socket>> func)
+				: base (callback, state)
+			{
+				/* Have to be done last */
+				Task = CreateTask<AcceptSocketTaskAsyncResult> (func);
+			}
+
+			public AcceptSocketTaskAsyncResult (Socket acceptSocket, int receiveSize, AsyncCallback callback, object state, Func<AcceptSocketTaskAsyncResult, Task<Socket>> func)
+				: base (callback, state)
+			{
+				AcceptSocket = acceptSocket;
+				ReceiveSize = receiveSize;
+				/* Have to be done last */
+				Task = CreateTask<AcceptSocketTaskAsyncResult> (func);
+			}
 		}
 
 		static SafeSocketHandle Accept_internal (SafeSocketHandle safeHandle, out int error, bool blocking)
@@ -948,6 +1018,89 @@ namespace System.Net.Sockets
 			}
 		});
 
+		public IAsyncResult BeginConnect (EndPoint end_point, AsyncCallback callback, object state)
+		{
+			ThrowIfDisposedAndClosed ();
+
+			if (end_point == null)
+				throw new ArgumentNullException ("end_point");
+			if (is_listening)
+				throw new InvalidOperationException ();
+
+			return new ConnectSocketTaskAsyncResult (
+				end_point, callback, state, DoBeginConnect);
+		}
+
+		async Task DoBeginConnect (ConnectSocketTaskAsyncResult sockares)
+		{
+			EndPoint endPoint = sockares.RemoteEndPoint;
+
+			IPEndPoint ipEndPoint = endPoint as IPEndPoint;
+			if (ipEndPoint != null) {
+				if (ipEndPoint.Address.Equals (IPAddress.Any) || ipEndPoint.Address.Equals (IPAddress.IPv6Any))
+					throw new SocketException (SocketError.AddressNotAvailable);
+
+				endPoint = RemapIPEndPoint (ipEndPoint);
+			}
+
+			int nativeError;
+
+			if (connect_in_progress) {
+				// This could happen when multiple IPs are used
+				// Calling connect() again will reset the connection attempt and cause
+				// an error. Better to just close the socket and move on.
+				connect_in_progress = false;
+
+				m_Handle.Dispose ();
+				m_Handle = new SafeSocketHandle (Socket_internal (addressFamily, socketType, protocolType, out nativeError), true);
+				if (nativeError != 0)
+					throw new SocketException ((SocketError) nativeError);
+			}
+
+			bool blocking = is_blocking;
+			if (blocking)
+				Blocking = false;
+			Connect_internal (m_Handle, endPoint.Serialize (), out nativeError, false);
+			if (blocking)
+				Blocking = true;
+
+			SocketError error = (SocketError) nativeError;
+			if (error == SocketError.Success) {
+				// succeeded synch
+				is_connected = true;
+				is_bound = true;
+				return;
+			}
+
+			if (error != SocketError.InProgress && error != SocketError.WouldBlock) {
+				// error synch
+				is_connected = false;
+				is_bound = false;
+				throw new SocketException (error);
+			}
+
+			is_connected = false;
+			is_bound = false;
+			connect_in_progress = true;
+
+			await WriteSem.WaitAsync (WriteCTS.Token);
+
+			try {
+				await IOSelector.WriteAsync (m_Handle, WriteCTS.Token);
+
+				error = (SocketError) GetSocketOption (SocketOptionLevel.Socket, SocketOptionName.Error);
+				if (error != SocketError.Success)
+					throw new SocketException (error);
+
+				seed_endpoint = endPoint;
+				is_connected = true;
+				is_bound = true;
+				connect_in_progress = false;
+			} finally {
+				WriteSem.Release ();
+			}
+		}
+
 		public IAsyncResult BeginConnect (string host, int port, AsyncCallback callback, object state)
 		{
 			ThrowIfDisposedAndClosed ();
@@ -961,77 +1114,8 @@ namespace System.Net.Sockets
 			if (is_listening)
 				throw new InvalidOperationException ();
 
-			return BeginConnect (Dns.GetHostAddresses (host), port, callback, state);
-		}
-
-		public IAsyncResult BeginConnect (EndPoint end_point, AsyncCallback callback, object state)
-		{
-			ThrowIfDisposedAndClosed ();
-
-			if (end_point == null)
-				throw new ArgumentNullException ("end_point");
-			if (is_listening)
-				throw new InvalidOperationException ();
-
-			SocketAsyncResult sockares = new SocketAsyncResult (this, callback, state, SocketOperation.Connect) {
-				EndPoint = end_point,
-			};
-
-			// Bug #75154: Connect() should not succeed for .Any addresses.
-			if (end_point is IPEndPoint) {
-				IPEndPoint ep = (IPEndPoint) end_point;
-				if (ep.Address.Equals (IPAddress.Any) || ep.Address.Equals (IPAddress.IPv6Any)) {
-					sockares.Complete (new SocketException ((int) SocketError.AddressNotAvailable), true);
-					return sockares;
-				}
-				
-				end_point = RemapIPEndPoint (ep);
-			}
-
-			int error = 0;
-
-			if (connect_in_progress) {
-				// This could happen when multiple IPs are used
-				// Calling connect() again will reset the connection attempt and cause
-				// an error. Better to just close the socket and move on.
-				connect_in_progress = false;
-				m_Handle.Dispose ();
-				m_Handle = new SafeSocketHandle (Socket_internal (addressFamily, socketType, protocolType, out error), true);
-				if (error != 0)
-					throw new SocketException (error);
-			}
-
-			bool blk = is_blocking;
-			if (blk)
-				Blocking = false;
-			Connect_internal (m_Handle, end_point.Serialize (), out error, false);
-			if (blk)
-				Blocking = true;
-
-			if (error == 0) {
-				// succeeded synch
-				is_connected = true;
-				is_bound = true;
-				sockares.Complete (true);
-				return sockares;
-			}
-
-			if (error != (int) SocketError.InProgress && error != (int) SocketError.WouldBlock) {
-				// error synch
-				is_connected = false;
-				is_bound = false;
-				sockares.Complete (new SocketException (error), true);
-				return sockares;
-			}
-
-			// continue asynch
-			is_connected = false;
-			is_bound = false;
-			connect_in_progress = true;
-
-			IOSelector.Add (sockares.Handle, new IOSelectorJob (IOOperation.Write, BeginConnectCallback, sockares));
-
-			return sockares;
+			return new ConnectSocketTaskAsyncResult (
+				host, port, callback, state, DoBeginConnectMultiple);
 		}
 
 		public IAsyncResult BeginConnect (IPAddress[] addresses, int port, AsyncCallback callback, object state)
@@ -1049,109 +1133,76 @@ namespace System.Net.Sockets
 			if (is_listening)
 				throw new InvalidOperationException ();
 
-			SocketAsyncResult sockares = new SocketAsyncResult (this, callback, state, SocketOperation.Connect) {
-				Addresses = addresses,
-				Port = port,
-			};
-
 			is_connected = false;
 
-			return BeginMConnect (sockares);
+			return new ConnectSocketTaskAsyncResult (
+				addresses, port, callback, state, DoBeginConnectMultiple);
 		}
 
-		internal IAsyncResult BeginMConnect (SocketAsyncResult sockares)
+		async Task DoBeginConnectMultiple (ConnectSocketTaskAsyncResult sockares)
 		{
-			SocketAsyncResult ares = null;
-			Exception exc = null;
-			AsyncCallback callback;
+			IPAddress[] addresses;
 
-			for (int i = sockares.CurrentAddress; i < sockares.Addresses.Length; i++) {
+			addresses = sockares.Addresses;
+			if (addresses == null)
+				addresses = await Task.Run (() => Dns.GetHostAddresses (sockares.Host));
+
+			SocketError lastError = SocketError.SocketError;
+
+			for (int i = 0; i < addresses.Length; ++i) {
 				try {
-					sockares.CurrentAddress++;
+					await Task.Factory.FromAsync (
+						BeginConnect (new IPEndPoint (addresses [i], sockares.Port), null, null), EndConnect);
 
-					ares = (SocketAsyncResult) BeginConnect (new IPEndPoint (sockares.Addresses [i], sockares.Port), null, sockares);
-					if (ares.IsCompleted && ares.CompletedSynchronously) {
-						ares.CheckIfThrowDelayedException ();
-
-						callback = ares.AsyncCallback;
-						if (callback != null)
-							ThreadPool.UnsafeQueueUserWorkItem (_ => callback (ares), null);
-					}
-
-					break;
-				} catch (Exception e) {
-					exc = e;
-					ares = null;
+					return;
+				} catch (SocketException e) {
+					lastError = e.SocketErrorCode;
 				}
 			}
 
-			if (ares == null)
-				throw exc;
-
-			return sockares;
+			throw new SocketException (lastError);
 		}
 
-		static IOAsyncCallback BeginConnectCallback = new IOAsyncCallback (ares => {
-			SocketAsyncResult sockares = (SocketAsyncResult) ares;
-
-			if (sockares.EndPoint == null) {
-				sockares.Complete (new SocketException ((int)SocketError.AddressNotAvailable));
-				return;
-			}
-
-			SocketAsyncResult mconnect = sockares.AsyncState as SocketAsyncResult;
-			bool is_mconnect = mconnect != null && mconnect.Addresses != null;
-
-			try {
-				EndPoint ep = sockares.EndPoint;
-				int error_code = (int) sockares.socket.GetSocketOption (SocketOptionLevel.Socket, SocketOptionName.Error);
-
-				if (error_code == 0) {
-					if (is_mconnect)
-						sockares = mconnect;
-
-					sockares.socket.seed_endpoint = ep;
-					sockares.socket.is_connected = true;
-					sockares.socket.is_bound = true;
-					sockares.socket.connect_in_progress = false;
-					sockares.error = 0;
-					sockares.Complete ();
-					return;
-				}
-
-				if (!is_mconnect) {
-					sockares.socket.connect_in_progress = false;
-					sockares.Complete (new SocketException (error_code));
-					return;
-				}
-
-				if (mconnect.CurrentAddress >= mconnect.Addresses.Length) {
-					mconnect.Complete (new SocketException (error_code));
-					return;
-				}
-
-				mconnect.socket.BeginMConnect (mconnect);
-			} catch (Exception e) {
-				sockares.socket.connect_in_progress = false;
-
-				if (is_mconnect)
-					sockares = mconnect;
-
-				sockares.Complete (e);
-				return;
-			}
-		});
-
-		public void EndConnect (IAsyncResult result)
+		public void EndConnect (IAsyncResult asyncResult)
 		{
 			ThrowIfDisposedAndClosed ();
 
-			SocketAsyncResult sockares = ValidateEndIAsyncResult (result, "EndConnect", "result");
+			ConnectSocketTaskAsyncResult sockares =
+				ValidateEndIAsyncResult<ConnectSocketTaskAsyncResult> (asyncResult, nameof (EndConnect), nameof (asyncResult));
+		}
 
-			if (!sockares.IsCompleted)
-				sockares.AsyncWaitHandle.WaitOne();
+		class ConnectSocketTaskAsyncResult : SocketTaskAsyncResult
+		{
+			public string Host;
+			public int Port;
+			public IPAddress[] Addresses;
+			public EndPoint RemoteEndPoint;
 
-			sockares.CheckIfThrowDelayedException();
+			public ConnectSocketTaskAsyncResult (string host, int port, AsyncCallback callback, object state, Func<ConnectSocketTaskAsyncResult, Task> func)
+				: base (callback, state)
+			{
+				Host = host;
+				Port = port;
+				/* Have to be done last */
+				Task = CreateTask<ConnectSocketTaskAsyncResult> (func);
+			}
+
+			public ConnectSocketTaskAsyncResult (IPAddress[] addresses, int port, AsyncCallback callback, object state, Func<ConnectSocketTaskAsyncResult, Task> func)
+				: base (callback, state)
+			{
+				Addresses = addresses;
+				Port = port;
+				/* Have to be done last */
+				Task = CreateTask<ConnectSocketTaskAsyncResult> (func);
+			}
+
+			public ConnectSocketTaskAsyncResult (EndPoint remoteEndPoint, AsyncCallback callback, object state, Func<ConnectSocketTaskAsyncResult, Task> func)
+				: base (callback, state)
+			{
+				RemoteEndPoint = remoteEndPoint;
+				/* Have to be done last */
+				Task = CreateTask<ConnectSocketTaskAsyncResult> (func);
+			}
 		}
 
 		static void Connect_internal (SafeSocketHandle safeHandle, SocketAddress sa, out int error, bool blocking)
@@ -1246,19 +1297,6 @@ namespace System.Net.Sockets
 			}
 		});
 
-		public IAsyncResult BeginDisconnect (bool reuseSocket, AsyncCallback callback, object state)
-		{
-			ThrowIfDisposedAndClosed ();
-
-			SocketAsyncResult sockares = new SocketAsyncResult (this, callback, state, SocketOperation.Disconnect) {
-				ReuseSocket = reuseSocket,
-			};
-
-			IOSelector.Add (sockares.Handle, new IOSelectorJob (IOOperation.Write, BeginDisconnectCallback, sockares));
-
-			return sockares;
-		}
-
 		static IOAsyncCallback BeginDisconnectCallback = new IOAsyncCallback (ares => {
 			SocketAsyncResult sockares = (SocketAsyncResult) ares;
 
@@ -1272,16 +1310,49 @@ namespace System.Net.Sockets
 			sockares.Complete ();
 		});
 
+		public IAsyncResult BeginDisconnect (bool reuseSocket, AsyncCallback callback, object state)
+		{
+			ThrowIfDisposedAndClosed ();
+
+			return new DisconnectSocketTaskAsyncResult (
+				reuseSocket, callback, state, DoBeginDisconnect);
+		}
+
+		async Task DoBeginDisconnect (DisconnectSocketTaskAsyncResult sockares)
+		{
+			await WriteSem.WaitAsync (WriteCTS.Token);
+
+			try {
+				await IOSelector.WriteAsync (m_Handle, WriteCTS.Token);
+
+				int nativeError;
+				Disconnect_internal (m_Handle, sockares.ReuseSocket, out nativeError);
+
+				SocketError error = (SocketError) nativeError;
+				if (error != SocketError.Success) {
+					if (nativeError == 50) {
+						/* ERROR_NOT_SUPPORTED */
+						throw new PlatformNotSupportedException ();
+					}
+
+					throw new SocketException (error);
+				}
+
+				is_connected = false;
+				if (sockares.ReuseSocket) {
+					/* Do managed housekeeping here... */
+				}
+			} finally {
+				WriteSem.Release ();
+			}
+		}
+
 		public void EndDisconnect (IAsyncResult asyncResult)
 		{
 			ThrowIfDisposedAndClosed ();
 
-			SocketAsyncResult sockares = ValidateEndIAsyncResult (asyncResult, "EndDisconnect", "asyncResult");
-
-			if (!sockares.IsCompleted)
-				sockares.AsyncWaitHandle.WaitOne ();
-
-			sockares.CheckIfThrowDelayedException ();
+			DisconnectSocketTaskAsyncResult sockares =
+				ValidateEndIAsyncResult<DisconnectSocketTaskAsyncResult> (asyncResult, nameof (EndDisconnect), nameof (asyncResult));
 		}
 
 		static void Disconnect_internal (SafeSocketHandle safeHandle, bool reuse, out int error)
@@ -1298,6 +1369,19 @@ namespace System.Net.Sockets
 
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]
 		extern static void Disconnect_internal (IntPtr sock, bool reuse, out int error);
+
+		class DisconnectSocketTaskAsyncResult : SocketTaskAsyncResult
+		{
+			public bool ReuseSocket;
+
+			public DisconnectSocketTaskAsyncResult (bool reuseSocket, AsyncCallback callback, object state, Func<DisconnectSocketTaskAsyncResult, Task> func)
+				: base (callback, state)
+			{
+				ReuseSocket = reuseSocket;
+				/* Have to be done last */
+				Task = CreateTask<DisconnectSocketTaskAsyncResult> (func);
+			}
+		}
 
 #endregion
 
@@ -1378,12 +1462,16 @@ namespace System.Net.Sockets
 			if (e.Buffer == null && e.BufferList == null)
 				throw new NullReferenceException ("Either e.Buffer or e.BufferList must be valid buffers.");
 
+			IntPtr handle;
+			IOSelectorJob job;
+
 			if (e.Buffer == null) {
 				InitSocketAsyncEventArgs (e, ReceiveAsyncCallback, e, SocketOperation.ReceiveGeneric);
 
 				e.socket_async_result.Buffers = e.BufferList;
 
-				QueueIOSelectorJob (ReadSem, e.socket_async_result.Handle, new IOSelectorJob (IOOperation.Read, BeginReceiveGenericCallback, e.socket_async_result));
+				handle = e.socket_async_result.Handle;
+				job = new IOSelectorJob (IOOperation.Read, BeginReceiveGenericCallback, e.socket_async_result);
 			} else {
 				InitSocketAsyncEventArgs (e, ReceiveAsyncCallback, e, SocketOperation.Receive);
 
@@ -1391,8 +1479,14 @@ namespace System.Net.Sockets
 				e.socket_async_result.Offset = e.Offset;
 				e.socket_async_result.Size = e.Count;
 
-				QueueIOSelectorJob (ReadSem, e.socket_async_result.Handle, new IOSelectorJob (IOOperation.Read, BeginReceiveCallback, e.socket_async_result));
+				handle = e.socket_async_result.Handle;
+				job = new IOSelectorJob (IOOperation.Read, BeginReceiveCallback, e.socket_async_result);
 			}
+
+			ReadSem.WaitAsync (ReadCTS.Token).ContinueWith (t => {
+				if (!t.IsCanceled)
+					IOSelector.Add (handle, job);
+			});
 
 			return true;
 		}
@@ -1414,28 +1508,19 @@ namespace System.Net.Sockets
 			}
 		});
 
-		public IAsyncResult BeginReceive (byte[] buffer, int offset, int size, SocketFlags socketFlags, out SocketError errorCode, AsyncCallback callback, object state)
-		{
-			ThrowIfDisposedAndClosed ();
-			ThrowIfBufferNull (buffer);
-			ThrowIfBufferOutOfRange (buffer, offset, size);
+		static IOAsyncCallback BeginReceiveGenericCallback = new IOAsyncCallback (ares => {
+			SocketAsyncResult sockares = (SocketAsyncResult) ares;
+			int total = 0;
 
-			/* As far as I can tell from the docs and from experimentation, a pointer to the
-			 * SocketError parameter is not supposed to be saved for the async parts.  And as we don't
-			 * set any socket errors in the setup code, we just have to set it to Success. */
-			errorCode = SocketError.Success;
+			try {
+				total = sockares.socket.Receive (sockares.Buffers, sockares.SockFlags);
+			} catch (Exception e) {
+				sockares.Complete (e);
+				return;
+			}
 
-			SocketAsyncResult sockares = new SocketAsyncResult (this, callback, state, SocketOperation.Receive) {
-				Buffer = buffer,
-				Offset = offset,
-				Size = size,
-				SockFlags = socketFlags,
-			};
-
-			QueueIOSelectorJob (ReadSem, sockares.Handle, new IOSelectorJob (IOOperation.Read, BeginReceiveCallback, sockares));
-
-			return sockares;
-		}
+			sockares.Complete (total);
+		});
 
 		static IOAsyncCallback BeginReceiveCallback = new IOAsyncCallback (ares => {
 			SocketAsyncResult sockares = (SocketAsyncResult) ares;
@@ -1451,6 +1536,46 @@ namespace System.Net.Sockets
 			sockares.Complete (total);
 		});
 
+		public IAsyncResult BeginReceive (byte[] buffer, int offset, int size, SocketFlags socketFlags, out SocketError errorCode, AsyncCallback callback, object state)
+		{
+			ThrowIfDisposedAndClosed ();
+			ThrowIfBufferNull (buffer);
+			ThrowIfBufferOutOfRange (buffer, offset, size);
+
+			/* As far as I can tell from the docs and from experimentation, a pointer to the SocketError
+			 * parameter is not supposed to be saved for the async parts. And as we don't set any socket
+			 * errors in the setup code, we just have to set it to Success. */
+			errorCode = SocketError.Success;
+
+			return new ReceiveSocketTaskAsyncResult (
+				buffer, offset, size, socketFlags, callback, state, DoBeginReceive);
+		}
+
+		async Task<int> DoBeginReceive (ReceiveSocketTaskAsyncResult sockares)
+		{
+			await ReadSem.WaitAsync (ReadCTS.Token);
+
+			try {
+				await IOSelector.ReadAsync (m_Handle, ReadCTS.Token);
+
+				int nativeError;
+				int total = Receive_internal (m_Handle, sockares.Buffer, sockares.Offset, sockares.Size, sockares.SocketFlags, out nativeError, is_blocking);
+
+				sockares.ErrorCode = (SocketError) nativeError;
+				if (sockares.ErrorCode != SocketError.Success
+					 && sockares.ErrorCode != SocketError.WouldBlock
+					 && sockares.ErrorCode != SocketError.InProgress)
+				{
+					is_connected = false;
+					return 0;
+				}
+
+				return total;
+			} finally {
+				ReadSem.Release ();
+			}
+		}
+
 		[CLSCompliant (false)]
 		public IAsyncResult BeginReceive (IList<ArraySegment<byte>> buffers, SocketFlags socketFlags, out SocketError errorCode, AsyncCallback callback, object state)
 		{
@@ -1459,53 +1584,103 @@ namespace System.Net.Sockets
 			if (buffers == null)
 				throw new ArgumentNullException ("buffers");
 
-			/* I assume the same SocketError semantics as above */
+			/* As far as I can tell from the docs and from experimentation, a pointer to the SocketError
+			 * parameter is not supposed to be saved for the async parts. And as we don't set any socket
+			 * errors in the setup code, we just have to set it to Success. */
 			errorCode = SocketError.Success;
 
-			SocketAsyncResult sockares = new SocketAsyncResult (this, callback, state, SocketOperation.ReceiveGeneric) {
-				Buffers = buffers,
-				SockFlags = socketFlags,
-			};
-
-			QueueIOSelectorJob (ReadSem, sockares.Handle, new IOSelectorJob (IOOperation.Read, BeginReceiveGenericCallback, sockares));
-
-			return sockares;
+			return new ReceiveSocketTaskAsyncResult (
+				buffers, socketFlags, callback, state, DoBeginReceiveGeneric);
 		}
 
-		static IOAsyncCallback BeginReceiveGenericCallback = new IOAsyncCallback (ares => {
-			SocketAsyncResult sockares = (SocketAsyncResult) ares;
-			int total = 0;
+		async Task<int> DoBeginReceiveGeneric (ReceiveSocketTaskAsyncResult sockares)
+		{
+			await ReadSem.WaitAsync (ReadCTS.Token);
 
 			try {
-				total = sockares.socket.Receive (sockares.Buffers, sockares.SockFlags);
-			} catch (Exception e) {
-				sockares.Complete (e);
-				return;
-			}
+				await IOSelector.ReadAsync (m_Handle, ReadCTS.Token);
 
-			sockares.Complete (total);
-		});
+				WSABUF[] buffers = new WSABUF [sockares.Buffers.Count];
+				GCHandle[] gch = new GCHandle [sockares.Buffers.Count];
+
+				for (int i = 0; i < buffers.Length; i++) {
+					ArraySegment<byte> segment = sockares.Buffers [i];
+
+					if (segment.Offset < 0 || segment.Count < 0 || segment.Count > segment.Array.Length - segment.Offset)
+						throw new ArgumentOutOfRangeException ("segment");
+
+					gch [i] = GCHandle.Alloc (segment.Array, GCHandleType.Pinned);
+					buffers [i].len = segment.Count;
+					buffers [i].buf = Marshal.UnsafeAddrOfPinnedArrayElement (segment.Array, segment.Offset);
+				}
+
+				int nativeError, total;
+
+				try {
+					total = Receive_internal (m_Handle, buffers, sockares.SocketFlags, out nativeError, is_blocking);
+				} finally {
+					for (int i = 0; i < buffers.Length; ++i) {
+						if (gch [i].IsAllocated)
+							gch [i].Free ();
+					}
+				}
+
+				sockares.ErrorCode = (SocketError) nativeError;
+				if (sockares.ErrorCode != SocketError.Success
+					 && sockares.ErrorCode != SocketError.WouldBlock
+					 && sockares.ErrorCode != SocketError.InProgress)
+				{
+					is_connected = false;
+					return 0;
+				}
+
+				return total;
+			} finally {
+				ReadSem.Release ();
+			}
+		}
 
 		public int EndReceive (IAsyncResult asyncResult, out SocketError errorCode)
 		{
 			ThrowIfDisposedAndClosed ();
 
-			SocketAsyncResult sockares = ValidateEndIAsyncResult (asyncResult, "EndReceive", "asyncResult");
-
-			if (!sockares.IsCompleted)
-				sockares.AsyncWaitHandle.WaitOne ();
+			ReceiveSocketTaskAsyncResult sockares =
+				ValidateEndIAsyncResult<ReceiveSocketTaskAsyncResult, int> (asyncResult, nameof (EndReceive), nameof (asyncResult));
 
 			errorCode = sockares.ErrorCode;
+			return sockares.Result;
+		}
 
-			if (errorCode != SocketError.Success && errorCode != SocketError.WouldBlock && errorCode != SocketError.InProgress)
-				is_connected = false;
+		class ReceiveSocketTaskAsyncResult : SocketTaskAsyncResult<int>
+		{
+			public IList<ArraySegment<byte>> Buffers;
+			public byte[] Buffer;
+			public int Offset;
+			public int Size;
+			public SocketFlags SocketFlags;
+			public SocketError ErrorCode;
 
-			// If no socket error occurred, call CheckIfThrowDelayedException in case there are other
-			// kinds of exceptions that should be thrown.
-			if (errorCode == SocketError.Success)
-				sockares.CheckIfThrowDelayedException();
+			public ReceiveSocketTaskAsyncResult (byte[] buffer, int offset, int size, SocketFlags socketFlags,
+					AsyncCallback callback, object state, Func<ReceiveSocketTaskAsyncResult, Task<int>> func)
+				: base (callback, state)
+			{
+				Buffer = buffer;
+				Offset = offset;
+				Size = size;
+				SocketFlags = socketFlags;
+				/* Have to be done last */
+				Task = CreateTask<ReceiveSocketTaskAsyncResult> (func);
+			}
 
-			return sockares.Total;
+			public ReceiveSocketTaskAsyncResult (IList<ArraySegment<byte>> buffers, SocketFlags socketFlags,
+					AsyncCallback callback, object state, Func<ReceiveSocketTaskAsyncResult, Task<int>> func)
+				: base (callback, state)
+			{
+				Buffers = buffers;
+				SocketFlags = socketFlags;
+				/* Have to be done last */
+				Task = CreateTask<ReceiveSocketTaskAsyncResult> (func);
+			}
 		}
 
 		static int Receive_internal (SafeSocketHandle safeHandle, WSABUF[] bufarray, SocketFlags flags, out int error, bool blocking)
@@ -1607,7 +1782,13 @@ namespace System.Net.Sockets
 			e.socket_async_result.EndPoint = e.RemoteEndPoint;
 			e.socket_async_result.SockFlags = e.SocketFlags;
 
-			QueueIOSelectorJob (ReadSem, e.socket_async_result.Handle, new IOSelectorJob (IOOperation.Read, BeginReceiveFromCallback, e.socket_async_result));
+			IntPtr handle = e.socket_async_result.Handle;
+			IOSelectorJob job = new IOSelectorJob (IOOperation.Read, BeginReceiveFromCallback, e.socket_async_result);
+
+			ReadSem.WaitAsync (ReadCTS.Token).ContinueWith (t => {
+				if (!t.IsCanceled)
+					IOSelector.Add (handle, job);
+			});
 
 			return true;
 		}
@@ -1629,28 +1810,6 @@ namespace System.Net.Sockets
 			}
 		});
 
-		public IAsyncResult BeginReceiveFrom (byte[] buffer, int offset, int size, SocketFlags socket_flags, ref EndPoint remote_end, AsyncCallback callback, object state)
-		{
-			ThrowIfDisposedAndClosed ();
-			ThrowIfBufferNull (buffer);
-			ThrowIfBufferOutOfRange (buffer, offset, size);
-
-			if (remote_end == null)
-				throw new ArgumentNullException ("remote_end");
-
-			SocketAsyncResult sockares = new SocketAsyncResult (this, callback, state, SocketOperation.ReceiveFrom) {
-				Buffer = buffer,
-				Offset = offset,
-				Size = size,
-				SockFlags = socket_flags,
-				EndPoint = remote_end,
-			};
-
-			QueueIOSelectorJob (ReadSem, sockares.Handle, new IOSelectorJob (IOOperation.Read, BeginReceiveFromCallback, sockares));
-
-			return sockares;
-		}
-
 		static IOAsyncCallback BeginReceiveFromCallback = new IOAsyncCallback (ares => {
 			SocketAsyncResult sockares = (SocketAsyncResult) ares;
 			int total = 0;
@@ -1671,26 +1830,74 @@ namespace System.Net.Sockets
 			sockares.Complete (total);
 		});
 
-		public int EndReceiveFrom(IAsyncResult result, ref EndPoint end_point)
+		public IAsyncResult BeginReceiveFrom (byte[] buffer, int offset, int size, SocketFlags socket_flags, ref EndPoint remoteEP, AsyncCallback callback, object state)
+		{
+			ThrowIfDisposedAndClosed ();
+			ThrowIfBufferNull (buffer);
+			ThrowIfBufferOutOfRange (buffer, offset, size);
+
+			if (remoteEP == null)
+				throw new ArgumentNullException (nameof (remoteEP));
+
+			return new ReceiveFromSocketTaskAsyncResult (
+				buffer, offset, size, socket_flags, remoteEP, callback, state, DoBeginReceiveFrom);
+		}
+
+		async Task<int> DoBeginReceiveFrom (ReceiveFromSocketTaskAsyncResult sockares)
+		{
+			await ReadSem.WaitAsync (ReadCTS.Token);
+
+			try {
+				await IOSelector.ReadAsync (m_Handle, ReadCTS.Token);
+
+				SocketAddress sockaddr = sockares.EndPoint.Serialize();
+
+				int nativeError;
+				int received = ReceiveFrom_internal (m_Handle, sockares.Buffer, sockares.Offset, sockares.Size, sockares.SocketFlags, ref sockaddr, out nativeError, is_blocking);
+
+				SocketError error = (SocketError) nativeError;
+				if (error != SocketError.Success) {
+					if (error != SocketError.WouldBlock && error != SocketError.InProgress) {
+						is_connected = false;
+					} else if (error == SocketError.WouldBlock && is_blocking) {
+						// This might happen when ReceiveTimeout is set
+						error = SocketError.TimedOut;
+					}
+
+					throw new SocketException (error);
+				}
+
+				is_connected = true;
+				is_bound = true;
+
+				/* If sockaddr is null then we're a connection oriented protocol and should ignore the
+				 * sockares.EndPoint parameter (see MSDN documentation for Socket.ReceiveFrom(...) ) */
+				if (sockaddr != null) {
+					/* Stupidly, EndPoint.Create() is an instance method */
+					sockares.EndPoint = sockares.EndPoint.Create (sockaddr);
+				}
+
+				seed_endpoint = sockares.EndPoint;
+
+				return received;
+			} finally {
+				ReadSem.Release ();
+			}
+		}
+
+		public int EndReceiveFrom (IAsyncResult asyncResult, ref EndPoint endPoint)
 		{
 			ThrowIfDisposedAndClosed ();
 
-			if (end_point == null)
-				throw new ArgumentNullException ("remote_end");
+			if (endPoint == null)
+				throw new ArgumentNullException (nameof (endPoint));
 
-			SocketAsyncResult sockares = ValidateEndIAsyncResult (result, "EndReceiveFrom", "result");
+			ReceiveFromSocketTaskAsyncResult sockares =
+				ValidateEndIAsyncResult<ReceiveFromSocketTaskAsyncResult, int> (asyncResult, nameof (EndReceiveFrom), nameof (asyncResult));
 
-			if (!sockares.IsCompleted)
-				sockares.AsyncWaitHandle.WaitOne();
-
-			sockares.CheckIfThrowDelayedException();
-
-			end_point = sockares.EndPoint;
-
-			return sockares.Total;
+			endPoint = sockares.EndPoint;
+			return sockares.Result;
 		}
-
-
 
 		static int ReceiveFrom_internal (SafeSocketHandle safeHandle, byte[] buffer, int offset, int count, SocketFlags flags, ref SocketAddress sockaddr, out int error, bool blocking)
 		{
@@ -1704,6 +1911,27 @@ namespace System.Net.Sockets
 
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]
 		extern static int ReceiveFrom_internal(IntPtr sock, byte[] buffer, int offset, int count, SocketFlags flags, ref SocketAddress sockaddr, out int error, bool blocking);
+
+		class ReceiveFromSocketTaskAsyncResult : SocketTaskAsyncResult<int>
+		{
+			public byte[] Buffer;
+			public int Offset;
+			public int Size;
+			public SocketFlags SocketFlags;
+			public EndPoint EndPoint;
+
+			public ReceiveFromSocketTaskAsyncResult (byte[] buffer, int offset, int size, SocketFlags socketFlags, EndPoint endPoint, AsyncCallback callback, object state, Func<ReceiveFromSocketTaskAsyncResult, Task<int>> func)
+				: base (callback, state)
+			{
+				Buffer = buffer;
+				Offset = offset;
+				Size = size;
+				SocketFlags = socketFlags;
+				EndPoint = endPoint;
+				/* Have to be done last */
+				Task = CreateTask<ReceiveFromSocketTaskAsyncResult> (func);
+			}
+		}
 
 #endregion
 
@@ -1733,7 +1961,6 @@ namespace System.Net.Sockets
 			throw new NotImplementedException ();
 		}
 
-		[MonoTODO]
 		public IAsyncResult BeginReceiveMessageFrom (byte[] buffer, int offset, int size, SocketFlags socketFlags, ref EndPoint remoteEP, AsyncCallback callback, object state)
 		{
 			ThrowIfDisposedAndClosed ();
@@ -1743,10 +1970,15 @@ namespace System.Net.Sockets
 			if (remoteEP == null)
 				throw new ArgumentNullException ("remoteEP");
 
+			return new ReceiveMessageFromSocketTaskAsyncResult (
+				buffer, offset, size, socketFlags, remoteEP, callback, state, DoBeginReceiveMessageFrom);
+		}
+
+		async Task<int> DoBeginReceiveMessageFrom (ReceiveMessageFromSocketTaskAsyncResult sockares)
+		{
 			throw new NotImplementedException ();
 		}
 
-		[MonoTODO]
 		public int EndReceiveMessageFrom (IAsyncResult asyncResult, ref SocketFlags socketFlags, ref EndPoint endPoint, out IPPacketInformation ipPacketInformation)
 		{
 			ThrowIfDisposedAndClosed ();
@@ -1754,9 +1986,36 @@ namespace System.Net.Sockets
 			if (endPoint == null)
 				throw new ArgumentNullException ("endPoint");
 
-			/*SocketAsyncResult sockares =*/ ValidateEndIAsyncResult (asyncResult, "EndReceiveMessageFrom", "asyncResult");
+			ReceiveMessageFromSocketTaskAsyncResult sockares =
+				ValidateEndIAsyncResult<ReceiveMessageFromSocketTaskAsyncResult, int> (asyncResult, nameof (EndReceiveMessageFrom), nameof (asyncResult));
 
-			throw new NotImplementedException ();
+			socketFlags = sockares.SocketFlags;
+			endPoint = sockares.RemoteEndPoint;
+			ipPacketInformation = sockares.IPPacketInformation;
+			return sockares.Result;
+		}
+
+		class ReceiveMessageFromSocketTaskAsyncResult : SocketTaskAsyncResult<int>
+		{
+			public byte[] Buffer;
+			public int Offset;
+			public int Size;
+			public SocketFlags SocketFlags;
+			public EndPoint RemoteEndPoint;
+			public IPPacketInformation IPPacketInformation;
+
+			public ReceiveMessageFromSocketTaskAsyncResult (byte[] buffer, int offset, int size, SocketFlags socketFlags, EndPoint remoteEP,
+					AsyncCallback callback, object state, Func<ReceiveMessageFromSocketTaskAsyncResult, Task<int>> func)
+				: base (callback, state)
+			{
+				Buffer = buffer;
+				Offset = offset;
+				Size = size;
+				SocketFlags = socketFlags;
+				RemoteEndPoint = remoteEP;
+				/* Have to be done last */
+				Task = CreateTask<ReceiveMessageFromSocketTaskAsyncResult> (func);
+			}
 		}
 
 #endregion
@@ -1844,12 +2103,16 @@ m_Handle, buffer, offset + sent, size - sent, socketFlags, out nativeError, is_b
 			if (e.Buffer == null && e.BufferList == null)
 				throw new NullReferenceException ("Either e.Buffer or e.BufferList must be valid buffers.");
 
+			IntPtr handle;
+			IOSelectorJob job;
+
 			if (e.Buffer == null) {
 				InitSocketAsyncEventArgs (e, SendAsyncCallback, e, SocketOperation.SendGeneric);
 
 				e.socket_async_result.Buffers = e.BufferList;
 
-				QueueIOSelectorJob (WriteSem, e.socket_async_result.Handle, new IOSelectorJob (IOOperation.Write, BeginSendGenericCallback, e.socket_async_result));
+				handle = e.socket_async_result.Handle;
+				job = new IOSelectorJob (IOOperation.Write, BeginSendGenericCallback, e.socket_async_result);
 			} else {
 				InitSocketAsyncEventArgs (e, SendAsyncCallback, e, SocketOperation.Send);
 
@@ -1857,8 +2120,14 @@ m_Handle, buffer, offset + sent, size - sent, socketFlags, out nativeError, is_b
 				e.socket_async_result.Offset = e.Offset;
 				e.socket_async_result.Size = e.Count;
 
-				QueueIOSelectorJob (WriteSem, e.socket_async_result.Handle, new IOSelectorJob (IOOperation.Write, s => BeginSendCallback ((SocketAsyncResult) s, 0), e.socket_async_result));
+				handle = e.socket_async_result.Handle;
+				job = new IOSelectorJob (IOOperation.Write, s => BeginSendCallback ((SocketAsyncResult) s, 0), e.socket_async_result);
 			}
+
+			WriteSem.WaitAsync (WriteCTS.Token).ContinueWith (t => {
+				if (!t.IsCanceled)
+					IOSelector.Add (handle, job);
+			});
 
 			return true;
 		}
@@ -1879,31 +2148,6 @@ m_Handle, buffer, offset + sent, size - sent, socketFlags, out nativeError, is_b
 				e.Complete ();
 			}
 		});
-
-		public IAsyncResult BeginSend (byte[] buffer, int offset, int size, SocketFlags socketFlags, out SocketError errorCode, AsyncCallback callback, object state)
-		{
-			ThrowIfDisposedAndClosed ();
-			ThrowIfBufferNull (buffer);
-			ThrowIfBufferOutOfRange (buffer, offset, size);
-
-			if (!is_connected) {
-				errorCode = SocketError.NotConnected;
-				return null;
-			}
-
-			errorCode = SocketError.Success;
-
-			SocketAsyncResult sockares = new SocketAsyncResult (this, callback, state, SocketOperation.Send) {
-				Buffer = buffer,
-				Offset = offset,
-				Size = size,
-				SockFlags = socketFlags,
-			};
-
-			QueueIOSelectorJob (WriteSem, sockares.Handle, new IOSelectorJob (IOOperation.Write, s => BeginSendCallback ((SocketAsyncResult) s, 0), sockares));
-
-			return sockares;
-		}
 
 		static void BeginSendCallback (SocketAsyncResult sockares, int sent_so_far)
 		{
@@ -1937,31 +2181,6 @@ m_Handle, buffer, offset + sent, size - sent, socketFlags, out nativeError, is_b
 			sockares.Complete (total);
 		}
 
-		[CLSCompliant (false)]
-		public IAsyncResult BeginSend (IList<ArraySegment<byte>> buffers, SocketFlags socketFlags, out SocketError errorCode, AsyncCallback callback, object state)
-		{
-			ThrowIfDisposedAndClosed ();
-
-			if (buffers == null)
-				throw new ArgumentNullException ("buffers");
-
-			if (!is_connected) {
-				errorCode = SocketError.NotConnected;
-				return null;
-			}
-
-			errorCode = SocketError.Success;
-
-			SocketAsyncResult sockares = new SocketAsyncResult (this, callback, state, SocketOperation.SendGeneric) {
-				Buffers = buffers,
-				SockFlags = socketFlags,
-			};
-
-			QueueIOSelectorJob (WriteSem, sockares.Handle, new IOSelectorJob (IOOperation.Write, BeginSendGenericCallback, sockares));
-
-			return sockares;
-		}
-
 		static IOAsyncCallback BeginSendGenericCallback = new IOAsyncCallback (ares => {
 			SocketAsyncResult sockares = (SocketAsyncResult) ares;
 			int total = 0;
@@ -1976,26 +2195,158 @@ m_Handle, buffer, offset + sent, size - sent, socketFlags, out nativeError, is_b
 			sockares.Complete (total);
 		});
 
+		public IAsyncResult BeginSend (byte[] buffer, int offset, int size, SocketFlags socketFlags, out SocketError errorCode, AsyncCallback callback, object state)
+		{
+			ThrowIfDisposedAndClosed ();
+			ThrowIfBufferNull (buffer);
+			ThrowIfBufferOutOfRange (buffer, offset, size);
+
+			if (!is_connected) {
+				errorCode = SocketError.NotConnected;
+				return null;
+			}
+
+			errorCode = SocketError.Success;
+
+			return new SendSocketTaskAsyncResult (
+				buffer, offset, size, socketFlags, callback, state, DoBeginSend);
+		}
+
+		async Task<int> DoBeginSend (SendSocketTaskAsyncResult sockares)
+		{
+			if (sockares.Size == 0)
+				return 0;
+
+			await WriteSem.WaitAsync (WriteCTS.Token);
+
+			try {
+				int sent = 0;
+				do {
+					await IOSelector.WriteAsync (m_Handle, WriteCTS.Token);
+
+					int nativeError;
+					sent += Send_internal (m_Handle, sockares.Buffer, sockares.Size - sent, sockares.Offset + sent, sockares.SocketFlags, out nativeError, is_blocking);
+
+					sockares.ErrorCode = (SocketError) nativeError;
+					if (sockares.ErrorCode != SocketError.Success
+						 && sockares.ErrorCode != SocketError.WouldBlock
+						 && sockares.ErrorCode != SocketError.InProgress)
+					{
+						is_connected = false;
+						return 0;
+					}
+				} while (sent < sockares.Size);
+
+				return sent;
+			} finally {
+				WriteSem.Release ();
+			}
+		}
+
+		[CLSCompliant (false)]
+		public IAsyncResult BeginSend (IList<ArraySegment<byte>> buffers, SocketFlags socketFlags, out SocketError errorCode, AsyncCallback callback, object state)
+		{
+			ThrowIfDisposedAndClosed ();
+
+			if (!is_connected) {
+				errorCode = SocketError.NotConnected;
+				return null;
+			}
+
+			errorCode = SocketError.Success;
+
+			return new SendSocketTaskAsyncResult (
+				buffers, socketFlags, callback, state, DoBeginSendGeneric);
+		}
+
+		async Task<int> DoBeginSendGeneric (SendSocketTaskAsyncResult sockares)
+		{
+			await WriteSem.WaitAsync (WriteCTS.Token);
+
+			try {
+				await IOSelector.WriteAsync (m_Handle, WriteCTS.Token);
+
+				WSABUF[] buffers = new WSABUF [sockares.Buffers.Count];
+				GCHandle[] gch = new GCHandle [sockares.Buffers.Count];
+
+				for (int i = 0; i < buffers.Length; i++) {
+					ArraySegment<byte> segment = sockares.Buffers [i];
+
+					if (segment.Offset < 0 || segment.Count < 0 || segment.Count > segment.Array.Length - segment.Offset)
+						throw new ArgumentOutOfRangeException ("segment");
+
+					gch [i] = GCHandle.Alloc (segment.Array, GCHandleType.Pinned);
+					buffers [i].len = segment.Count;
+					buffers [i].buf = Marshal.UnsafeAddrOfPinnedArrayElement (segment.Array, segment.Offset);
+				}
+
+				int nativeError, total;
+
+				try {
+					total = Send_internal (m_Handle, buffers, sockares.SocketFlags, out nativeError, is_blocking);
+				} finally {
+					for (int i = 0; i < buffers.Length; ++i) {
+						if (gch [i].IsAllocated)
+							gch [i].Free ();
+					}
+				}
+
+				sockares.ErrorCode = (SocketError) nativeError;
+				if (sockares.ErrorCode != SocketError.Success
+					 && sockares.ErrorCode != SocketError.WouldBlock
+					 && sockares.ErrorCode != SocketError.InProgress)
+				{
+					is_connected = false;
+					return 0;
+				}
+
+				return total;
+			} finally {
+				WriteSem.Release ();
+			}
+		}
+
 		public int EndSend (IAsyncResult asyncResult, out SocketError errorCode)
 		{
 			ThrowIfDisposedAndClosed ();
 
-			SocketAsyncResult sockares = ValidateEndIAsyncResult (asyncResult, "EndSend", "asyncResult");
-
-			if (!sockares.IsCompleted)
-				sockares.AsyncWaitHandle.WaitOne ();
+			SendSocketTaskAsyncResult sockares =
+				ValidateEndIAsyncResult<SendSocketTaskAsyncResult, int> (asyncResult, nameof (EndSend), nameof (asyncResult));
 
 			errorCode = sockares.ErrorCode;
+			return sockares.Result;
+		}
 
-			if (errorCode != SocketError.Success && errorCode != SocketError.WouldBlock && errorCode != SocketError.InProgress)
-				is_connected = false;
+		class SendSocketTaskAsyncResult : SocketTaskAsyncResult<int>
+		{
+			public IList<ArraySegment<byte>> Buffers;
+			public byte[] Buffer;
+			public int Offset;
+			public int Size;
+			public SocketFlags SocketFlags;
+			public SocketError ErrorCode;
 
-			/* If no socket error occurred, call CheckIfThrowDelayedException in
-			 * case there are other kinds of exceptions that should be thrown.*/
-			if (errorCode == SocketError.Success)
-				sockares.CheckIfThrowDelayedException ();
+			public SendSocketTaskAsyncResult (byte[] buffer, int offset, int size, SocketFlags socketFlags,
+					AsyncCallback callback, object state, Func<SendSocketTaskAsyncResult, Task<int>> func)
+				: base (callback, state)
+			{
+				Buffer = buffer;
+				Offset = offset;
+				Size = size;
+				SocketFlags = socketFlags;
+				/* Have to be done last */
+				Task = CreateTask<SendSocketTaskAsyncResult> (func);
+			}
 
-			return sockares.Total;
+			public SendSocketTaskAsyncResult (IList<ArraySegment<byte>> buffers, SocketFlags socketFlags,
+					AsyncCallback callback, object state, Func<SendSocketTaskAsyncResult, Task<int>> func)
+				: base (callback, state)
+			{
+				Buffers = buffers;
+				SocketFlags = socketFlags;
+				/* Have to be done last */
+				Task = CreateTask<SendSocketTaskAsyncResult> (func);
+			}
 		}
 
 		static int Send_internal (SafeSocketHandle safeHandle, WSABUF[] bufarray, SocketFlags flags, out int error, bool blocking)
@@ -2073,7 +2424,13 @@ m_Handle, buffer, offset + sent, size - sent, socketFlags, out nativeError, is_b
 			e.socket_async_result.SockFlags = e.SocketFlags;
 			e.socket_async_result.EndPoint = e.RemoteEndPoint;
 
-			QueueIOSelectorJob (WriteSem, e.socket_async_result.Handle, new IOSelectorJob (IOOperation.Write, s => BeginSendToCallback ((SocketAsyncResult) s, 0), e.socket_async_result));
+			IntPtr handle = e.socket_async_result.Handle;
+			IOSelectorJob job = new IOSelectorJob (IOOperation.Write, s => BeginSendToCallback ((SocketAsyncResult) s, 0), e.socket_async_result);
+
+			WriteSem.WaitAsync (WriteCTS.Token).ContinueWith (t => {
+				if (!t.IsCanceled)
+					IOSelector.Add (handle, job);
+			});
 
 			return true;
 		}
@@ -2094,25 +2451,6 @@ m_Handle, buffer, offset + sent, size - sent, socketFlags, out nativeError, is_b
 				e.Complete ();
 			}
 		});
-
-		public IAsyncResult BeginSendTo(byte[] buffer, int offset, int size, SocketFlags socket_flags, EndPoint remote_end, AsyncCallback callback, object state)
-		{
-			ThrowIfDisposedAndClosed ();
-			ThrowIfBufferNull (buffer);
-			ThrowIfBufferOutOfRange (buffer, offset, size);
-
-			SocketAsyncResult sockares = new SocketAsyncResult (this, callback, state, SocketOperation.SendTo) {
-				Buffer = buffer,
-				Offset = offset,
-				Size = size,
-				SockFlags = socket_flags,
-				EndPoint = remote_end,
-			};
-
-			QueueIOSelectorJob (WriteSem, sockares.Handle, new IOSelectorJob (IOOperation.Write, s => BeginSendToCallback ((SocketAsyncResult) s, 0), sockares));
-
-			return sockares;
-		}
 
 		static void BeginSendToCallback (SocketAsyncResult sockares, int sent_so_far)
 		{
@@ -2140,18 +2478,76 @@ m_Handle, buffer, offset + sent, size - sent, socketFlags, out nativeError, is_b
 			sockares.Complete ();
 		}
 
-		public int EndSendTo (IAsyncResult result)
+		public IAsyncResult BeginSendTo(byte[] buffer, int offset, int size, SocketFlags socketFlags, EndPoint remoteEP, AsyncCallback callback, object state)
+		{
+			ThrowIfDisposedAndClosed ();
+			ThrowIfBufferNull (buffer);
+			ThrowIfBufferOutOfRange (buffer, offset, size);
+
+			if (remoteEP == null)
+				throw new ArgumentNullException (nameof (remoteEP));
+
+			return new SendToSocketTaskAsyncResult (
+				buffer, offset, size, socketFlags, remoteEP, callback, state, DoBeginSendTo);
+		}
+
+		async Task<int> DoBeginSendTo (SendToSocketTaskAsyncResult sockares)
+		{
+			await WriteSem.WaitAsync (WriteCTS.Token);
+
+			try {
+				await IOSelector.WriteAsync (m_Handle, WriteCTS.Token);
+
+				int nativeError;
+				int sent = SendTo_internal (m_Handle, sockares.Buffer, sockares.Offset, sockares.Size, sockares.SocketFlags, sockares.RemoteEndPoint.Serialize (), out nativeError, is_blocking);
+
+				SocketError error = (SocketError) nativeError;
+				if (error != SocketError.Success) {
+					if (error != SocketError.WouldBlock && error != SocketError.InProgress)
+						is_connected = false;
+					throw new SocketException (error);
+				}
+
+				is_connected = true;
+				is_bound = true;
+				seed_endpoint = sockares.RemoteEndPoint;
+
+				return sent;
+			} finally {
+				WriteSem.Release ();
+			}
+		}
+
+		public int EndSendTo (IAsyncResult asyncResult)
 		{
 			ThrowIfDisposedAndClosed ();
 
-			SocketAsyncResult sockares = ValidateEndIAsyncResult (result, "EndSendTo", "result");
+			SendToSocketTaskAsyncResult sockares =
+				ValidateEndIAsyncResult<SendToSocketTaskAsyncResult, int> (asyncResult, nameof (EndSendTo), nameof (asyncResult));
 
-			if (!sockares.IsCompleted)
-				sockares.AsyncWaitHandle.WaitOne();
+			return sockares.Result;
+		}
 
-			sockares.CheckIfThrowDelayedException();
+		class SendToSocketTaskAsyncResult : SocketTaskAsyncResult<int>
+		{
+			public byte[] Buffer;
+			public int Offset;
+			public int Size;
+			public SocketFlags SocketFlags;
+			public EndPoint RemoteEndPoint;
 
-			return sockares.Total;
+			public SendToSocketTaskAsyncResult (byte[] buffer, int offset, int size, SocketFlags socketFlags, EndPoint remoteEP,
+					AsyncCallback callback, object state, Func<SendToSocketTaskAsyncResult, Task<int>> func)
+				: base (callback, state)
+			{
+				Buffer = buffer;
+				Offset = offset;
+				Size = size;
+				SocketFlags = socketFlags;
+				RemoteEndPoint = remoteEP;
+				/* Have to be done last */
+				Task = CreateTask<SendToSocketTaskAsyncResult> (func);
+			}
 		}
 
 		static int SendTo_internal (SafeSocketHandle safeHandle, byte[] buffer, int offset, int count, SocketFlags flags, SocketAddress sa, out int error, bool blocking)
@@ -2590,6 +2986,9 @@ m_Handle, buffer, offset + sent, size - sent, socketFlags, out nativeError, is_b
 				is_closed = true;
 				IntPtr x = Handle;
 
+				ReadCTS.Cancel ();
+				WriteCTS.Cancel ();
+
 				if (was_connected)
 					Linger (x);
 
@@ -2629,12 +3028,6 @@ m_Handle, buffer, offset + sent, size - sent, socketFlags, out nativeError, is_b
 
 #endregion
 
-		void ThrowIfDisposedAndClosed (Socket socket)
-		{
-			if (socket.CleanedUp && socket.is_closed)
-				throw new ObjectDisposedException (socket.GetType ().ToString ());
-		}
-
 		void ThrowIfDisposedAndClosed ()
 		{
 			if (CleanedUp && is_closed)
@@ -2665,30 +3058,54 @@ m_Handle, buffer, offset + sent, size - sent, socketFlags, out nativeError, is_b
 				throw new SocketException ((int)SocketError.ProtocolOption);
 		}
 
-		SocketAsyncResult ValidateEndIAsyncResult (IAsyncResult ares, string methodName, string argName)
+		T ValidateEndIAsyncResult <T, TResult> (IAsyncResult ares, string methodName, string argName) where T : SocketTaskAsyncResult<TResult>
 		{
 			if (ares == null)
 				throw new ArgumentNullException (argName);
 
-			SocketAsyncResult sockares = ares as SocketAsyncResult;
+			T sockares = ares as T;
 			if (sockares == null)
 				throw new ArgumentException ("Invalid IAsyncResult", argName);
 			if (Interlocked.CompareExchange (ref sockares.EndCalled, 1, 0) == 1)
 				throw new InvalidOperationException (methodName + " can only be called once per asynchronous operation");
 
+			if (!sockares.IsCompleted)
+				sockares.AsyncWaitHandle.WaitOne ();
+
+			Task<TResult> t = sockares.Task;
+			if (t.IsFaulted) {
+				Exception e = t.Exception.InnerExceptions [0];
+				if (e is OperationCanceledException)
+					throw new ObjectDisposedException (nameof (EndReceive), e);
+				throw e;
+			}
+
 			return sockares;
 		}
 
-		void QueueIOSelectorJob (SemaphoreSlim sem, IntPtr handle, IOSelectorJob job)
+		T ValidateEndIAsyncResult <T> (IAsyncResult ares, string methodName, string argName) where T : SocketTaskAsyncResult
 		{
-			sem.WaitAsync ().ContinueWith (t => {
-				if (CleanedUp) {
-					job.MarkDisposed ();
-					return;
-				}
+			if (ares == null)
+				throw new ArgumentNullException (argName);
 
-				IOSelector.Add (handle, job);
-			});
+			T sockares = ares as T;
+			if (sockares == null)
+				throw new ArgumentException ("Invalid IAsyncResult", argName);
+			if (Interlocked.CompareExchange (ref sockares.EndCalled, 1, 0) == 1)
+				throw new InvalidOperationException (methodName + " can only be called once per asynchronous operation");
+
+			if (!sockares.IsCompleted)
+				sockares.AsyncWaitHandle.WaitOne ();
+
+			Task t = sockares.Task;
+			if (t.IsFaulted) {
+				Exception e = t.Exception.InnerExceptions [0];
+				if (e is OperationCanceledException)
+					throw new ObjectDisposedException (nameof (EndReceive), e);
+				throw e;
+			}
+
+			return sockares;
 		}
 
 		void InitSocketAsyncEventArgs (SocketAsyncEventArgs e, AsyncCallback callback, object state, SocketOperation operation)
@@ -2733,6 +3150,24 @@ m_Handle, buffer, offset + sent, size - sent, socketFlags, out nativeError, is_b
 				return new IPEndPoint (input.Address.MapToIPv6 (), input.Port);
 			
 			return input;
+		}
+
+		SafeSocketHandle CreateSafeHandle (AddressFamily addressFamily, SocketType socketType, ProtocolType protocolType, out SocketError error)
+		{
+			int nativeError;
+			SafeSocketHandle safeHandle;
+
+			try {} finally {
+				IntPtr handle = Socket_internal (addressFamily, socketType, protocolType, out nativeError);
+				if (handle == IntPtr.Zero)
+					throw new SocketException ((SocketError) nativeError);
+
+				safeHandle = new SafeSocketHandle (Socket_internal (addressFamily, socketType, protocolType, out nativeError), true);
+			}
+
+			error = (SocketError) nativeError;
+
+			return safeHandle;
 		}
 		
 		[StructLayout (LayoutKind.Sequential)]

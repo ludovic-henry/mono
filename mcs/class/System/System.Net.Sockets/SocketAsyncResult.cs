@@ -31,6 +31,7 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Runtime.Remoting.Messaging;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace System.Net.Sockets
 {
@@ -133,7 +134,7 @@ namespace System.Net.Sockets
 			}
 		}
 
-		internal override void CompleteDisposed ()
+		internal override void SetCanceled ()
 		{
 			Complete ();
 		}
@@ -203,6 +204,93 @@ namespace System.Net.Sockets
 			AcceptedSocket = s;
 			Total = total;
 			Complete ();
+		}
+	}
+
+	abstract class BaseSocketTaskAsyncResult : IAsyncResult
+	{
+		public AsyncCallback AsyncCallback { get; }
+
+		public object AsyncState { get; }
+
+		public int EndCalled = 0;
+
+		protected abstract IAsyncResult TaskAsIAsyncResult { get; }
+
+		public WaitHandle AsyncWaitHandle
+		{
+			get { return TaskAsIAsyncResult.AsyncWaitHandle; }
+		}
+
+		public bool IsCompleted
+		{
+			get { return TaskAsIAsyncResult.IsCompleted; }
+		}
+
+		public bool CompletedSynchronously
+		{
+			get { return TaskAsIAsyncResult.CompletedSynchronously; }
+		}
+
+		protected BaseSocketTaskAsyncResult (AsyncCallback callback, object state)
+		{
+			AsyncCallback = callback;
+			AsyncState = state;
+		}
+	}
+
+	abstract class SocketTaskAsyncResult : BaseSocketTaskAsyncResult
+	{
+		public Task Task { get; protected set; }
+
+		protected override IAsyncResult TaskAsIAsyncResult
+		{
+			get { return (IAsyncResult) Task; }
+		}
+
+		public SocketTaskAsyncResult (AsyncCallback callback, object state)
+			: base (callback, state)
+		{
+		}
+
+		protected async Task CreateTask<T> (Func<T, Task> func) where T : SocketTaskAsyncResult
+		{
+			try {
+				await func ((T) this);
+			} finally {
+				if (AsyncCallback != null)
+					ThreadPool.UnsafeQueueUserWorkItem (o => ((SocketTaskAsyncResult) o).AsyncCallback ((IAsyncResult) o), this);
+			}
+		}
+	}
+
+	abstract class SocketTaskAsyncResult<TResult> : BaseSocketTaskAsyncResult
+	{
+		public Task<TResult> Task { get; protected set; }
+
+		protected override IAsyncResult TaskAsIAsyncResult
+		{
+			get { return (IAsyncResult) Task; }
+		}
+
+		public TResult Result
+		{
+			get { return Task.Result; }
+		}
+
+		public SocketTaskAsyncResult (AsyncCallback callback, object state)
+			: base (callback, state)
+		{
+		}
+
+		protected async Task<TResult> CreateTask<T> (Func<T, Task<TResult>> func) where T : SocketTaskAsyncResult<TResult>
+		{
+			try {
+				return await func ((T) this);
+			} finally {
+				if (AsyncCallback != null)
+					ThreadPool.UnsafeQueueUserWorkItem (o => ((SocketTaskAsyncResult <TResult>) o).AsyncCallback ((IAsyncResult) o), this);
+			}
 		}
 	}
 }

@@ -30,6 +30,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Remoting.Messaging;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace System
 {
@@ -120,7 +121,7 @@ namespace System
 			}
 		}
 
-		internal abstract void CompleteDisposed();
+		internal abstract void SetCanceled();
 	}
 
 	[StructLayout (LayoutKind.Sequential)]
@@ -147,9 +148,9 @@ namespace System
 		{
 		}
 
-		public void MarkDisposed ()
+		public void SetCanceled ()
 		{
-			state.CompleteDisposed ();
+			state.SetCanceled ();
 		}
 	}
 
@@ -158,7 +159,79 @@ namespace System
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]
 		public static extern void Add (IntPtr handle, IOSelectorJob job);
 
+		public static void Add (SafeHandle handle, IOSelectorJob job)
+		{
+			bool release = false;
+			try {
+				handle.DangerousAddRef (ref release);
+
+				Add (handle.DangerousGetHandle (), job);
+			} finally {
+				if (release)
+					handle.DangerousRelease ();
+			}
+		}
+
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		public static extern void Remove (IntPtr handle);
+		static extern void Remove (IntPtr handle);
+
+		public static void Remove (SafeHandle handle)
+		{
+			bool release = false;
+			try {
+				handle.DangerousAddRef (ref release);
+
+				Remove (handle.DangerousGetHandle ());
+			} finally {
+				if (release)
+					handle.DangerousRelease ();
+			}
+		}
+
+		public static Task ReadAsync (SafeHandle handle, CancellationToken ct)
+		{
+			TaskCompletionSource<object> tcs = new TaskCompletionSource<object> ();
+
+			ct.Register (() => {
+				if (tcs.TrySetCanceled ())
+					Remove (handle);
+			});
+
+			Add (handle, new IOSelectorJob (IOOperation.Read,
+				ioares => ((IOSelectorTask) ioares).TCS.TrySetResult (null), new IOSelectorTask (tcs)));
+
+			return (Task) tcs.Task;
+		}
+
+		public static Task WriteAsync (SafeHandle handle, CancellationToken ct)
+		{
+			TaskCompletionSource<object> tcs = new TaskCompletionSource<object> ();
+
+			ct.Register (() => {
+				if (tcs.TrySetCanceled ())
+					Remove (handle);
+			});
+
+			Add (handle, new IOSelectorJob (IOOperation.Write,
+				ioares => ((IOSelectorTask) ioares).TCS.TrySetResult (null), new IOSelectorTask (tcs)));
+
+			return (Task) tcs.Task;
+		}
+
+		class IOSelectorTask : IOAsyncResult
+		{
+			public TaskCompletionSource<object> TCS { get; private set; }
+
+			public IOSelectorTask (TaskCompletionSource<object> tcs)
+				: base ()
+			{
+				TCS = tcs;
+			}
+
+			internal override void SetCanceled()
+			{
+				TCS.TrySetCanceled ();
+			}
+		}
 	}
 }
