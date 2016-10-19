@@ -514,12 +514,11 @@ void mono_threads_suspend_free (THREAD_INFO_TYPE *info);
 void mono_threads_suspend_abort_syscall (THREAD_INFO_TYPE *info);
 gboolean mono_threads_suspend_needs_abort_syscall (void);
 
-void mono_threads_platform_register (THREAD_INFO_TYPE *info);
-void mono_threads_platform_unregister (THREAD_INFO_TYPE *info);
 int mono_threads_platform_create_thread (MonoThreadStart thread_fn, gpointer thread_data, gsize* const stack_size, MonoNativeThreadId *out_tid);
 void mono_threads_platform_get_stack_bounds (guint8 **staddr, size_t *stsize);
 gboolean mono_threads_platform_yield (void);
 void mono_threads_platform_exit (gsize exit_code);
+HANDLE mono_threads_platform_create_thread_handle (void);
 HANDLE mono_threads_platform_open_thread_handle (HANDLE handle);
 void mono_threads_platform_close_thread_handle (HANDLE handle);
 void mono_threads_platform_set_exited (gpointer handle);
