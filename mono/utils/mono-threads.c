@@ -1146,7 +1146,7 @@ inner_start_thread (gpointer data)
 	MonoThreadInfo *info;
 	MonoThreadStart start_routine;
 	gpointer start_routine_arg;
-	guint32 start_routine_res;
+	gsize start_routine_res;
 	gsize dummy;
 
 	thread_data = (CreateThreadData*) data;
@@ -1173,7 +1173,7 @@ inner_start_thread (gpointer data)
 	/* Run the actual main function of the thread */
 	start_routine_res = start_routine (start_routine_arg);
 
-	mono_threads_platform_exit (start_routine_res);
+	mono_thread_info_exit (start_routine_res);
 
 	g_assert_not_reached ();
 }
@@ -1409,6 +1409,10 @@ mono_thread_info_tls_set (THREAD_INFO_TYPE *info, MonoTlsKey key, gpointer value
 	((MonoThreadInfo*)info)->tls [key] = value;
 }
 
+#if defined(__native_client__)
+void nacl_shutdown_gc_thread(void);
+#endif
+
 /*
  * mono_thread_info_exit:
  *
@@ -1416,8 +1420,14 @@ mono_thread_info_tls_set (THREAD_INFO_TYPE *info, MonoTlsKey key, gpointer value
  * This function doesn't return.
  */
 void
-mono_thread_info_exit (void)
+mono_thread_info_exit (gsize exit_code)
 {
+#if defined(__native_client__)
+	nacl_shutdown_gc_thread();
+#endif
+
+	mono_thread_info_detach ();
+
 	mono_threads_platform_exit (0);
 }
 
