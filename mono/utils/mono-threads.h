@@ -344,6 +344,9 @@ MONO_API void
 mono_thread_info_detach (void);
 
 gboolean
+mono_thread_info_is_attached (void);
+
+gboolean
 mono_thread_info_is_exiting (void);
 
 THREAD_INFO_TYPE *

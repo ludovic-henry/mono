@@ -629,6 +629,20 @@ mono_thread_info_detach (void)
 	}
 }
 
+gboolean
+mono_thread_info_is_attached (void)
+{
+	MonoThreadInfo *info;
+
+	info = mono_thread_info_current_unchecked ();
+	if (!info)
+		return FALSE;
+	if (!mono_thread_info_is_live (info))
+		return FALSE;
+
+	return TRUE;
+}
+
 /*
  * mono_thread_info_is_exiting:
  *

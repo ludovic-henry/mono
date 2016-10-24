@@ -49,7 +49,7 @@ namespace System.Threading {
 		#region Sync with metadata/object-internals.h
 		int lock_thread_id;
 		// stores a thread handle
-		internal IntPtr system_thread_handle;
+		private IntPtr system_thread_handle;
 
 		/* Note this is an opaque object (an array), not a CultureInfo */
 		private object cached_culture_info;
@@ -109,11 +109,11 @@ namespace System.Threading {
 
 		// Closes the system thread handle
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		private extern void Thread_free_internal(IntPtr handle);
+		private extern void Thread_free_internal ();
 
 		[ReliabilityContract (Consistency.WillNotCorruptState, Cer.Success)]
 		~InternalThread() {
-			Thread_free_internal(system_thread_handle);
+			Thread_free_internal ();
 		}
 	}
 
