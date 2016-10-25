@@ -459,6 +459,7 @@ BASE_TEST_CS_SRC_UNIVERSAL=		\
 	block_guard_restore_aligment_on_exit.cs	\
 	thread_static_gc_layout.cs \
 	sleep.cs \
+	sleep-stw.cs \
 	bug-27147.cs	\
 	bug-30085.cs	\
 	bug-17537.cs	\
@@ -470,7 +471,8 @@ BASE_TEST_CS_SRC_UNIVERSAL=		\
 	bug-29585.cs	\
 	priority.cs	\
 	abort-cctor.cs	\
-	thread-native-exit.cs
+	thread-native-exit.cs	\
+	thread-abort-wait.cs
 
 if INSTALL_MOBILE_STATIC
 BASE_TEST_CS_SRC= \
