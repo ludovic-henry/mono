@@ -533,22 +533,19 @@ set_current_thread_for_domain (MonoDomain *domain, MonoInternalThread *thread, M
 }
 
 static MonoThread*
-create_thread_object (MonoDomain *domain)
-{
-	MonoError error;
-	MonoVTable *vt = mono_class_vtable (domain, mono_defaults.thread_class);
-	MonoThread *t = (MonoThread*)mono_object_new_mature (vt, &error);
-	/* only possible failure mode is OOM, from which we don't expect to recover. */
-	mono_error_assert_ok (&error);
-	return t;
-}
-
-static MonoThread*
-new_thread_with_internal (MonoDomain *domain, MonoInternalThread *internal)
+create_thread_object (MonoDomain *domain, MonoInternalThread *internal)
 {
 	MonoThread *thread;
+	MonoVTable *vtable;
+	MonoError error;
 
-	thread = create_thread_object (domain);
+	vtable = mono_class_vtable (domain, mono_defaults.thread_class);
+	g_assert (vtable);
+
+	thread = (MonoThread*)mono_object_new_mature (vt, &error);
+	/* only possible failure mode is OOM, from which we don't expect to recover. */
+	mono_error_assert_ok (&error);
+
 	thread->priority = MONO_THREAD_PRIORITY_NORMAL;
 
 	MONO_OBJECT_SETREF (thread, internal_thread, internal);
@@ -557,7 +554,7 @@ new_thread_with_internal (MonoDomain *domain, MonoInternalThread *internal)
 }
 
 static MonoInternalThread*
-create_internal_thread (void)
+create_internal_thread_object (void)
 {
 	MonoError error;
 	MonoInternalThread *thread;
@@ -647,7 +644,7 @@ mono_thread_attach_internal (MonoThread *thread, gboolean force_attach, gboolean
 
 	g_assert (!internal->root_domain_thread);
 	if (domain != root_domain)
-		MONO_OBJECT_SETREF (internal, root_domain_thread, new_thread_with_internal (root_domain, internal));
+		MONO_OBJECT_SETREF (internal, root_domain_thread, create_thread_object (root_domain, internal));
 	else
 		MONO_OBJECT_SETREF (internal, root_domain_thread, thread);
 
@@ -957,10 +954,10 @@ mono_thread_create_internal (MonoDomain *domain, gpointer func, gpointer arg, gb
 
 	mono_error_init (error);
 
-	thread = create_thread_object (domain);
-	thread->priority = MONO_THREAD_PRIORITY_NORMAL;
+	internal = create_internal_thread_object ();
 
-	internal = create_internal_thread ();
+	thread = create_thread_object (domain, internal);
+	thread->priority = MONO_THREAD_PRIORITY_NORMAL;
 
 	MONO_OBJECT_SETREF (thread, internal_thread, internal);
 
@@ -1013,9 +1010,9 @@ mono_thread_attach_full (MonoDomain *domain, gboolean force_attach)
 
 	tid=mono_native_thread_id_get ();
 
-	internal = create_internal_thread ();
+	internal = create_internal_thread_object ();
 
-	thread = new_thread_with_internal (domain, internal);
+	thread = create_thread_object (domain, internal);
 
 	if (!mono_thread_attach_internal (thread, force_attach, TRUE, &stack_ptr)) {
 		/* Mono is shutting down, so just wait for the end */
@@ -1115,7 +1112,7 @@ ves_icall_System_Threading_Thread_ConstructInternalThread (MonoThread *this_obj)
 {
 	MonoInternalThread *internal;
 
-	internal = create_internal_thread ();
+	internal = create_internal_thread_object ();
 
 	internal->state = ThreadState_Unstarted;
 
@@ -1481,7 +1478,7 @@ mono_thread_current (void)
 
 	if (!*current_thread_ptr) {
 		g_assert (domain != mono_get_root_domain ());
-		*current_thread_ptr = new_thread_with_internal (domain, internal);
+		*current_thread_ptr = create_thread_object (domain, internal);
 	}
 	return *current_thread_ptr;
 }
@@ -1498,7 +1495,7 @@ mono_thread_current_for_thread (MonoInternalThread *internal)
 
 	if (!*current_thread_ptr) {
 		g_assert (domain != mono_get_root_domain ());
-		*current_thread_ptr = new_thread_with_internal (domain, internal);
+		*current_thread_ptr = create_thread_object (domain, internal);
 	}
 	return *current_thread_ptr;
 }
