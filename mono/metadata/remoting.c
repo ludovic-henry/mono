@@ -148,6 +148,8 @@ mono_remoting_init (void)
 	remoting_mutex_inited = TRUE;
 }
 
+static void breakpointforxdomaintae (void) {}
+
 static void
 mono_remoting_marshal_init (void)
 {
@@ -201,6 +203,8 @@ mono_remoting_marshal_init (void)
 #ifndef DISABLE_JIT
 		register_icall (mono_compile_method_icall, "mono_compile_method_icall", "ptr ptr", FALSE);
 #endif
+
+		register_icall (breakpointforxdomaintae, "breakpointforxdomaintae", "void", FALSE);
 
 	}
 
@@ -1142,6 +1146,7 @@ mono_marshal_get_xappdomain_invoke (MonoMethod *method)
 	mono_mb_emit_managed_call (mb, method_rs_deserialize, NULL);
 	mono_mb_emit_op (mb, CEE_CASTCLASS, mono_defaults.exception_class);
 	mono_mb_emit_managed_call (mb, method_exc_fixexc, NULL);
+	mono_mb_emit_icall (mb, breakpointforxdomaintae);
 	mono_mb_emit_byte (mb, CEE_THROW);
 	mono_mb_patch_short_branch (mb, pos_noex);
 
