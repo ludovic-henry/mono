@@ -53,67 +53,146 @@ namespace System.Threading {
 		IntPtr native_handle; // used only on Win32
 
 		/* accessed only from unmanaged code */
-		private IntPtr name;
-		private int name_len; 
-		private ThreadState state;
-		private object abort_exc;
-		private int abort_state_handle;
-		/* thread_id is only accessed from unmanaged code */
-		internal Int64 thread_id;
+		IntPtr name;
+		int name_len;
+		ThreadState state;
+		object abort_exc;
+		int abort_state_handle;
+		Int64 thread_id;
 		
 		/* start_notify is used by the runtime to signal that Start()
 		 * is ok to return
 		 */
-		private IntPtr stack_ptr;
-		private UIntPtr static_data; /* GC-tracked */
-		private IntPtr runtime_thread_info;
+		IntPtr stack_ptr;
+		UIntPtr static_data; /* GC-tracked */
+		IntPtr runtime_thread_info;
 		/* current System.Runtime.Remoting.Contexts.Context instance
 		   keep as an object to avoid triggering its class constructor when not needed */
-		private object current_appcontext;
-		private object root_domain_thread;
-		internal byte[] _serialized_principal;
-		internal int _serialized_principal_version;
-		private IntPtr appdomain_refs;
-		private int interruption_requested;
-		private IntPtr synch_cs;
-		internal bool threadpool_thread;
-		private bool thread_interrupt_requested;
+		object current_appcontext;
+		object root_domain_thread;
+		byte[] _serialized_principal;
+		int _serialized_principal_version;
+		IntPtr appdomain_refs;
+		int interruption_requested;
+		IntPtr synch_cs;
+		bool threadpool_thread;
+		bool thread_interrupt_requested;
 		/* These are used from managed code */
-		internal int stack_size;
-		internal byte apartment_state;
-		internal volatile int critical_region_level;
-		internal int managed_id;
-		private int small_id;
-		private IntPtr manage_callback;
-		private IntPtr interrupt_on_stop;
-		private IntPtr flags;
-		private IntPtr thread_pinning_ref;
-		private IntPtr abort_protected_block_count;
-		private int priority = (int) ThreadPriority.Normal;
-		private IntPtr owned_mutex;
-		private IntPtr suspended_event;
-		private int self_suspended;
+		int stack_size;
+		byte apartment_state;
+		volatile int critical_region_level;
+		int managed_id;
+		int small_id;
+		IntPtr manage_callback;
+		IntPtr interrupt_on_stop;
+		IntPtr flags;
+		IntPtr thread_pinning_ref;
+		IntPtr abort_protected_block_count;
+		int priority; // (int) ThreadPriority.Normal;
+		IntPtr owned_mutex;
+		IntPtr suspended_event;
+		int self_suspended;
 		/* 
 		 * These fields are used to avoid having to increment corlib versions
 		 * when a new field is added to the unmanaged MonoThread structure.
 		 */
-		private IntPtr unused1;
-		private IntPtr unused2;
+		IntPtr unused1;
+		IntPtr unused2;
 
 		/* This is used only to check that we are in sync between the representation
 		 * of MonoInternalThread in native and InternalThread in managed
 		 *
 		 * DO NOT RENAME! DO NOT ADD FIELDS AFTER! */
-		private IntPtr last;
+		IntPtr last;
 		#endregion
 #pragma warning restore 169, 414, 649
 
-		// Closes the system thread handle
+		internal bool GetIsThreadPoolThread ()
+		{
+			return threadpool_thread;
+		}
+
+		internal void SetIsThreadPoolThread (bool value)
+		{
+			threadpool_thread = value;
+		}
+
+		internal int GetStackSize ()
+		{
+			return stack_size;
+		}
+
+		internal void SetStackSize (int value)
+		{
+			stack_size = value;
+		}
+
+		internal byte GetApartmentState ()
+		{
+			return apartment_state;
+		}
+
+		internal void SetApartmentState (byte value)
+		{
+			apartment_state = value;
+		}
+
+		internal void IncCriticalRegionLevel ()
+		{
+			critical_region_level ++;
+		}
+
+		internal void DecCriticalRegionLevel ()
+		{
+			critical_region_level --;
+		}
+
+		internal int GetManagedID ()
+		{
+			return managed_id;
+		}
+
+		internal void SetManagedID (int value)
+		{
+			managed_id = value;
+		}
+
+		internal byte[] GetSerializedPrincipal ()
+		{
+			return _serialized_principal;
+		}
+
+		internal void SetSerializedPrincipal (byte[] value)
+		{
+			_serialized_principal = value;
+		}
+
+		internal int GetSerializedPrincipalVersion ()
+		{
+			return _serialized_principal_version;
+		}
+
+		internal void SetSerializedPrincipalVersion (int value)
+		{
+			_serialized_principal_version = value;
+		}
+
+		internal long GetThreadID ()
+		{
+			return thread_id;
+		}
+
+		internal void SetThreadID (long value)
+		{
+			thread_id = value;
+		}
+
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]
 		private extern void Thread_free_internal();
 
 		[ReliabilityContract (Consistency.WillNotCorruptState, Cer.Success)]
-		~InternalThread() {
+		~InternalThread()
+		{
 			Thread_free_internal();
 		}
 	}
@@ -122,7 +201,7 @@ namespace System.Threading {
 	public sealed partial class Thread {
 #pragma warning disable 414		
 		#region Sync with metadata/object-internals.h
-		private InternalThread internal_thread;
+		InternalThread internal_thread;
 		object m_ThreadStartArg;
 		object pending_exception;
 		#endregion
@@ -147,7 +226,7 @@ namespace System.Threading {
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]
 		private extern void ConstructInternalThread ();
 
-		private InternalThread Internal {
+		InternalThread Internal {
 			get {
 				if (internal_thread == null)
 					ConstructInternalThread ();
@@ -176,12 +255,12 @@ namespace System.Threading {
 
 		static void DeserializePrincipal (Thread th)
 		{
-			MemoryStream ms = new MemoryStream (ByteArrayToCurrentDomain (th.Internal._serialized_principal));
+			MemoryStream ms = new MemoryStream (ByteArrayToCurrentDomain (th.Internal.GetSerializedPrincipal ()));
 			int type = ms.ReadByte ();
 			if (type == 0) {
 				BinaryFormatter bf = new BinaryFormatter ();
 				th.principal = (IPrincipal) bf.Deserialize (ms);
-				th.principal_version = th.Internal._serialized_principal_version;
+				th.principal_version = th.Internal.GetSerializedPrincipalVersion ();
 			} else if (type == 1) {
 				BinaryReader reader = new BinaryReader (ms);
 				string name = reader.ReadString ();
@@ -242,20 +321,20 @@ namespace System.Threading {
 					bf.Serialize (ms, value);
 				} catch {}
 			}
-			th.Internal._serialized_principal = ByteArrayToRootDomain (ms.ToArray ());
+			th.Internal.SetSerializedPrincipal (ByteArrayToRootDomain (ms.ToArray ()));
 		}
 
 		public static IPrincipal CurrentPrincipal {
 			get {
 				Thread th = CurrentThread;
 
-				if (th.principal_version != th.Internal._serialized_principal_version)
+				if (th.principal_version != th.Internal.GetSerializedPrincipalVersion ())
 					th.principal = null;
 
 				if (th.principal != null)
 					return th.principal;
 
-				if (th.Internal._serialized_principal != null) {
+				if (th.Internal.GetSerializedPrincipal () != null) {
 					try {
 						DeserializePrincipal (th);
 						return th.principal;
@@ -263,7 +342,7 @@ namespace System.Threading {
 				}
 
 				th.principal = GetDomain ().DefaultPrincipal;
-				th.principal_version = th.Internal._serialized_principal_version;
+				th.principal_version = th.Internal.GetSerializedPrincipalVersion ();
 				return th.principal;
 			}
 			[SecurityPermission (SecurityAction.Demand, ControlPrincipal = true)]
@@ -271,15 +350,15 @@ namespace System.Threading {
 				Thread th = CurrentThread;
 
 				if (value != GetDomain ().DefaultPrincipal) {
-					++th.Internal._serialized_principal_version;
+					th.Internal.SetSerializedPrincipalVersion (th.Internal.GetSerializedPrincipalVersion () + 1);
 					try {
 						SerializePrincipal (th, value);
 					} catch (Exception) {
-						th.Internal._serialized_principal = null;
+						th.Internal.SetSerializedPrincipal (null);
 					}
-					th.principal_version = th.Internal._serialized_principal_version;
+					th.principal_version = th.Internal.GetSerializedPrincipalVersion ();
 				} else {
-					th.Internal._serialized_principal = null;
+					th.Internal.SetSerializedPrincipal (null);
 				}
 
 				th.principal = value;
@@ -302,7 +381,7 @@ namespace System.Threading {
 
 		internal static int CurrentThreadId {
 			get {
-				return (int)(CurrentThread.internal_thread.thread_id);
+				return (int)(CurrentThread.Internal.GetThreadID ());
 			}
 		}
 
@@ -333,7 +412,7 @@ namespace System.Threading {
 				if ((ThreadState & ThreadState.Stopped) != 0)
 					throw new ThreadStateException ("Thread is dead; state can not be accessed.");
 
-				return (ApartmentState)Internal.apartment_state;
+				return (ApartmentState)Internal.GetApartmentState ();
 			}
 
 			set {
@@ -349,10 +428,10 @@ namespace System.Threading {
 
 		internal bool IsThreadPoolThreadInternal {
 			get {
-				return Internal.threadpool_thread;
+				return Internal.GetIsThreadPoolThread ();
 			}
 			set {
-				Internal.threadpool_thread = value;
+				Internal.SetIsThreadPoolThread (value);
 			}
 		}
 
@@ -487,7 +566,7 @@ namespace System.Threading {
 		void StartInternal (IPrincipal principal, ref StackCrawlMark stackMark)
 		{
 #if FEATURE_ROLE_BASED_SECURITY
-			Internal._serialized_principal = CurrentThread.Internal._serialized_principal;
+			Internal.SetSerializedPrincipal (CurrentThread.Internal.GetSerializedPrincipal ());
 #endif
 
 			// Thread_internal creates and starts the new thread, 
@@ -617,26 +696,26 @@ namespace System.Threading {
 		void SetStart (MulticastDelegate start, int maxStackSize)
 		{
 			m_Delegate = start;
-			Internal.stack_size = maxStackSize;
+			Internal.SetStackSize (maxStackSize);
 		}
 
 		public int ManagedThreadId {
 			[ReliabilityContractAttribute (Consistency.WillNotCorruptState, Cer.Success)]
 			get {
-				return Internal.managed_id;
+				return Internal.GetManagedID ();
 			}
 		}
 
 		[ReliabilityContract (Consistency.WillNotCorruptState, Cer.MayFail)]
 		public static void BeginCriticalRegion ()
 		{
-			CurrentThread.Internal.critical_region_level++;
+			CurrentThread.Internal.IncCriticalRegionLevel ();
 		}
 
 		[ReliabilityContract (Consistency.WillNotCorruptState, Cer.Success)]
 		public static void EndCriticalRegion ()
 		{
-			CurrentThread.Internal.critical_region_level--;
+			CurrentThread.Internal.DecCriticalRegionLevel ();
 		}
 
 		[ReliabilityContractAttribute (Consistency.WillNotCorruptState, Cer.MayFail)]
@@ -653,7 +732,7 @@ namespace System.Threading {
 
 		public ApartmentState GetApartmentState ()
 		{
-			return (ApartmentState)Internal.apartment_state;
+			return (ApartmentState)Internal.GetApartmentState ();
 		}
 
 		public void SetApartmentState (ApartmentState state)
@@ -667,11 +746,11 @@ namespace System.Threading {
 			if ((ThreadState & ThreadState.Unstarted) == 0)
 				throw new ThreadStateException ("Thread was in an invalid state for the operation being executed.");
 
-			if ((ApartmentState)Internal.apartment_state != ApartmentState.Unknown && 
-			    (ApartmentState)Internal.apartment_state != state)
+			if ((ApartmentState)Internal.GetApartmentState () != ApartmentState.Unknown && 
+			    (ApartmentState)Internal.GetApartmentState () != state)
 				return false;
 
-			Internal.apartment_state = (byte)state;
+			Internal.SetApartmentState ((byte)state);
 
 			return true;
 		}
