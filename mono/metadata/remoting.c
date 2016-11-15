@@ -18,6 +18,7 @@
 #include "mono/metadata/exception.h"
 #include "mono/metadata/debug-helpers.h"
 #include "mono/metadata/reflection-internals.h"
+#include "mono/metadata/threads-types.h"
 
 typedef enum {
 	MONO_MARSHAL_NONE,			/* No marshalling needed */

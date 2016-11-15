@@ -16,6 +16,7 @@
 #include <glib.h>
 
 #include <mono/metadata/object.h>
+#include <mono/metadata/object-internals.h>
 #include "mono/utils/mono-compiler.h"
 #include "mono/utils/mono-membar.h"
 #include "mono/utils/mono-threads.h"
@@ -56,8 +57,6 @@ typedef enum {
 #ifdef HOST_WIN32
 typedef SECURITY_ATTRIBUTES WapiSecurityAttributes;
 #endif
-
-typedef struct _MonoInternalThread MonoInternalThread;
 
 typedef void (*MonoThreadCleanupFunc) (MonoNativeThreadId tid);
 /* INFO has type MonoThreadInfo* */

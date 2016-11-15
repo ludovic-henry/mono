@@ -6,7 +6,6 @@
 #include <mono/metadata/reflection.h>
 #include <mono/metadata/mempool.h>
 #include <mono/metadata/class-internals.h>
-#include <mono/metadata/threads-types.h>
 #include <mono/metadata/handle.h>
 #include "mono/utils/mono-compiler.h"
 #include "mono/utils/mono-error.h"
@@ -348,7 +347,7 @@ typedef enum {
 	MONO_THREAD_FLAG_NAME_SET = 2, // Thread name set from managed code
 } MonoThreadFlags;
 
-struct _MonoInternalThread {
+typedef struct {
 	MonoObject  obj;
 	volatile int lock_thread_id; /* to be used as the pre-shifted thread id in thin locks. Used for appdomain_ref push/pop */
 	MonoThreadHandle *handle;
@@ -400,11 +399,11 @@ struct _MonoInternalThread {
 	 *
 	 * DO NOT RENAME! DO NOT ADD FIELDS AFTER! */
 	gpointer last;
-};
+} MonoInternalThread;
 
 struct _MonoThread {
 	MonoObject obj;
-	struct _MonoInternalThread *internal_thread;
+	MonoInternalThread *internal_thread;
 	MonoObject *start_obj;
 	MonoException *pending_exception;
 };
