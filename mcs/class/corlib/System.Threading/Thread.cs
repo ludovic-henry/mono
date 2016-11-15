@@ -52,8 +52,6 @@ namespace System.Threading {
 		IntPtr handle;
 		IntPtr native_handle; // used only on Win32
 
-		/* Note this is an opaque object (an array), not a CultureInfo */
-		private object cached_culture_info;
 		/* accessed only from unmanaged code */
 		private IntPtr name;
 		private int name_len; 
