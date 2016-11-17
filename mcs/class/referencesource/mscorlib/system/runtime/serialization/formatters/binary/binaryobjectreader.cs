@@ -141,7 +141,7 @@ namespace System.Runtime.Serialization.Formatters.Binary {
 
         }
 
-#if FEATURE_REMOTING || MOBILE_LEGACY
+#if FEATURE_REMOTING || (MOBILE && !XAMMAC)
         [System.Security.SecurityCritical]  // auto-generated
         internal Object Deserialize(HeaderHandler handler, __BinaryParser serParser, bool fCheck, bool isCrossAppDomain, IMethodCallMessage methodCallMessage) {
             if (serParser == null)

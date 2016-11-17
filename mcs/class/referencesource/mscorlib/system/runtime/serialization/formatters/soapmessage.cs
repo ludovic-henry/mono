@@ -12,7 +12,7 @@
  **
  **
  ===========================================================*/
-#if FEATURE_REMOTING || MOBILE_LEGACY
+#if FEATURE_REMOTING || (MOBILE && !XAMMAC)
 namespace System.Runtime.Serialization.Formatters {
     using System.Runtime.Remoting;
     using System.Runtime.Remoting.Messaging;

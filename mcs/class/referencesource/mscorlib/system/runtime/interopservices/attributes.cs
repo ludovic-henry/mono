@@ -269,7 +269,7 @@ namespace System.Runtime.InteropServices{
         public String Value { get {return _val;} }  
     }    
 
-#if FEATURE_COMINTEROP || MOBILE_LEGACY
+#if FEATURE_COMINTEROP || (MOBILE && !XAMMAC)
     [AttributeUsage(AttributeTargets.All, Inherited = false)] 
     [System.Runtime.InteropServices.ComVisible(true)]
     public sealed class ComConversionLossAttribute : Attribute
@@ -279,7 +279,7 @@ namespace System.Runtime.InteropServices{
         }
     }
 #endif
-#if FEATURE_COMINTEROP || MOBILE_LEGACY
+#if FEATURE_COMINTEROP || (MOBILE && !XAMMAC)
 [Serializable]
 [Flags()]
     [System.Runtime.InteropServices.ComVisible(true)]
@@ -991,7 +991,7 @@ namespace System.Runtime.InteropServices{
         public int Value { get { return _val; } }
     }
 
-#if FEATURE_COMINTEROP || MOBILE_LEGACY
+#if FEATURE_COMINTEROP || (MOBILE && !XAMMAC)
     [AttributeUsage(AttributeTargets.Parameter | AttributeTargets.Field | AttributeTargets.Property | AttributeTargets.ReturnValue, Inherited = false)] 
     [System.Runtime.InteropServices.ComVisible(true)]
     public sealed class ComAliasNameAttribute : Attribute
@@ -1064,7 +1064,7 @@ namespace System.Runtime.InteropServices{
         public Type EventProvider { get {return _EventProvider;} }
     }
 #endif
-#if FEATURE_COMINTEROP || MOBILE_LEGACY
+#if FEATURE_COMINTEROP || (MOBILE && !XAMMAC)
     [AttributeUsage(AttributeTargets.Assembly, Inherited = false)] 
     [System.Runtime.InteropServices.ComVisible(true)]
     public sealed class TypeLibVersionAttribute : Attribute

@@ -252,7 +252,7 @@ namespace System.Threading
             ec.SynchronizationContextNoFlow = syncContext;
         }
 
-#if MOBILE_LEGACY
+#if (MOBILE && !XAMMAC)
         [Obsolete("The method is not supported and will be removed")]
         public static void SetThreadStaticContext(SynchronizationContext syncContext)
         {

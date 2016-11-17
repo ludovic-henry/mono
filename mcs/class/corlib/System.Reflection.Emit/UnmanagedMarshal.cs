@@ -71,7 +71,7 @@ namespace System.Reflection.Emit {
 				if (t == UnmanagedType.LPArray)
 					throw new ArgumentException ();
 
-#if FEATURE_COMINTEROP || MOBILE_LEGACY
+#if FEATURE_COMINTEROP || (MOBILE && !XAMMAC)
 				if (t == UnmanagedType.SafeArray)
 					throw new ArgumentException ();
 #endif
@@ -102,7 +102,7 @@ namespace System.Reflection.Emit {
 		public static UnmanagedMarshal DefineLPArray( UnmanagedType elemType) {
 			return new UnmanagedMarshal (UnmanagedType.LPArray, elemType);
 		}
-#if FEATURE_COMINTEROP || MOBILE_LEGACY
+#if FEATURE_COMINTEROP || (MOBILE && !XAMMAC)
 		public static UnmanagedMarshal DefineSafeArray( UnmanagedType elemType) {
 			return new UnmanagedMarshal (UnmanagedType.SafeArray, elemType);
 		}

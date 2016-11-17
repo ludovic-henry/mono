@@ -21,7 +21,7 @@ PROFILE_MCS_FLAGS = \
 	-d:NET_4_0 \
 	-d:NET_4_5 \
 	-d:MONO \
-	-d:MOBILE,MOBILE_LEGACY \
+	-d:MOBILE \
 	-d:MOBILE_DYNAMIC \
 	-d:MONODROID \
 	-d:ANDROID \

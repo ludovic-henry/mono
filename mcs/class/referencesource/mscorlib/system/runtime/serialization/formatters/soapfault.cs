@@ -14,7 +14,7 @@
  ** Date:  June 27, 2000
  **
  ===========================================================*/
-#if FEATURE_REMOTING || MOBILE_LEGACY
+#if FEATURE_REMOTING || (MOBILE && !XAMMAC)
 namespace System.Runtime.Serialization.Formatters
 {
     using System;

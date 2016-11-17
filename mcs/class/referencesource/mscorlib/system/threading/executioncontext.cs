@@ -1,4 +1,4 @@
-#if MOBILE_LEGACY
+#if (MOBILE && !XAMMAC)
 #define FEATURE_REMOTING
 #endif
 // ==++==
