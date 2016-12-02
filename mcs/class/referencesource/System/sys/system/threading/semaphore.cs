@@ -29,7 +29,7 @@ namespace System.Threading
 
     [HostProtection(Synchronization=true, ExternalThreading=true)]
     [ComVisibleAttribute(false)]
-    public sealed class Semaphore: WaitHandle
+    public sealed partial class Semaphore: WaitHandle
     {
         private const int MAX_PATH = 260;
 
@@ -391,19 +391,6 @@ namespace System.Threading
 
             semaphoreSecurity.Persist(SafeWaitHandle);
         }
-#endif
-
-#if MONO
-        [MethodImplAttribute(MethodImplOptions.InternalCall)]
-        internal static extern IntPtr CreateSemaphore_internal (
-            int initialCount, int maximumCount, string name, out int errorCode);
-
-        [MethodImplAttribute(MethodImplOptions.InternalCall)]
-        internal static extern bool ReleaseSemaphore_internal (
-            IntPtr handle, int releaseCount, out int previousCount);
-
-        [MethodImplAttribute (MethodImplOptions.InternalCall)]
-        private static extern IntPtr OpenSemaphore_internal (string name, SemaphoreRights rights, out int errorCode);
 #endif
     }
 }
