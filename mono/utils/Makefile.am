@@ -1,30 +1,13 @@
-noinst_LTLIBRARIES = libmonoutils.la
-
-AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/mono $(LIBGC_CPPFLAGS) $(GLIB_CFLAGS) $(SHARED_CFLAGS)
-
 if ENABLE_DTRACE
-
-BUILT_SOURCES = mono-dtrace.h
 
 mono-dtrace.h: $(top_srcdir)/data/mono.d
 	$(DTRACE) $(DTRACEFLAGS) -h -s $(top_srcdir)/data/mono.d -o $@ || > $@
 
 endif
 
-if HOST_WIN32
-win32_sources = \
-	os-event-win32.c
-
-platform_sources = $(win32_sources)
-else
-unix_sources = \
-	os-event-unix.c
-
-platform_sources = $(unix_sources)
-endif
-
-monoutils_sources = \
-	$(platform_sources)	\
+EXTRA_DIST = \
+	os-event-win32.c \
+	os-event-unix.c \
 	mono-md5.c		\
 	mono-sha1.c		\
 	mono-logger.c		\
@@ -174,94 +157,91 @@ monoutils_sources = \
 	checked-build.c \
 	checked-build.h \
 	os-event.h \
-	refcount.h
+	refcount.h \
+	mach-support-x86.c \
+	mach-support-amd64.c \
+	mach-support-arm.c \
+	mach-support-arm64.c \
+	mach-support-unknown.c \
+	mono-hwcap-x86.c \
+	mono-hwcap-x86.c \
+	mono-hwcap-arm.c \
+	mono-hwcap-arm64.c \
+	mono-hwcap-mips.c \
+	mono-hwcap-ppc.c \
+	mono-hwcap-ppc.c \
+	mono-hwcap-sparc.c \
+	mono-hwcap-sparc.c \
+	mono-hwcap-ia64.c \
+	mono-hwcap-s390x.c \
+	mono-hwcap-cross.c \
+	mono-embed.h \
+	mono-embed.c \
+	CMakeLists.txt
 
-arch_sources = 
+CMAKE_VERBOSE=$(if $(V),VERBOSE=1,)
 
-if !CROSS_COMPILE
+CMAKE_ARGS = \
+	-D CMAKE_INSTALL_PREFIX:PATH=$(prefix) \
+	-D SRC_DIR:PATH=$(abs_top_srcdir)/mono/btls \
+	-D MONO_CFLAGS:STRING="$(LIBGC_CPPFLAGS) $(GLIB_CFLAGS) $(SHARED_CFLAGS)"
+
+if CROSS_COMPILE
+	CMAKE_ARGS += -D MONO_CROSS_COMPILE:BOOL=1
+endif
 
 if X86
-arch_sources += mach-support-x86.c
+	CMAKE_ARGS += -D MONO_HOST_X86:BOOL=1
 endif
 
 if AMD64
-arch_sources += mach-support-amd64.c
+	CMAKE_ARGS += -D MONO_HOST_AMD64:BOOL=1
 endif
 
 if ARM
-arch_sources += mach-support-arm.c
+	CMAKE_ARGS += -D MONO_HOST_ARM:BOOL=1
 endif
 
 if ARM64
-arch_sources += mach-support-arm64.c
-endif
-
-else
-
-arch_sources += mach-support-unknown.c
-
-endif
-
-if !CROSS_COMPILE
-
-if X86
-arch_sources += mono-hwcap-x86.c
-endif
-
-if AMD64
-arch_sources += mono-hwcap-x86.c
-endif
-
-if ARM
-arch_sources += mono-hwcap-arm.c
-endif
-
-if ARM64
-arch_sources += mono-hwcap-arm64.c
+	CMAKE_ARGS += -D MONO_HOST_ARM64:BOOL=1
 endif
 
 if MIPS
-arch_sources += mono-hwcap-mips.c
+	CMAKE_ARGS += -D MONO_HOST_MIPS:BOOL=1
 endif
 
 if POWERPC
-arch_sources += mono-hwcap-ppc.c
+	CMAKE_ARGS += -D MONO_HOST_POWERPC:BOOL=1
 endif
 
 if POWERPC64
-arch_sources += mono-hwcap-ppc.c
+	CMAKE_ARGS += -D MONO_HOST_POWERPC64:BOOL=1
 endif
 
 if SPARC
-arch_sources += mono-hwcap-sparc.c
+	CMAKE_ARGS += -D MONO_HOST_SPARC:BOOL=1
 endif
 
 if SPARC64
-arch_sources += mono-hwcap-sparc.c
+	CMAKE_ARGS += -D MONO_HOST_SPARC64:BOOL=1
 endif
 
 if IA64
-arch_sources += mono-hwcap-ia64.c
+	CMAKE_ARGS += -D MONO_HOST_IA64:BOOL=1
 endif
 
 if S390X
-arch_sources += mono-hwcap-s390x.c
+	CMAKE_ARGS += -D MONO_HOST_S390X:BOOL=1
 endif
 
-else
+all-local: build/libmono-utils-shared$(libsuffix) build/libmono-utils-static.a
 
-arch_sources += mono-hwcap-cross.c
+build/libmono-utils-shared$(libsuffix) build/libmono-utils-static.a: build/Makefile
+	$(MAKE) -C build $(CMAKE_VERBOSE)
 
-endif
+build/Makefile:
+	-mkdir -p build
+	(cd build && $(CMAKE) $(CMAKE_ARGS) $(abs_top_srcdir)/mono/utils)
 
-libmonoutils_la_SOURCES = $(monoutils_sources) $(arch_sources)
-libmonoutilsincludedir = $(includedir)/mono-$(API_VER)/mono/utils
-
-libmonoutilsinclude_HEADERS = 	\
-	mono-logger.h		\
-	mono-error.h		\
-	mono-publib.h		\
-	mono-dl-fallback.h	\
-	mono-counters.h
-
-EXTRA_DIST = mono-embed.h mono-embed.c
+clean-local:
+	-rm -rf build
