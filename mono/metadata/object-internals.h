@@ -348,7 +348,6 @@ typedef enum {
 } MonoThreadFlags;
 
 typedef struct {
-	MonoObject  obj;
 	volatile int lock_thread_id; /* to be used as the pre-shifted thread id in thin locks. Used for appdomain_ref push/pop */
 	MonoThreadHandle *handle;
 	gpointer native_handle;
@@ -363,7 +362,7 @@ typedef struct {
 	void *thread_info; /*This is MonoThreadInfo*, but to simplify dependencies, let's make it a void* here. */
 	MonoAppContext *current_appcontext;
 	MonoThread *root_domain_thread;
-	MonoObject *_serialized_principal;
+	MonoArray *_serialized_principal;
 	int _serialized_principal_version;
 	gpointer appdomain_refs;
 	/* This is modified using atomic ops, so keep it a gint32 */
@@ -400,6 +399,11 @@ typedef struct {
 	 * DO NOT RENAME! DO NOT ADD FIELDS AFTER! */
 	gpointer last;
 } MonoInternalThread;
+
+typedef struct {
+	MonoObject obj;
+	MonoInternalThread *internal;
+} MonoInternalThreadContainer;
 
 struct _MonoThread {
 	MonoObject obj;

@@ -44,156 +44,98 @@ using System.Runtime.ConstrainedExecution;
 
 namespace System.Threading {
 	[StructLayout (LayoutKind.Sequential)]
-	sealed class InternalThread : CriticalFinalizerObject {
-#pragma warning disable 169, 414, 649
-		#region Sync with metadata/object-internals.h
-		int lock_thread_id;
-		// stores a thread handle
-		IntPtr handle;
-		IntPtr native_handle; // used only on Win32
+	struct InternalThread
+	{
+		IntPtr data;
 
-		/* accessed only from unmanaged code */
-		IntPtr name;
-		int name_len;
-		ThreadState state;
-		object abort_exc;
-		int abort_state_handle;
-		Int64 thread_id;
-		
-		/* start_notify is used by the runtime to signal that Start()
-		 * is ok to return
-		 */
-		IntPtr stack_ptr;
-		UIntPtr static_data; /* GC-tracked */
-		IntPtr runtime_thread_info;
-		/* current System.Runtime.Remoting.Contexts.Context instance
-		   keep as an object to avoid triggering its class constructor when not needed */
-		object current_appcontext;
-		object root_domain_thread;
-		byte[] _serialized_principal;
-		int _serialized_principal_version;
-		IntPtr appdomain_refs;
-		int interruption_requested;
-		IntPtr synch_cs;
-		bool threadpool_thread;
-		bool thread_interrupt_requested;
-		/* These are used from managed code */
-		int stack_size;
-		byte apartment_state;
-		volatile int critical_region_level;
-		int managed_id;
-		int small_id;
-		IntPtr manage_callback;
-		IntPtr interrupt_on_stop;
-		IntPtr flags;
-		IntPtr thread_pinning_ref;
-		IntPtr abort_protected_block_count;
-		int priority; // (int) ThreadPriority.Normal;
-		IntPtr owned_mutex;
-		IntPtr suspended_event;
-		int self_suspended;
-		/* 
-		 * These fields are used to avoid having to increment corlib versions
-		 * when a new field is added to the unmanaged MonoThread structure.
-		 */
-		IntPtr unused1;
-		IntPtr unused2;
+		[MethodImplAttribute(MethodImplOptions.InternalCall)]
+		internal extern static void Construct (Thread thread, out InternalThreadContainer container);
 
-		/* This is used only to check that we are in sync between the representation
-		 * of MonoInternalThread in native and InternalThread in managed
-		 *
-		 * DO NOT RENAME! DO NOT ADD FIELDS AFTER! */
-		IntPtr last;
-		#endregion
-#pragma warning restore 169, 414, 649
-
-		internal bool GetIsThreadPoolThread ()
+		internal static bool IsNull (InternalThread thread)
 		{
-			return threadpool_thread;
-		}
-
-		internal void SetIsThreadPoolThread (bool value)
-		{
-			threadpool_thread = value;
-		}
-
-		internal int GetStackSize ()
-		{
-			return stack_size;
-		}
-
-		internal void SetStackSize (int value)
-		{
-			stack_size = value;
-		}
-
-		internal byte GetApartmentState ()
-		{
-			return apartment_state;
-		}
-
-		internal void SetApartmentState (byte value)
-		{
-			apartment_state = value;
-		}
-
-		internal void IncCriticalRegionLevel ()
-		{
-			critical_region_level ++;
-		}
-
-		internal void DecCriticalRegionLevel ()
-		{
-			critical_region_level --;
-		}
-
-		internal int GetManagedID ()
-		{
-			return managed_id;
-		}
-
-		internal void SetManagedID (int value)
-		{
-			managed_id = value;
-		}
-
-		internal byte[] GetSerializedPrincipal ()
-		{
-			return _serialized_principal;
-		}
-
-		internal void SetSerializedPrincipal (byte[] value)
-		{
-			_serialized_principal = value;
-		}
-
-		internal int GetSerializedPrincipalVersion ()
-		{
-			return _serialized_principal_version;
-		}
-
-		internal void SetSerializedPrincipalVersion (int value)
-		{
-			_serialized_principal_version = value;
-		}
-
-		internal long GetThreadID ()
-		{
-			return thread_id;
-		}
-
-		internal void SetThreadID (long value)
-		{
-			thread_id = value;
+			return thread.data == IntPtr.Zero;
 		}
 
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		private extern void Thread_free_internal();
+		internal extern bool GetIsThreadPoolThread ();
+		[MethodImplAttribute(MethodImplOptions.InternalCall)]
+		internal extern void SetIsThreadPoolThread (bool value);
 
-		[ReliabilityContract (Consistency.WillNotCorruptState, Cer.Success)]
-		~InternalThread()
+		[MethodImplAttribute(MethodImplOptions.InternalCall)]
+		internal extern int GetStackSize ();
+		[MethodImplAttribute(MethodImplOptions.InternalCall)]
+		internal extern void SetStackSize (int value);
+
+		[MethodImplAttribute(MethodImplOptions.InternalCall)]
+		internal extern byte GetApartmentState ();
+		[MethodImplAttribute(MethodImplOptions.InternalCall)]
+		internal extern void SetApartmentState (byte value);
+
+		[MethodImplAttribute(MethodImplOptions.InternalCall)]
+		internal extern void IncCriticalRegionLevel ();
+		[MethodImplAttribute(MethodImplOptions.InternalCall)]
+		internal extern void DecCriticalRegionLevel ();
+
+		[MethodImplAttribute(MethodImplOptions.InternalCall)]
+		internal extern int GetManagedID ();
+		[MethodImplAttribute(MethodImplOptions.InternalCall)]
+		internal extern void SetManagedID (int value);
+
+		[MethodImplAttribute(MethodImplOptions.InternalCall)]
+		internal extern byte[] GetSerializedPrincipal ();
+		[MethodImplAttribute(MethodImplOptions.InternalCall)]
+		internal extern void SetSerializedPrincipal (byte[] value);
+
+		[MethodImplAttribute(MethodImplOptions.InternalCall)]
+		internal extern int GetSerializedPrincipalVersion ();
+		[MethodImplAttribute(MethodImplOptions.InternalCall)]
+		internal extern void SetSerializedPrincipalVersion (int value);
+
+		[MethodImplAttribute(MethodImplOptions.InternalCall)]
+		internal extern long GetThreadID ();
+		[MethodImplAttribute(MethodImplOptions.InternalCall)]
+		internal extern void SetThreadID (long value);
+
+		[MethodImplAttribute(MethodImplOptions.InternalCall)]
+		internal extern string GetName ();
+		[MethodImplAttribute(MethodImplOptions.InternalCall)]
+		internal extern void SetName (string value);
+
+		[MethodImplAttribute(MethodImplOptions.InternalCall)]
+		internal extern int GetState ();
+		[MethodImplAttribute(MethodImplOptions.InternalCall)]
+		internal extern void SetState (int value);
+		[MethodImplAttribute(MethodImplOptions.InternalCall)]
+		internal extern void ClrState (int value);
+
+		[MethodImplAttribute(MethodImplOptions.InternalCall)]
+		internal extern void Abort (object stateInfo);
+
+		[MethodImplAttribute(MethodImplOptions.InternalCall)]
+		internal extern void Unref ();
+	}
+
+	/*
+	 * This class is only used to keep a reference to a InternalThread.
+	 *
+	 * We use it so we can enjoy the GC's memory management to ensure we unref the
+	 * InternalThread struct only when it's not accessible from anywhere anymore.
+	 *
+	 * It is constructed in the runtime in threads.c.
+	 */
+	[StructLayout (LayoutKind.Sequential)]
+	sealed class InternalThreadContainer : CriticalFinalizerObject
+	{
+		InternalThread Thread;
+
+		public InternalThreadContainer (InternalThread thread)
 		{
-			Thread_free_internal();
+			Thread = thread;
+		}
+
+		~InternalThreadContainer()
+		{
+			Thread.Unref ();
 		}
 	}
 
@@ -202,6 +144,7 @@ namespace System.Threading {
 #pragma warning disable 414		
 		#region Sync with metadata/object-internals.h
 		InternalThread internal_thread;
+		InternalThreadContainer internal_thread_container;
 		object m_ThreadStartArg;
 		object pending_exception;
 		#endregion
@@ -223,13 +166,10 @@ namespace System.Threading {
 
 		private bool m_ExecutionContextBelongsToOuterScope;
 
-		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		private extern void ConstructInternalThread ();
-
 		InternalThread Internal {
 			get {
-				if (internal_thread == null)
-					ConstructInternalThread ();
+				if (InternalThread.IsNull (internal_thread))
+					InternalThread.New (this, out internal_thread_container);
 				return internal_thread;
 			}
 		}
@@ -396,10 +336,6 @@ namespace System.Threading {
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]
 		private extern IntPtr Thread_internal (MulticastDelegate start);
 
-		private Thread (InternalThread it) {
-			internal_thread = it;
-		}
-		
 		// part of ".NETPortable,Version=v4.0,Profile=Profile3" i.e. FX4 and SL4
 		[ReliabilityContract (Consistency.WillNotCorruptState, Cer.Success)]
 		~Thread ()
@@ -437,7 +373,7 @@ namespace System.Threading {
 
 		public bool IsAlive {
 			get {
-				ThreadState curstate = GetState (Internal);
+				ThreadState curstate = (ThreadState) Internal.GetState ();
 				
 				if((curstate & ThreadState.Aborted) != 0 ||
 				   (curstate & ThreadState.Stopped) != 0 ||
@@ -451,7 +387,7 @@ namespace System.Threading {
 
 		public bool IsBackground {
 			get {
-				ThreadState thread_state = GetState (Internal);
+				ThreadState thread_state = (ThreadState) Internal.GetState ();
 				if ((thread_state & ThreadState.Stopped) != 0)
 					throw new ThreadStateException ("Thread is dead; state can not be accessed.");
 
@@ -460,18 +396,12 @@ namespace System.Threading {
 			
 			set {
 				if (value) {
-					SetState (Internal, ThreadState.Background);
+					Internal.SetState ((int) ThreadState.Background);
 				} else {
-					ClrState (Internal, ThreadState.Background);
+					Internal.ClrState ((int) ThreadState.Background);
 				}
 			}
 		}
-
-		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		private extern static string GetName_internal (InternalThread thread);
-
-		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		private extern static void SetName_internal (InternalThread thread, String name);
 
 		/* 
 		 * The thread name must be shared by appdomains, so it is stored in
@@ -479,35 +409,27 @@ namespace System.Threading {
 		 */
 
 		public string Name {
-			get {
-				return GetName_internal (Internal);
-			}
-			
-			set {
-				SetName_internal (Internal, value);
-			}
+			get { return Internal.GetName (); }
+			set { Internal.SetName (value); }
 		}
 
 		public ThreadState ThreadState {
 			get {
-				return GetState (Internal);
+				return (ThreadState) Internal.GetState ();
 			}
 		}
 
 #if MONO_FEATURE_THREAD_ABORT
-		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		private extern static void Abort_internal (InternalThread thread, object stateInfo);
-
 		[SecurityPermission (SecurityAction.Demand, ControlThread=true)]
 		public void Abort () 
 		{
-			Abort_internal (Internal, null);
+			Internal.Abort (null);
 		}
 
 		[SecurityPermission (SecurityAction.Demand, ControlThread=true)]
 		public void Abort (object stateInfo) 
 		{
-			Abort_internal (Internal, stateInfo);
+			Internal.Abort (stateInfo);
 		}
 
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]
@@ -575,15 +497,6 @@ namespace System.Threading {
 
 			m_ThreadStartArg = null;
 		}
-
-		[MethodImplAttribute (MethodImplOptions.InternalCall)]
-		extern private static void SetState (InternalThread thread, ThreadState set);
-
-		[MethodImplAttribute (MethodImplOptions.InternalCall)]
-		extern private static void ClrState (InternalThread thread, ThreadState clr);
-
-		[MethodImplAttribute (MethodImplOptions.InternalCall)]
-		extern private static ThreadState GetState (InternalThread thread);
 
 		[MethodImplAttribute (MethodImplOptions.InternalCall)]
 		extern public static byte VolatileRead (ref byte address);

@@ -66,15 +66,12 @@ MonoInternalThread* mono_thread_create_internal (MonoDomain *domain, gpointer fu
 
 void mono_threads_install_cleanup (MonoThreadCleanupFunc func);
 
-void ves_icall_System_Threading_Thread_ConstructInternalThread (MonoThread *this_obj);
 gpointer ves_icall_System_Threading_Thread_Thread_internal(MonoThread *this_obj, MonoObject *start);
 void ves_icall_System_Threading_InternalThread_Thread_free_internal(MonoInternalThread *this_obj);
 void ves_icall_System_Threading_Thread_Sleep_internal(gint32 ms);
 gboolean ves_icall_System_Threading_Thread_Join_internal(MonoThread *this_obj, int ms);
 gint32 ves_icall_System_Threading_Thread_GetDomainID (void);
 gboolean ves_icall_System_Threading_Thread_Yield (void);
-MonoString* ves_icall_System_Threading_Thread_GetName_internal (MonoInternalThread *this_obj);
-void ves_icall_System_Threading_Thread_SetName_internal (MonoInternalThread *this_obj, MonoString *name);
 int ves_icall_System_Threading_Thread_GetPriority (MonoThread *this_obj);
 void ves_icall_System_Threading_Thread_SetPriority (MonoThread *this_obj, int priority);
 MonoObject* ves_icall_System_Threading_Thread_GetCachedCurrentCulture (MonoInternalThread *this_obj);
@@ -123,14 +120,10 @@ gint64 ves_icall_System_Threading_Interlocked_Increment_Long(gint64 *location);
 gint32 ves_icall_System_Threading_Interlocked_Decrement_Int(gint32 *location);
 gint64 ves_icall_System_Threading_Interlocked_Decrement_Long(gint64 * location);
 
-void ves_icall_System_Threading_Thread_Abort (MonoInternalThread *thread, MonoObject *state);
 void ves_icall_System_Threading_Thread_ResetAbort (MonoThread *this_obj);
 MonoObject* ves_icall_System_Threading_Thread_GetAbortExceptionState (MonoThread *thread);
 void ves_icall_System_Threading_Thread_Suspend (MonoThread *this_obj);
 void ves_icall_System_Threading_Thread_Resume (MonoThread *thread);
-void ves_icall_System_Threading_Thread_ClrState (MonoInternalThread *thread, guint32 state);
-void ves_icall_System_Threading_Thread_SetState (MonoInternalThread *thread, guint32 state);
-guint32 ves_icall_System_Threading_Thread_GetState (MonoInternalThread *thread);
 
 gint8 ves_icall_System_Threading_Thread_VolatileRead1 (void *ptr);
 gint16 ves_icall_System_Threading_Thread_VolatileRead2 (void *ptr);
@@ -174,6 +167,67 @@ void ves_icall_System_Threading_Thread_SpinWait_nop (void);
 
 void ves_icall_System_Runtime_Remoting_Contexts_Context_RegisterContext (MonoAppContext *ctx);
 void ves_icall_System_Runtime_Remoting_Contexts_Context_ReleaseContext (MonoAppContext *ctx);
+
+void
+ves_icall_System_Threading_InternalThread_Construct (MonoThread *thread, MonoInternalThreadContainer **container);
+
+void
+ves_icall_System_Threading_InternalThread_Unref (MonoInternalThread *internal);
+
+void
+ves_icall_System_Threading_InternalThread_Abort (MonoInternalThread *internal, MonoObject *state_info);
+
+MonoBoolean
+ves_icall_System_Threading_InternalThread_GetIsThreadPoolThread (MonoInternalThread *internal);
+void
+ves_icall_System_Threading_InternalThread_SetIsThreadPoolThread (MonoInternalThread *internal, MonoBoolean value);
+
+gint32
+ves_icall_System_Threading_InternalThread_GetStackSize (MonoInternalThread *internal);
+void
+ves_icall_System_Threading_InternalThread_SetStackSize (MonoInternalThread *internal, gint32 value);
+
+gint8
+ves_icall_System_Threading_InternalThread_GetApartmentState (MonoInternalThread *internal);
+void
+ves_icall_System_Threading_InternalThread_SetApartmentState (MonoInternalThread *internal, gint8 value);
+
+void
+ves_icall_System_Threading_InternalThread_IncCriticalRegionLevel (MonoInternalThread *internal);
+void
+ves_icall_System_Threading_InternalThread_DecCriticalRegionLevel (MonoInternalThread *internal);
+
+gint32
+ves_icall_System_Threading_InternalThread_GetManagedID (MonoInternalThread *internal);
+void
+ves_icall_System_Threading_InternalThread_SetManagedID (MonoInternalThread *internal, gint32 value);
+
+MonoArray*
+ves_icall_System_Threading_InternalThread_GetSerializedPrincipal (MonoInternalThread *internal);
+void
+ves_icall_System_Threading_InternalThread_SetSerializedPrincipal (MonoInternalThread *internal, MonoArray *value);
+
+gint32
+ves_icall_System_Threading_InternalThread_GetSerializedPrincipalVersion (MonoInternalThread *internal);
+void
+ves_icall_System_Threading_InternalThread_SetSerializedPrincipalVersion (MonoInternalThread *internal, gint32 value);
+
+gint64
+ves_icall_System_Threading_InternalThread_GetThreadID (MonoInternalThread *internal);
+void
+ves_icall_System_Threading_InternalThread_SetThreadID (MonoInternalThread *internal, gint64 value);
+
+MonoString*
+ves_icall_System_Threading_InternalThread_GetName (MonoInternalThread *internal);
+void
+ves_icall_System_Threading_InternalThread_SetName (MonoInternalThread *internal, MonoString *value);
+
+gint32
+ves_icall_System_Threading_InternalThread_GetState (MonoInternalThread *internal);
+void
+ves_icall_System_Threading_InternalThread_SetState (MonoInternalThread *internal, gint32 value);
+void
+ves_icall_System_Threading_InternalThread_ClrState (MonoInternalThread *internal, gint32 value);
 
 MonoInternalThread *mono_thread_internal_current (void);
 

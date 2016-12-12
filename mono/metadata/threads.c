@@ -572,6 +572,12 @@ create_internal_thread_object (void)
 	return thread;
 }
 
+static MonoInternalThreadContainer*
+create_internal_thread_container_object (MonoInternalThread *internal)
+{
+	
+}
+
 static void
 mono_thread_internal_set_priority (MonoInternalThread *internal, MonoThreadPriority priority)
 {
@@ -1184,15 +1190,16 @@ mono_thread_exit (void)
 }
 
 void
-ves_icall_System_Threading_Thread_ConstructInternalThread (MonoThread *this_obj)
+ves_icall_System_Threading_InternalThread_Construct (MonoThread *thread, MonoInternalThreadContainer **container)
 {
 	MonoInternalThread *internal;
 
 	internal = create_internal_thread_object ();
-
 	internal->state = ThreadState_Unstarted;
 
-	InterlockedCompareExchangePointer ((volatile gpointer *)&this_obj->internal_thread, internal, NULL);
+	*container = create_internal_thread_container_object (internal);
+
+	InterlockedCompareExchangePointer ((volatile gpointer *)&thread->internal_thread, internal, NULL);
 }
 
 MonoThread *
@@ -1406,7 +1413,7 @@ mono_thread_get_managed_id (MonoThread *thread)
 }
 
 MonoString* 
-ves_icall_System_Threading_Thread_GetName_internal (MonoInternalThread *this_obj)
+ves_icall_System_Threading_InternalThread_GetName (MonoInternalThread *this_obj)
 {
 	MonoError error;
 	MonoString* str;
@@ -1469,7 +1476,7 @@ mono_thread_set_name_internal (MonoInternalThread *this_obj, MonoString *name, g
 }
 
 void 
-ves_icall_System_Threading_Thread_SetName_internal (MonoInternalThread *this_obj, MonoString *name)
+ves_icall_System_Threading_InternalThread_SetName (MonoInternalThread *this_obj, MonoString *name)
 {
 	MonoError error;
 	mono_thread_set_name_internal (this_obj, name, TRUE, &error);
@@ -2119,7 +2126,7 @@ ves_icall_System_Threading_Thread_MemoryBarrier (void)
 }
 
 void
-ves_icall_System_Threading_Thread_ClrState (MonoInternalThread* this_obj, guint32 state)
+ves_icall_System_Threading_InternalThread_ClrState (MonoInternalThread* this_obj, gint32 state)
 {
 	mono_thread_clr_state (this_obj, (MonoThreadState)state);
 
@@ -2133,7 +2140,7 @@ ves_icall_System_Threading_Thread_ClrState (MonoInternalThread* this_obj, guint3
 }
 
 void
-ves_icall_System_Threading_Thread_SetState (MonoInternalThread* this_obj, guint32 state)
+ves_icall_System_Threading_InternalThread_SetState (MonoInternalThread *this_obj, gint32 state)
 {
 	mono_thread_set_state (this_obj, (MonoThreadState)state);
 	
@@ -2146,10 +2153,10 @@ ves_icall_System_Threading_Thread_SetState (MonoInternalThread* this_obj, guint3
 	}
 }
 
-guint32
-ves_icall_System_Threading_Thread_GetState (MonoInternalThread* this_obj)
+gint32
+ves_icall_System_Threading_InternalThread_GetState (MonoInternalThread *this_obj)
 {
-	guint32 state;
+	gint32 state;
 
 	LOCK_THREAD (this_obj);
 	
@@ -2249,7 +2256,7 @@ request_thread_abort (MonoInternalThread *thread, MonoObject *state)
 }
 
 void
-ves_icall_System_Threading_Thread_Abort (MonoInternalThread *thread, MonoObject *state)
+ves_icall_System_Threading_InternalThread_Abort (MonoInternalThread *thread, MonoObject *state)
 {
 	if (!request_thread_abort (thread, state))
 		return;
@@ -5190,4 +5197,117 @@ mono_thread_internal_is_current (MonoInternalThread *internal)
 {
 	g_assert (internal);
 	return mono_native_thread_id_equals (mono_native_thread_id_get (), MONO_UINT_TO_NATIVE_THREAD_ID (internal->tid));
+}
+
+void
+ves_icall_System_Threading_InternalThread_Construct (MonoThread *thread, MonoInternalThreadContainer **container)
+{
+	MonoInternalThread *internal;
+
+	internal = create_internal_thread_object ();
+	internal-> =
+
+	return internal;
+}
+
+void
+ves_icall_System_Threading_InternalThread_Unref (MonoInternalThread *internal)
+{
+	g_assert_not_reached ();
+}
+
+MonoBoolean
+ves_icall_System_Threading_InternalThread_GetIsThreadPoolThread (MonoInternalThread *internal)
+{
+	return internal->threadpool_thread;
+}
+
+void
+ves_icall_System_Threading_InternalThread_SetIsThreadPoolThread (MonoInternalThread *internal, MonoBoolean value)
+{
+	internal->threadpool_thread = value;
+}
+
+gint32
+ves_icall_System_Threading_InternalThread_GetStackSize (MonoInternalThread *internal)
+{
+	return internal->stack_size;
+}
+
+void
+ves_icall_System_Threading_InternalThread_SetStackSize (MonoInternalThread *internal, gint32 value)
+{
+	internal->stack_size = value;
+}
+
+gint8
+ves_icall_System_Threading_InternalThread_GetApartmentState (MonoInternalThread *internal)
+{
+	return internal->apartment_state;
+}
+
+void
+ves_icall_System_Threading_InternalThread_SetApartmentState (MonoInternalThread *internal, gint8 value)
+{
+	internal->apartment_state = value;
+}
+
+void
+ves_icall_System_Threading_InternalThread_IncCriticalRegionLevel (MonoInternalThread *internal)
+{
+	internal->critical_region_level ++;
+}
+
+void
+ves_icall_System_Threading_InternalThread_DecCriticalRegionLevel (MonoInternalThread *internal)
+{
+	internal->critical_region_level --;
+}
+
+gint32
+ves_icall_System_Threading_InternalThread_GetManagedID (MonoInternalThread *internal)
+{
+	return internal->managed_id;
+}
+
+void
+ves_icall_System_Threading_InternalThread_SetManagedID (MonoInternalThread *internal, gint32 value)
+{
+	internal->managed_id = value;
+}
+
+MonoArray*
+ves_icall_System_Threading_InternalThread_GetSerializedPrincipal (MonoInternalThread *internal)
+{
+	return internal->_serialized_principal;
+}
+
+void
+ves_icall_System_Threading_InternalThread_SetSerializedPrincipal (MonoInternalThread *internal, MonoArray *value)
+{
+	internal->_serialized_principal = value;
+}
+
+gint32
+ves_icall_System_Threading_InternalThread_GetSerializedPrincipalVersion (MonoInternalThread *internal)
+{
+	return internal->_serialized_principal_version;
+}
+
+void
+ves_icall_System_Threading_InternalThread_SetSerializedPrincipalVersion (MonoInternalThread *internal, gint32 value)
+{
+	internal->_serialized_principal_version = value;
+}
+
+gint64
+ves_icall_System_Threading_InternalThread_GetThreadID (MonoInternalThread *internal)
+{
+	return internal->tid;
+}
+
+void
+ves_icall_System_Threading_InternalThread_SetThreadID (MonoInternalThread *internal, gint64 value)
+{
+	internal->tid = value;
 }
