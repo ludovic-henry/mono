@@ -127,7 +127,7 @@ typedef union {
 typedef MonoInternalThread ThreadPoolWorkerThread;
 
 struct MonoThreadPoolWorker {
-	MonoRefCount ref;
+	MonoRefCount refcount;
 
 	ThreadPoolWorkerCounter counters;
 
