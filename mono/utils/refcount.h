@@ -22,6 +22,7 @@ typedef struct {
 } MonoRefCount;
 
 #define mono_refcount_init(v,destructor) do { mono_refcount_initialize (&(v)->refcount, (destructor)); } while (0)
+#define mono_refcount_tryinc(v) (mono_refcount_tryincrement (&(v)->refcount))
 #define mono_refcount_inc(v) (mono_refcount_increment (&(v)->refcount),(v))
 #define mono_refcount_dec(v) do { mono_refcount_decrement (&(v)->refcount); } while (0)
 
@@ -32,17 +33,43 @@ mono_refcount_initialize (MonoRefCount *refcount, void (*destructor) (gpointer d
 	refcount->destructor = destructor;
 }
 
+static inline gboolean
+mono_refcount_tryincrement (MonoRefCount *refcount)
+{
+	gint32 oldref, newref;
+
+	g_assert (refcount);
+	g_assert (refcount->ref >= 0);
+	g_assert (refcount->ref <= G_MAXINT32);
+
+	do {
+		oldref = refcount->ref;
+		if (oldref == 0)
+			return FALSE;
+		if (oldref == G_MAXINT32)
+			g_error ("%s: cannot increment a ref with value %d", __func__, G_MAXINT32);
+
+		newref = oldref + 1;
+	} while (InterlockedCompareExchange (&refcount->ref, newref, oldref) != oldref);
+
+	return TRUE;
+}
+
 static inline void
 mono_refcount_increment (MonoRefCount *refcount)
 {
 	gint32 oldref, newref;
 
 	g_assert (refcount);
+	g_assert (refcount->ref >= 0);
+	g_assert (refcount->ref <= G_MAXINT32);
 
 	do {
 		oldref = refcount->ref;
 		if (oldref == 0)
 			g_error ("%s: cannot increment a ref with value 0", __func__);
+		if (oldref == G_MAXINT32)
+			g_error ("%s: cannot increment a ref with value %d", __func__, G_MAXINT32);
 
 		newref = oldref + 1;
 	} while (InterlockedCompareExchange (&refcount->ref, newref, oldref) != oldref);
@@ -62,6 +89,9 @@ mono_refcount_decrement (MonoRefCount *refcount)
 
 		newref = oldref - 1;
 	} while (InterlockedCompareExchange (&refcount->ref, newref, oldref) != oldref);
+
+	g_assert (refcount->ref >= 0);
+	g_assert (refcount->ref < G_MAXINT32);
 
 	if (newref == 0 && refcount->destructor)
 		refcount->destructor ((gpointer) refcount);

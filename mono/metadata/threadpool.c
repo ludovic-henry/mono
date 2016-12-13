@@ -599,7 +599,13 @@ mono_threadpool_remove_domain_jobs (MonoDomain *domain, int timeout)
 	 */
 	mono_lazy_initialize (&status, initialize);
 
-	mono_refcount_inc (&threadpool);
+	if (!mono_refcount_tryinc (&threadpool)) {
+		/* We already cleanup the threadpool, so
+		 * there are no more threads running.
+		 * This is a race between mono_threadpool_cleanup
+		 * and mono_threadpool_remove_domain_jobs */
+		return TRUE;
+	}
 
 	domains_lock ();
 
