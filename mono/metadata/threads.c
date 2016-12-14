@@ -1121,6 +1121,10 @@ mono_thread_detach_internal (MonoInternalThread *thread)
 	if (mono_thread_cleanup_fn)
 		mono_thread_cleanup_fn (thread_get_tid (thread));
 
+	/* we don't want the compiler to move operations on thread
+	 * after we unregister the thread->thread_pinning_ref root */
+	mono_memory_barrier ();
+
 	if (mono_gc_is_moving ()) {
 		MONO_GC_UNREGISTER_ROOT (thread->thread_pinning_ref);
 		thread->thread_pinning_ref = NULL;
@@ -3082,32 +3086,33 @@ static void build_wait_tids (gpointer key, gpointer value, gpointer user)
 	}
 }
 
-static gboolean
-remove_and_abort_threads (gpointer key, gpointer value, gpointer user)
+static void
+abort_threads (gpointer key, gpointer value, gpointer user)
 {
 	struct wait_data *wait=(struct wait_data *)user;
-	MonoNativeThreadId self = mono_native_thread_id_get ();
 	MonoInternalThread *thread = (MonoInternalThread *)value;
 
 	if (wait->num >= MONO_W32HANDLE_MAXIMUM_WAIT_OBJECTS)
-		return FALSE;
+		return;
 
-	/* The finalizer thread is not a background thread */
-	if (!mono_native_thread_id_equals (thread_get_tid (thread), self)
-	     && (thread->state & ThreadState_Background) != 0
-	     && (thread->flags & MONO_THREAD_FLAG_DONT_MANAGE) == 0
-	) {
-		wait->handles[wait->num] = mono_threads_open_thread_handle (thread->handle);
-		wait->threads[wait->num] = thread;
-		wait->num++;
+	if (mono_native_thread_id_equals (thread_get_tid (thread), mono_native_thread_id_get ()))
+		return;
+	if (mono_gc_is_finalizer_internal_thread (thread))
+		return;
 
-		THREAD_DEBUG (g_print ("%s: Aborting id: %"G_GSIZE_FORMAT"\n", __func__, (gsize)thread->tid));
-		mono_thread_internal_abort (thread);
-		return TRUE;
+	if (!(thread->state & ThreadState_Background)) {
+		// FIXME we shouldn't have a background thread at this point in time
+		return;
 	}
+	if ((thread->flags & MONO_THREAD_FLAG_DONT_MANAGE))
+		return;
 
-	return !mono_native_thread_id_equals (thread_get_tid (thread), self)
-	        && !mono_gc_is_finalizer_internal_thread (thread);
+	wait->handles[wait->num] = mono_threads_open_thread_handle (thread->handle);
+	wait->threads[wait->num] = thread;
+	wait->num++;
+
+	THREAD_DEBUG (g_print ("%s: Aborting id: %"G_GSIZE_FORMAT"\n", __func__, (gsize)thread->tid));
+	mono_thread_internal_abort (thread);
 }
 
 /** 
@@ -3215,7 +3220,7 @@ void mono_thread_manage (void)
 		wait->num = 0;
 		/*We must zero all InternalThread pointers to avoid making the GC unhappy.*/
 		memset (wait->threads, 0, MONO_W32HANDLE_MAXIMUM_WAIT_OBJECTS * SIZEOF_VOID_P);
-		mono_g_hash_table_foreach_remove (threads, remove_and_abort_threads, wait);
+		mono_g_hash_table_foreach (threads, abort_threads, wait);
 
 		mono_threads_unlock ();
 
