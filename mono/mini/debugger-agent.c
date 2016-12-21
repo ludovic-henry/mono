@@ -1635,7 +1635,13 @@ stop_debugger_thread (void)
 static void
 start_debugger_thread (void)
 {
-	debugger_thread_handle = mono_threads_create_thread (debugger_thread, NULL, NULL, NULL);
+	MonoError error;
+	MonoInternalThread *thread;
+
+	thread = mono_thread_create_internal (mono_get_root_domain (), debugger_thread, NULL, FALSE, FALSE, 0, &error);
+	mono_error_assert_ok (&error);
+
+	debugger_thread_handle = mono_threads_open_thread_handle (thread->handle);
 	g_assert (debugger_thread_handle);
 }
 
@@ -10132,12 +10138,12 @@ debugger_thread (void *arg)
 
 	debugger_thread_id = mono_native_thread_id_get ();
 
-	MonoThread *thread = mono_thread_attach (mono_get_root_domain ());
-	mono_thread_set_name_internal (thread->internal_thread, mono_string_new (mono_get_root_domain (), "Debugger agent"), TRUE, FALSE, &error);
+	MonoInternalThread *internal = mono_thread_internal_current ();
+	mono_thread_set_name_internal (internal, mono_string_new (mono_domain_get (), "Debugger agent"), TRUE, FALSE, &error);
 	mono_error_assert_ok (&error);
 
-	thread->internal_thread->state |= ThreadState_Background;
-	thread->internal_thread->flags |= MONO_THREAD_FLAG_DONT_MANAGE;
+	internal->state |= ThreadState_Background;
+	internal->flags |= MONO_THREAD_FLAG_DONT_MANAGE;
 
 	if (agent_config.defer) {
 		if (!wait_for_attach ()) {

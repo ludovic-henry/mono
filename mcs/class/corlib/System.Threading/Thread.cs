@@ -62,7 +62,7 @@ namespace System.Threading {
 		private int abort_state_handle;
 		/* thread_id is only accessed from unmanaged code */
 		internal Int64 thread_id;
-		private IntPtr stack_ptr;
+		private IntPtr unused1;
 		private UIntPtr static_data; /* GC-tracked */
 		private IntPtr runtime_thread_info;
 		/* current System.Runtime.Remoting.Contexts.Context instance
@@ -95,8 +95,8 @@ namespace System.Threading {
 		 * These fields are used to avoid having to increment corlib versions
 		 * when a new field is added to the unmanaged MonoThread structure.
 		 */
-		private IntPtr unused1;
 		private IntPtr unused2;
+		private IntPtr unused3;
 
 		/* This is used only to check that we are in sync between the representation
 		 * of MonoInternalThread in native and InternalThread in managed

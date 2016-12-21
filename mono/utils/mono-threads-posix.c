@@ -35,70 +35,22 @@ extern int tkill (pid_t tid, int signal);
 
 #include <sys/resource.h>
 
-static void
-reset_priority (pthread_attr_t *attr)
-{
-	struct sched_param param;
-	gint res;
-	gint policy;
-
-	memset (&param, 0, sizeof (param));
-
-	res = pthread_attr_getschedpolicy (attr, &policy);
-	if (res != 0)
-		g_error ("%s: pthread_attr_getschedpolicy failed, error: \"%s\" (%d)", __func__, g_strerror (res), res);
-
-#ifdef _POSIX_PRIORITY_SCHEDULING
-	gint max, min;
-
-	/* Necessary to get valid priority range */
-
-	min = sched_get_priority_min (policy);
-	max = sched_get_priority_max (policy);
-
-	if (max > 0 && min >= 0 && max > min)
-		param.sched_priority = (max - min) / 2 + min;
-	else
-#endif
-	{
-		switch (policy) {
-		case SCHED_FIFO:
-		case SCHED_RR:
-			param.sched_priority = 50;
-			break;
-#ifdef SCHED_BATCH
-		case SCHED_BATCH:
-#endif
-		case SCHED_OTHER:
-			param.sched_priority = 0;
-			break;
-		default:
-			g_warning ("%s: unknown policy %d", __func__, policy);
-			return;
-		}
-	}
-
-	res = pthread_attr_setschedparam (attr, &param);
-	if (res != 0)
-		g_error ("%s: pthread_attr_setschedparam failed, error: \"%s\" (%d)", __func__, g_strerror (res), res);
-}
-
-int
-mono_threads_platform_create_thread (MonoThreadStart thread_fn, gpointer thread_data, gsize* const stack_size, MonoNativeThreadId *out_tid)
+gboolean
+mono_thread_platform_create_thread (MonoThreadStart thread_fn, gpointer thread_data, gsize* const stack_size, MonoNativeThreadId *tid)
 {
 	pthread_attr_t attr;
-	pthread_t thread;
 	gint res;
 	gsize set_stack_size;
 	gsize min_stack_size;
 
+	g_assert (thread_fn);
+	g_assert (stack_size);
+	g_assert (tid);
+
 	res = pthread_attr_init (&attr);
 	g_assert (!res);
 
-	if (stack_size)
-		set_stack_size = *stack_size;
-	else
-		set_stack_size = 0;
+	set_stack_size = *stack_size;
 
 #ifdef HAVE_PTHREAD_ATTR_SETSTACKSIZE
 	if (set_stack_size == 0) {
@@ -121,25 +73,14 @@ mono_threads_platform_create_thread (MonoThreadStart thread_fn, gpointer thread_
 	g_assert (!res);
 #endif /* HAVE_PTHREAD_ATTR_SETSTACKSIZE */
 
-	reset_priority (&attr);
+	res = pthread_attr_getstacksize (&attr, &min_stack_size);
+	if (res != 0)
+		g_error ("%s: pthread_attr_getstacksize failed, error: \"%s\" (%d)", g_strerror (res), res);
 
-	if (stack_size) {
-		res = pthread_attr_getstacksize (&attr, &min_stack_size);
-		if (res != 0)
-			g_error ("%s: pthread_attr_getstacksize failed, error: \"%s\" (%d)", g_strerror (res), res);
-
-		*stack_size = min_stack_size;
-	}
+	*stack_size = min_stack_size;
 
 	/* Actually start the thread */
-	res = mono_gc_pthread_create (&thread, &attr, (gpointer (*)(gpointer)) thread_fn, thread_data);
-	if (res)
-		return -1;
-
-	if (out_tid)
-		*out_tid = thread;
-
-	return 0;
+	return mono_gc_pthread_create (tid, &attr, (gpointer (*)(gpointer)) thread_fn, thread_data) == 0;
 }
 
 void
