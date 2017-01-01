@@ -226,6 +226,19 @@ BOOL mono_w32socket_transmit_file (SOCKET hSocket, gpointer hFile, guint32 nNumb
 }
 #endif /* #if G_HAVE_API_SUPPORT(HAVE_CLASSIC_WINAPI_SUPPORT | HAVE_UWP_WINAPI_SUPPORT) */
 
+gint
+mono_w32socket_set_blocking (SOCKET socket, gboolean blocking)
+{
+	gulong nonblocking_long = !blocking;
+	return ioctlsocket (socket, FIONBIO, &nonblocking_long);
+}
+
+gint
+mono_w32socket_get_available (SOCKET socket, guint64 *amount)
+{
+	return ioctlsocket (sock, FIONREAD, (int*) amount);
+}
+
 void
 mono_w32socket_set_last_error (gint32 error)
 {
