@@ -32,7 +32,6 @@ typedef struct
  * using the bitfield flags method
  */
 #define SIO_GET_EXTENSION_FUNCTION_POINTER 0xC8000006
-#define SIO_KEEPALIVE_VALS 0x98000004
 
 extern void WSASetLastError(int error);
 extern int WSAGetLastError(void);
