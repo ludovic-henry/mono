@@ -104,6 +104,11 @@
 #ifdef HOST_WIN32
 
 static void
+mono_w32socket_intialize (void)
+{
+}
+
+static void
 mono_w32socket_cleanup (void)
 {
 }
@@ -2786,6 +2791,7 @@ void
 mono_network_init (void)
 {
 	mono_networking_init ();
+	mono_w32socket_initialize ();
 }
 
 void

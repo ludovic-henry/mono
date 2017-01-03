@@ -70,6 +70,9 @@ typedef struct {
 #ifndef HOST_WIN32
 
 void
+mono_w32socket_initialize (void);
+
+void
 mono_w32socket_cleanup (void);
 
 #endif
