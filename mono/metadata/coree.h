@@ -16,7 +16,6 @@
 
 #ifdef HOST_WIN32
 
-#include <mono/io-layer/io-layer.h>
 #include <mono/utils/mono-compiler.h>
 #include "image.h"
 

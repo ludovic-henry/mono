@@ -14,7 +14,6 @@
 
 #include <glib.h>
 #include <string.h>
-#include <mono/io-layer/io-layer.h>
 #include <mono/utils/mono-path.h>
 #include "cil-coff.h"
 #include "metadata-internals.h"

@@ -17,7 +17,6 @@
 #include <mono/metadata/environment.h>
 #include <mono/metadata/exception.h>
 #include <mono/utils/mono-compiler.h>
-#include <mono/io-layer/io-layer.h>
 
 extern MonoString* ves_icall_System_Environment_GetOSVersionString (void);
 
