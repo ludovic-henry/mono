@@ -1,25 +1,8 @@
-/*
- * wapi.h:  Public include files
- *
- * Author:
- *	Dick Porter (dick@ximian.com)
- *
- * (C) 2002 Ximian, Inc.
- */
 
-#ifndef _WAPI_WAPI_H_
-#define _WAPI_WAPI_H_
+#ifndef __MONO_UTILS_W32API_H__
+#define __MONO_UTILS_W32API_H__
 
-#include <config.h>
 #include <glib.h>
-
-#ifdef HAVE_DIRENT_H
-#include <dirent.h>
-#endif
-#include <unistd.h>
-#include <utime.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 
 G_BEGIN_DECLS
 
@@ -42,4 +25,4 @@ typedef gpointer HMODULE;
 
 G_END_DECLS
 
-#endif /* _WAPI_WAPI_H_ */
+#endif /* __MONO_UTILS_W32API_H__ */
