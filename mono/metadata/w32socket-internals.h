@@ -151,6 +151,9 @@ mono_w32socket_FD_SET (SOCKET sock, fd_set *set);
 
 #endif /* HAVE_SYS_SELECT_H */
 
+gboolean
+mono_w32socket_close (SOCKET sock);
+
 #endif /* HOST_WIN32 */
 
 gint

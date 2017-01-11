@@ -606,7 +606,7 @@ mono_w32socket_transmit_file (SOCKET sock, gpointer file_handle, TRANSMIT_FILE_B
 	}
 
 	if ((flags & TF_DISCONNECT) == TF_DISCONNECT)
-		CloseHandle (handle);
+		mono_w32handle_close (handle);
 
 	return TRUE;
 }
@@ -1168,6 +1168,12 @@ mono_w32socket_FD_SET (SOCKET sock, fd_set *set)
 }
 
 #endif /* HAVE_SYS_SELECT_H */
+
+gboolean
+mono_w32socket_close (SOCKET sock)
+{
+	return mono_w32handle_close (GINT_TO_POINTER (sock));
+}
 
 gint
 mono_w32socket_set_blocking (SOCKET socket, gboolean blocking)
