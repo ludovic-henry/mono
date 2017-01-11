@@ -1441,7 +1441,7 @@ mono_image_open_full (const char *fname, MonoImageOpenStatus *status, gboolean r
 		fname_utf16 = g_utf8_to_utf16 (absfname, -1, NULL, NULL, NULL);
 		module_handle = MonoLoadImage (fname_utf16);
 		if (status && module_handle == NULL)
-			last_error = GetLastError ();
+			last_error = mono_w32error_get_last ();
 
 		/* mono_image_open_from_module_handle is called by _CorDllMain. */
 		image = g_hash_table_lookup (loaded_images, absfname);
