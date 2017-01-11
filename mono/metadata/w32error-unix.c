@@ -27,7 +27,7 @@ mono_w32error_set_last (guint32 error)
 {
 	gint ret;
 	mono_lazy_initialize (&error_key_once, error_key_init);
-	ret = pthread_setspecific (error_key, GUINT_TO_POINTER (error_key));
+	ret = pthread_setspecific (error_key, GUINT_TO_POINTER (error));
 	g_assert (ret == 0);
 }
 
