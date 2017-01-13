@@ -47,16 +47,6 @@ typedef struct {
 	guint8 Data4[8];
 } GUID;
 
-typedef struct {
-	guint32 Internal;
-	guint32 InternalHigh;
-	guint32 Offset;
-	guint32 OffsetHigh;
-	gpointer hEvent;
-	gpointer handle1;
-	gpointer handle2;
-} OVERLAPPED;
-
 #endif
 
 void

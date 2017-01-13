@@ -973,14 +973,14 @@ mono_w32socket_disconnect (MonoSocket sock, gboolean reuse)
 }
 
 static gboolean
-extension_disconect (MonoSocket sock, OVERLAPPED *overlapped, guint32 flags, guint32 reserved)
+extension_disconect (MonoSocket sock, gpointer overlapped, guint32 flags, guint32 reserved)
 {
 	return mono_w32socket_disconnect (sock, flags & TF_REUSE_SOCKET) == 0;
 }
 
 static gboolean
 extension_transmit_file (MonoSocket sock, gpointer file_handle, guint32 bytes_to_write, guint32 bytes_per_send,
-	OVERLAPPED *ol, TRANSMIT_FILE_BUFFERS *buffers, guint32 flags)
+	gpointer overlapped, TRANSMIT_FILE_BUFFERS *buffers, guint32 flags)
 {
 	return mono_w32socket_transmit_file (sock, file_handle, buffers, flags, FALSE);
 }
