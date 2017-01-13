@@ -103,62 +103,62 @@
 
 #ifdef HOST_WIN32
 
-static SOCKET
+static MonoSocket
 mono_w32socket_socket (int domain, int type, int protocol)
 {
 	return WSASocket (domain, type, protocol, NULL, 0, WSA_FLAG_OVERLAPPED);
 }
 
 static gint
-mono_w32socket_bind (SOCKET sock, struct sockaddr *addr, socklen_t addrlen)
+mono_w32socket_bind (MonoSocket sock, struct sockaddr *addr, socklen_t addrlen)
 {
 	return bind (sock, addr, addrlen);
 }
 
 static gint
-mono_w32socket_getpeername (SOCKET sock, struct sockaddr *name, socklen_t *namelen)
+mono_w32socket_getpeername (MonoSocket sock, struct sockaddr *name, socklen_t *namelen)
 {
 	return getpeername (sock, name, namelen);
 }
 
 static gint
-mono_w32socket_getsockname (SOCKET sock, struct sockaddr *name, socklen_t *namelen)
+mono_w32socket_getsockname (MonoSocket sock, struct sockaddr *name, socklen_t *namelen)
 {
 	return getsockname (sock, name, namelen);
 }
 
 static gint
-mono_w32socket_getsockopt (SOCKET sock, gint level, gint optname, gpointer optval, socklen_t *optlen)
+mono_w32socket_getsockopt (MonoSocket sock, gint level, gint optname, gpointer optval, socklen_t *optlen)
 {
 	return getsockopt (sock, level, optname, optval, optlen);
 }
 
 static gint
-mono_w32socket_setsockopt (SOCKET sock, gint level, gint optname, const gpointer optval, socklen_t optlen)
+mono_w32socket_setsockopt (MonoSocket sock, gint level, gint optname, const gpointer optval, socklen_t optlen)
 {
 	return setsockopt (sock, level, optname, optval, optlen);
 }
 
 static gint
-mono_w32socket_listen (SOCKET sock, gint backlog)
+mono_w32socket_listen (MonoSocket sock, gint backlog)
 {
 	return listen (sock, backlog);
 }
 
 static gint
-mono_w32socket_shutdown (SOCKET sock, gint how)
+mono_w32socket_shutdown (MonoSocket sock, gint how)
 {
 	return shutdown (sock, how);
 }
 
 static gint
-mono_w32socket_ioctl (SOCKET sock, gint32 command, gchar *input, gint inputlen, gchar *output, gint outputlen, glong *written)
+mono_w32socket_ioctl (MonoSocket sock, gint32 command, gchar *input, gint inputlen, gchar *output, gint outputlen, glong *written)
 {
 	return WSAIoctl (sock, command, input, inputlen, output, outputlen, written, NULL, NULL);
 }
 
 static gboolean
-mono_w32socket_close (SOCKET sock)
+mono_w32socket_close (MonoSocket sock)
 {
 	return CloseHandle (sock);
 }
@@ -658,7 +658,7 @@ get_socket_assembly (void)
 gpointer
 ves_icall_System_Net_Sockets_Socket_Socket_internal (MonoObject *this_obj, gint32 family, gint32 type, gint32 proto, gint32 *werror)
 {
-	SOCKET sock;
+	MonoSocket sock;
 	gint32 sock_family;
 	gint32 sock_proto;
 	gint32 sock_type;
@@ -693,7 +693,7 @@ ves_icall_System_Net_Sockets_Socket_Socket_internal (MonoObject *this_obj, gint3
 	return GUINT_TO_POINTER (sock);
 }
 
-/* FIXME: the SOCKET parameter (here and in other functions in this
+/* FIXME: the MonoSocket parameter (here and in other functions in this
  * file) is really an IntPtr which needs to be converted to a guint32.
  */
 void
@@ -708,7 +708,7 @@ ves_icall_System_Net_Sockets_Socket_Close_internal (gsize sock, gint32 *werror)
 	mono_threadpool_io_remove_socket (GPOINTER_TO_INT (sock));
 
 	MONO_ENTER_GC_SAFE;
-	mono_w32socket_close ((SOCKET) sock);
+	mono_w32socket_close ((MonoSocket) sock);
 	MONO_EXIT_GC_SAFE;
 }
 
@@ -754,7 +754,7 @@ gpointer
 ves_icall_System_Net_Sockets_Socket_Accept_internal (gsize sock, gint32 *werror, gboolean blocking)
 {
 	gboolean interrupted;
-	SOCKET newsock;
+	MonoSocket newsock;
 
 	*werror = 0;
 
@@ -1683,8 +1683,8 @@ ves_icall_System_Net_Sockets_Socket_SendTo_internal (gsize sock, MonoArray *buff
 	return ret;
 }
 
-static SOCKET
-Socket_to_SOCKET (MonoObject *sockobj)
+static MonoSocket
+Socket_to_MonoSocket (MonoObject *sockobj)
 {
 	MonoSafeHandle *safe_handle;
 	MonoClassField *field;
@@ -1695,7 +1695,7 @@ Socket_to_SOCKET (MonoObject *sockobj)
 	if (safe_handle == NULL)
 		return -1;
 
-	return (SOCKET)safe_handle->handle;
+	return (MonoSocket)safe_handle->handle;
 }
 
 #define POLL_ERRORS (MONO_POLLERR | MONO_POLLHUP | MONO_POLLNVAL)
@@ -1738,7 +1738,7 @@ ves_icall_System_Net_Sockets_Socket_Select_internal (MonoArray **sockets, gint32
 			return;
 		}
 
-		pfds [idx].fd = Socket_to_SOCKET (obj);
+		pfds [idx].fd = Socket_to_MonoSocket (obj);
 		pfds [idx].events = (mode == 0) ? MONO_POLLIN : (mode == 1) ? MONO_POLLOUT : POLL_ERRORS;
 		idx++;
 	}
