@@ -15,11 +15,12 @@
 
 #include <mono/metadata/object-internals.h>
 
-#define INVALID_SOCKET ((SOCKET)(guint32)(~0))
+#ifdef HOST_WIN32
+typedef SOCKET MonoSocket;
+#else
+typedef gint MonoSocket;
+#define INVALID_SOCKET (-1)
 #define SOCKET_ERROR (-1)
-
-#ifndef HOST_WIN32
-typedef gint SOCKET;
 #endif
 
 /* This is a copy of System.Net.Sockets.SocketType */

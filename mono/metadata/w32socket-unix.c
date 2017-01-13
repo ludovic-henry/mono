@@ -147,14 +147,14 @@ mono_w32socket_cleanup (void)
 	in_cleanup = 0;
 }
 
-SOCKET
-mono_w32socket_accept (SOCKET sock, struct sockaddr *addr, socklen_t *addrlen, gboolean blocking)
+MonoSocket
+mono_w32socket_accept (MonoSocket sock, struct sockaddr *addr, socklen_t *addrlen, gboolean blocking)
 {
 	gpointer handle;
 	gpointer new_handle;
 	MonoW32HandleSocket *socket_handle;
 	MonoW32HandleSocket new_socket_handle;
-	SOCKET new_fd;
+	MonoSocket new_fd;
 	MonoThreadInfo *info;
 
 	if (addr != NULL && *addrlen < sizeof(struct sockaddr)) {
@@ -211,7 +211,7 @@ mono_w32socket_accept (SOCKET sock, struct sockaddr *addr, socklen_t *addrlen, g
 }
 
 int
-mono_w32socket_connect (SOCKET sock, const struct sockaddr *addr, int addrlen, gboolean blocking)
+mono_w32socket_connect (MonoSocket sock, const struct sockaddr *addr, int addrlen, gboolean blocking)
 {
 	gpointer handle;
 	MonoW32HandleSocket *socket_handle;
@@ -293,13 +293,13 @@ mono_w32socket_connect (SOCKET sock, const struct sockaddr *addr, int addrlen, g
 }
 
 int
-mono_w32socket_recv (SOCKET sock, char *buf, int len, int flags, gboolean blocking)
+mono_w32socket_recv (MonoSocket sock, char *buf, int len, int flags, gboolean blocking)
 {
 	return mono_w32socket_recvfrom (sock, buf, len, flags, NULL, 0, blocking);
 }
 
 int
-mono_w32socket_recvfrom (SOCKET sock, char *buf, int len, int flags, struct sockaddr *from, socklen_t *fromlen, gboolean blocking)
+mono_w32socket_recvfrom (MonoSocket sock, char *buf, int len, int flags, struct sockaddr *from, socklen_t *fromlen, gboolean blocking)
 {
 	gpointer handle;
 	MonoW32HandleSocket *socket_handle;
@@ -373,7 +373,7 @@ msghdr_iov_free (struct msghdr *hdr)
 }
 
 int
-mono_w32socket_recvbuffers (SOCKET sock, WSABUF *buffers, guint32 count, guint32 *received, guint32 *flags, gpointer overlapped, gpointer complete, gboolean blocking)
+mono_w32socket_recvbuffers (MonoSocket sock, WSABUF *buffers, guint32 count, guint32 *received, guint32 *flags, gpointer overlapped, gpointer complete, gboolean blocking)
 {
 	MonoW32HandleSocket *socket_handle;
 	MonoThreadInfo *info;
@@ -422,7 +422,7 @@ mono_w32socket_recvbuffers (SOCKET sock, WSABUF *buffers, guint32 count, guint32
 }
 
 int
-mono_w32socket_send (SOCKET sock, char *buf, int len, int flags, gboolean blocking)
+mono_w32socket_send (MonoSocket sock, char *buf, int len, int flags, gboolean blocking)
 {
 	gpointer handle;
 	int ret;
@@ -460,7 +460,7 @@ mono_w32socket_send (SOCKET sock, char *buf, int len, int flags, gboolean blocki
 }
 
 int
-mono_w32socket_sendto (SOCKET sock, const char *buf, int len, int flags, const struct sockaddr *to, int tolen, gboolean blocking)
+mono_w32socket_sendto (MonoSocket sock, const char *buf, int len, int flags, const struct sockaddr *to, int tolen, gboolean blocking)
 {
 	gpointer handle;
 	int ret;
@@ -488,7 +488,7 @@ mono_w32socket_sendto (SOCKET sock, const char *buf, int len, int flags, const s
 }
 
 int
-mono_w32socket_sendbuffers (SOCKET sock, WSABUF *buffers, guint32 count, guint32 *sent, guint32 flags, gpointer overlapped, gpointer complete, gboolean blocking)
+mono_w32socket_sendbuffers (MonoSocket sock, WSABUF *buffers, guint32 count, guint32 *sent, guint32 flags, gpointer overlapped, gpointer complete, gboolean blocking)
 {
 	struct msghdr hdr;
 	MonoThreadInfo *info;
@@ -528,7 +528,7 @@ mono_w32socket_sendbuffers (SOCKET sock, WSABUF *buffers, guint32 count, guint32
 #define SF_BUFFER_SIZE	16384
 
 BOOL
-mono_w32socket_transmit_file (SOCKET sock, gpointer file_handle, TRANSMIT_FILE_BUFFERS *buffers, guint32 flags, gboolean blocking)
+mono_w32socket_transmit_file (MonoSocket sock, gpointer file_handle, TRANSMIT_FILE_BUFFERS *buffers, guint32 flags, gboolean blocking)
 {
 	MonoThreadInfo *info;
 	gpointer handle;
@@ -612,12 +612,12 @@ mono_w32socket_transmit_file (SOCKET sock, gpointer file_handle, TRANSMIT_FILE_B
 	return TRUE;
 }
 
-SOCKET
+MonoSocket
 mono_w32socket_socket (int domain, int type, int protocol)
 {
 	MonoW32HandleSocket socket_handle = {0};
 	gpointer handle;
-	SOCKET sock;
+	MonoSocket sock;
 
 	socket_handle.domain = domain;
 	socket_handle.type = type;
@@ -693,7 +693,7 @@ mono_w32socket_socket (int domain, int type, int protocol)
 }
 
 gint
-mono_w32socket_bind (SOCKET sock, struct sockaddr *addr, socklen_t addrlen)
+mono_w32socket_bind (MonoSocket sock, struct sockaddr *addr, socklen_t addrlen)
 {
 	gpointer handle;
 	int ret;
@@ -716,7 +716,7 @@ mono_w32socket_bind (SOCKET sock, struct sockaddr *addr, socklen_t addrlen)
 }
 
 gint
-mono_w32socket_getpeername (SOCKET sock, struct sockaddr *name, socklen_t *namelen)
+mono_w32socket_getpeername (MonoSocket sock, struct sockaddr *name, socklen_t *namelen)
 {
 	gpointer handle;
 	gint ret;
@@ -739,7 +739,7 @@ mono_w32socket_getpeername (SOCKET sock, struct sockaddr *name, socklen_t *namel
 }
 
 gint
-mono_w32socket_getsockname (SOCKET sock, struct sockaddr *name, socklen_t *namelen)
+mono_w32socket_getsockname (MonoSocket sock, struct sockaddr *name, socklen_t *namelen)
 {
 	gpointer handle;
 	gint ret;
@@ -762,7 +762,7 @@ mono_w32socket_getsockname (SOCKET sock, struct sockaddr *name, socklen_t *namel
 }
 
 gint
-mono_w32socket_getsockopt (SOCKET sock, gint level, gint optname, gpointer optval, socklen_t *optlen)
+mono_w32socket_getsockopt (MonoSocket sock, gint level, gint optname, gpointer optval, socklen_t *optlen)
 {
 	gpointer handle;
 	gint ret;
@@ -809,7 +809,7 @@ mono_w32socket_getsockopt (SOCKET sock, gint level, gint optname, gpointer optva
 }
 
 gint
-mono_w32socket_setsockopt (SOCKET sock, gint level, gint optname, const gpointer optval, socklen_t optlen)
+mono_w32socket_setsockopt (MonoSocket sock, gint level, gint optname, const gpointer optval, socklen_t optlen)
 {
 	gpointer handle;
 	gint ret;
@@ -874,7 +874,7 @@ mono_w32socket_setsockopt (SOCKET sock, gint level, gint optname, const gpointer
 }
 
 gint
-mono_w32socket_listen (SOCKET sock, gint backlog)
+mono_w32socket_listen (MonoSocket sock, gint backlog)
 {
 	gpointer handle;
 	gint ret;
@@ -897,7 +897,7 @@ mono_w32socket_listen (SOCKET sock, gint backlog)
 }
 
 gint
-mono_w32socket_shutdown (SOCKET sock, gint how)
+mono_w32socket_shutdown (MonoSocket sock, gint how)
 {
 	MonoW32HandleSocket *socket_handle;
 	gpointer handle;
@@ -924,11 +924,11 @@ mono_w32socket_shutdown (SOCKET sock, gint how)
 }
 
 gint
-mono_w32socket_disconnect (SOCKET sock, gboolean reuse)
+mono_w32socket_disconnect (MonoSocket sock, gboolean reuse)
 {
 	MonoW32HandleSocket *socket_handle;
 	gpointer handle;
-	SOCKET newsock;
+	MonoSocket newsock;
 	gint ret;
 
 	mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_IO_LAYER, "%s: called on socket %d!", __func__, sock);
@@ -972,13 +972,13 @@ mono_w32socket_disconnect (SOCKET sock, gboolean reuse)
 }
 
 static gboolean
-extension_disconect (SOCKET sock, OVERLAPPED *overlapped, guint32 flags, guint32 reserved)
+extension_disconect (MonoSocket sock, OVERLAPPED *overlapped, guint32 flags, guint32 reserved)
 {
 	return mono_w32socket_disconnect (sock, flags & TF_REUSE_SOCKET) == 0;
 }
 
 static gboolean
-extension_transmit_file (SOCKET sock, gpointer file_handle, guint32 bytes_to_write, guint32 bytes_per_send,
+extension_transmit_file (MonoSocket sock, gpointer file_handle, guint32 bytes_to_write, guint32 bytes_per_send,
 	OVERLAPPED *ol, TRANSMIT_FILE_BUFFERS *buffers, guint32 flags)
 {
 	return mono_w32socket_transmit_file (sock, file_handle, buffers, flags, FALSE);
@@ -994,7 +994,7 @@ static struct {
 };
 
 gint
-mono_w32socket_ioctl (SOCKET sock, gint32 command, gchar *input, gint inputlen, gchar *output, gint outputlen, glong *written)
+mono_w32socket_ioctl (MonoSocket sock, gint32 command, gchar *input, gint inputlen, gchar *output, gint outputlen, glong *written)
 {
 	gpointer handle;
 	gint ret;
@@ -1112,7 +1112,7 @@ mono_w32socket_select (gint nfds, fd_set *readfds, fd_set *writefds, fd_set *exc
 }
 
 void
-mono_w32socket_FD_CLR (SOCKET sock, fd_set *set)
+mono_w32socket_FD_CLR (MonoSocket sock, fd_set *set)
 {
 	gpointer handle;
 
@@ -1131,7 +1131,7 @@ mono_w32socket_FD_CLR (SOCKET sock, fd_set *set)
 }
 
 gint
-mono_w32socket_FD_ISSET (SOCKET sock, fd_set *set)
+mono_w32socket_FD_ISSET (MonoSocket sock, fd_set *set)
 {
 	gpointer handle;
 
@@ -1150,7 +1150,7 @@ mono_w32socket_FD_ISSET (SOCKET sock, fd_set *set)
 }
 
 void
-mono_w32socket_FD_SET (SOCKET sock, fd_set *set)
+mono_w32socket_FD_SET (MonoSocket sock, fd_set *set)
 {
 	gpointer handle;
 
@@ -1171,13 +1171,13 @@ mono_w32socket_FD_SET (SOCKET sock, fd_set *set)
 #endif /* HAVE_SYS_SELECT_H */
 
 gboolean
-mono_w32socket_close (SOCKET sock)
+mono_w32socket_close (MonoSocket sock)
 {
 	return mono_w32handle_close (GINT_TO_POINTER (sock));
 }
 
 gint
-mono_w32socket_set_blocking (SOCKET socket, gboolean blocking)
+mono_w32socket_set_blocking (MonoSocket socket, gboolean blocking)
 {
 	gint ret;
 	gpointer handle;
@@ -1208,7 +1208,7 @@ mono_w32socket_set_blocking (SOCKET socket, gboolean blocking)
 }
 
 gint
-mono_w32socket_get_available (SOCKET socket, guint64 *amount)
+mono_w32socket_get_available (MonoSocket socket, guint64 *amount)
 {
 	gint ret;
 	gpointer handle;

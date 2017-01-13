@@ -23,13 +23,13 @@
 
 #define LOGDEBUG(...)  
 
-static gboolean set_blocking (SOCKET sock, gboolean block)
+static gboolean set_blocking (MonoSocket sock, gboolean block)
 {
 	u_long non_block = block ? 0 : 1;
 	return ioctlsocket (sock, FIONBIO, &non_block) != SOCKET_ERROR;
 }
 
-static DWORD get_socket_timeout (SOCKET sock, int optname)
+static DWORD get_socket_timeout (MonoSocket sock, int optname)
 {
 	DWORD timeout = 0;
 	int optlen = sizeof (DWORD);
@@ -50,7 +50,7 @@ static DWORD get_socket_timeout (SOCKET sock, int optname)
 * fired but with an error WSASetLastError() is called to set the error and the
 * function returns FALSE.
 */
-static gboolean alertable_socket_wait (SOCKET sock, int event_bit)
+static gboolean alertable_socket_wait (MonoSocket sock, int event_bit)
 {
 	static char *EVENT_NAMES[] = { "FD_READ", "FD_WRITE", NULL /*FD_OOB*/, "FD_ACCEPT", "FD_CONNECT", "FD_CLOSE" };
 	gboolean success = FALSE;
@@ -120,17 +120,17 @@ static gboolean alertable_socket_wait (SOCKET sock, int event_bit)
 		blocking ? "blocking" : "non-blocking", sock, ret, _saved_error)); \
 	WSASetLastError (_saved_error);
 
-SOCKET mono_w32socket_accept (SOCKET s, struct sockaddr *addr, socklen_t *addrlen, gboolean blocking)
+MonoSocket mono_w32socket_accept (MonoSocket s, struct sockaddr *addr, socklen_t *addrlen, gboolean blocking)
 {
 	MonoInternalThread *curthread = mono_thread_internal_current ();
-	SOCKET newsock = INVALID_SOCKET;
+	MonoSocket newsock = INVALID_SOCKET;
 	curthread->interrupt_on_stop = (gpointer)TRUE;
 	ALERTABLE_SOCKET_CALL (FD_ACCEPT_BIT, blocking, TRUE, newsock, accept, s, addr, addrlen);
 	curthread->interrupt_on_stop = (gpointer)FALSE;
 	return newsock;
 }
 
-int mono_w32socket_connect (SOCKET s, const struct sockaddr *name, int namelen, gboolean blocking)
+int mono_w32socket_connect (MonoSocket s, const struct sockaddr *name, int namelen, gboolean blocking)
 {
 	int ret = SOCKET_ERROR;
 	ALERTABLE_SOCKET_CALL (FD_CONNECT_BIT, blocking, FALSE, ret, connect, s, name, namelen);
@@ -138,7 +138,7 @@ int mono_w32socket_connect (SOCKET s, const struct sockaddr *name, int namelen, 
 	return ret;
 }
 
-int mono_w32socket_recv (SOCKET s, char *buf, int len, int flags, gboolean blocking)
+int mono_w32socket_recv (MonoSocket s, char *buf, int len, int flags, gboolean blocking)
 {
 	MonoInternalThread *curthread = mono_thread_internal_current ();
 	int ret = SOCKET_ERROR;
@@ -148,35 +148,35 @@ int mono_w32socket_recv (SOCKET s, char *buf, int len, int flags, gboolean block
 	return ret;
 }
 
-int mono_w32socket_recvfrom (SOCKET s, char *buf, int len, int flags, struct sockaddr *from, socklen_t *fromlen, gboolean blocking)
+int mono_w32socket_recvfrom (MonoSocket s, char *buf, int len, int flags, struct sockaddr *from, socklen_t *fromlen, gboolean blocking)
 {
 	int ret = SOCKET_ERROR;
 	ALERTABLE_SOCKET_CALL (FD_READ_BIT, blocking, TRUE, ret, recvfrom, s, buf, len, flags, from, fromlen);
 	return ret;
 }
 
-int mono_w32socket_recvbuffers (SOCKET s, WSABUF *lpBuffers, guint32 dwBufferCount, guint32 *lpNumberOfBytesRecvd, guint32 *lpFlags, gpointer lpOverlapped, gpointer lpCompletionRoutine, gboolean blocking)
+int mono_w32socket_recvbuffers (MonoSocket s, WSABUF *lpBuffers, guint32 dwBufferCount, guint32 *lpNumberOfBytesRecvd, guint32 *lpFlags, gpointer lpOverlapped, gpointer lpCompletionRoutine, gboolean blocking)
 {
 	int ret = SOCKET_ERROR;
 	ALERTABLE_SOCKET_CALL (FD_READ_BIT, blocking, TRUE, ret, WSARecv, s, lpBuffers, dwBufferCount, lpNumberOfBytesRecvd, lpFlags, lpOverlapped, lpCompletionRoutine);
 	return ret;
 }
 
-int mono_w32socket_send (SOCKET s, char *buf, int len, int flags, gboolean blocking)
+int mono_w32socket_send (MonoSocket s, char *buf, int len, int flags, gboolean blocking)
 {
 	int ret = SOCKET_ERROR;
 	ALERTABLE_SOCKET_CALL (FD_WRITE_BIT, blocking, FALSE, ret, send, s, buf, len, flags);
 	return ret;
 }
 
-int mono_w32socket_sendto (SOCKET s, const char *buf, int len, int flags, const struct sockaddr *to, int tolen, gboolean blocking)
+int mono_w32socket_sendto (MonoSocket s, const char *buf, int len, int flags, const struct sockaddr *to, int tolen, gboolean blocking)
 {
 	int ret = SOCKET_ERROR;
 	ALERTABLE_SOCKET_CALL (FD_WRITE_BIT, blocking, FALSE, ret, sendto, s, buf, len, flags, to, tolen);
 	return ret;
 }
 
-int mono_w32socket_sendbuffers (SOCKET s, WSABUF *lpBuffers, guint32 dwBufferCount, guint32 *lpNumberOfBytesRecvd, guint32 lpFlags, gpointer lpOverlapped, gpointer lpCompletionRoutine, gboolean blocking)
+int mono_w32socket_sendbuffers (MonoSocket s, WSABUF *lpBuffers, guint32 dwBufferCount, guint32 *lpNumberOfBytesRecvd, guint32 lpFlags, gpointer lpOverlapped, gpointer lpCompletionRoutine, gboolean blocking)
 {
 	int ret = SOCKET_ERROR;
 	ALERTABLE_SOCKET_CALL (FD_WRITE_BIT, blocking, FALSE, ret, WSASend, s, lpBuffers, dwBufferCount, lpNumberOfBytesRecvd, lpFlags, lpOverlapped, lpCompletionRoutine);
@@ -184,7 +184,7 @@ int mono_w32socket_sendbuffers (SOCKET s, WSABUF *lpBuffers, guint32 dwBufferCou
 }
 
 #if G_HAVE_API_SUPPORT(HAVE_CLASSIC_WINAPI_SUPPORT | HAVE_UWP_WINAPI_SUPPORT)
-BOOL mono_w32socket_transmit_file (SOCKET hSocket, gpointer hFile, TRANSMIT_FILE_BUFFERS *lpTransmitBuffers, guint32 dwReserved, gboolean blocking)
+BOOL mono_w32socket_transmit_file (MonoSocket hSocket, gpointer hFile, TRANSMIT_FILE_BUFFERS *lpTransmitBuffers, guint32 dwReserved, gboolean blocking)
 {
 	LOGDEBUG (g_message ("%06d - Performing %s TransmitFile () on socket %d", GetCurrentThreadId (), blocking ? "blocking" : "non-blocking", hSocket));
 
@@ -226,7 +226,7 @@ BOOL mono_w32socket_transmit_file (SOCKET hSocket, gpointer hFile, TRANSMIT_FILE
 #endif /* #if G_HAVE_API_SUPPORT(HAVE_CLASSIC_WINAPI_SUPPORT | HAVE_UWP_WINAPI_SUPPORT) */
 
 gint
-mono_w32socket_disconnect (SOCKET sock, gboolean reuse)
+mono_w32socket_disconnect (MonoSocket sock, gboolean reuse)
 {
 	GUID guid;
 	LPFN_DISCONNECTEX disconnect;
@@ -269,14 +269,14 @@ mono_w32socket_disconnect (SOCKET sock, gboolean reuse)
 }
 
 gint
-mono_w32socket_set_blocking (SOCKET socket, gboolean blocking)
+mono_w32socket_set_blocking (MonoSocket socket, gboolean blocking)
 {
 	gulong nonblocking_long = !blocking;
 	return ioctlsocket (socket, FIONBIO, &nonblocking_long);
 }
 
 gint
-mono_w32socket_get_available (SOCKET socket, guint64 *amount)
+mono_w32socket_get_available (MonoSocket socket, guint64 *amount)
 {
 	return ioctlsocket (sock, FIONREAD, (int*) amount);
 }
