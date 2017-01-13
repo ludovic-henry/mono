@@ -50,19 +50,6 @@ typedef struct {
 	guint8 Data4[8];
 } GUID;
 
-typedef struct {
-	guint32 Internal;
-	guint32 InternalHigh;
-	guint32 Offset;
-	guint32 OffsetHigh;
-	gpointer hEvent;
-	gpointer handle1;
-	gpointer handle2;
-} OVERLAPPED;
-
-typedef BOOL (WINAPI *LPFN_DISCONNECTEX)(MonoSocket, OVERLAPPED*, guint32, guint32);
-typedef BOOL (WINAPI *LPFN_TRANSMITFILE)(MonoSocket, HANDLE, guint32, guint32, OVERLAPPED*, TRANSMIT_FILE_BUFFERS*, guint32);
-
 #endif
 
 #ifndef HOST_WIN32
