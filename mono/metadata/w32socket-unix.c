@@ -985,6 +985,13 @@ extension_transmit_file (MonoSocket sock, gpointer file_handle, guint32 bytes_to
 	return mono_w32socket_transmit_file (sock, file_handle, buffers, flags, FALSE);
 }
 
+typedef struct {
+	guint32 Data1;
+	guint16 Data2;
+	guint16 Data3;
+	guint8 Data4[8];
+} GUID;
+
 static struct {
 	GUID guid;
 	gpointer func;

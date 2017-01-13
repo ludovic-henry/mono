@@ -40,13 +40,6 @@ typedef struct {
 	guint32 TailLength;
 } TRANSMIT_FILE_BUFFERS, *LPTRANSMIT_FILE_BUFFERS;
 
-typedef struct {
-	guint32 Data1;
-	guint16 Data2;
-	guint16 Data3;
-	guint8 Data4[8];
-} GUID;
-
 #endif
 
 void
