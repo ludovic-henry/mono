@@ -72,7 +72,6 @@ type_is_fd (MonoW32HandleType type)
 	switch (type) {
 	case MONO_W32HANDLE_FILE:
 	case MONO_W32HANDLE_CONSOLE:
-	case MONO_W32HANDLE_SOCKET:
 	case MONO_W32HANDLE_PIPE:
 		return TRUE;
 	default:
@@ -701,15 +700,6 @@ mono_w32handle_unref (gpointer handle)
 	destroy = mono_w32handle_unref_core (handle, handle_data);
 	if (destroy)
 		w32handle_destroy (handle);
-}
-
-static void
-mono_w32handle_ops_close (gpointer handle, gpointer data);
-
-void
-mono_w32handle_force_close (gpointer handle, gpointer data)
-{
-	mono_w32handle_ops_close (handle, data);
 }
 
 void

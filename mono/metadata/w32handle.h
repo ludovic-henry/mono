@@ -23,11 +23,9 @@ typedef enum {
 	MONO_W32HANDLE_UNUSED = 0,
 	MONO_W32HANDLE_FILE,
 	MONO_W32HANDLE_CONSOLE,
-	MONO_W32HANDLE_THREAD,
 	MONO_W32HANDLE_SEM,
 	MONO_W32HANDLE_MUTEX,
 	MONO_W32HANDLE_EVENT,
-	MONO_W32HANDLE_SOCKET,
 	MONO_W32HANDLE_FIND,
 	MONO_W32HANDLE_PROCESS,
 	MONO_W32HANDLE_PIPE,
@@ -142,9 +140,6 @@ mono_w32handle_register_capabilities (MonoW32HandleType type, MonoW32HandleCapab
 
 gboolean
 mono_w32handle_test_capabilities (gpointer handle, MonoW32HandleCapability caps);
-
-void
-mono_w32handle_force_close (gpointer handle, gpointer data);
 
 void
 mono_w32handle_set_signal_state (gpointer handle, gboolean state, gboolean broadcast);
