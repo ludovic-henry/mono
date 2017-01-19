@@ -44,7 +44,12 @@ namespace System.Net.Sockets {
 		{
 			int error = 0;
 
-			Socket.Blocking_internal (handle, false, out error);
+			try {
+				Mono.PAL.Sockets.SetBlocking (handle, false);
+			} catch (SocketException e) {
+				error = (int) e.SocketErrorCode;
+			}
+
 #if FULL_AOT_DESKTOP
 			/* It's only for platforms that do not have working syscall abort mechanism, like WatchOS and TvOS */
 			Socket.Shutdown_internal (handle, SocketShutdown.Both, out error);

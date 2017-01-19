@@ -153,10 +153,6 @@ namespace System.Net.Sockets
 			}
 		}
 
-		/* Creates a new system socket, returning the handle */
-		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		extern IntPtr Socket_internal (AddressFamily family, SocketType type, ProtocolType proto, out int error);
-
 #endregion
 
 #region Properties
@@ -165,31 +161,9 @@ namespace System.Net.Sockets
 			get {
 				ThrowIfDisposedAndClosed ();
 
-				int ret, error;
-				ret = Available_internal (m_Handle, out error);
-
-				if (error != 0)
-					throw new SocketException (error);
-
-				return ret;
+				return Mono.PAL.Sockets.GetAvailable (m_Handle);
 			}
 		}
-
-		static int Available_internal (SafeSocketHandle safeHandle, out int error)
-		{
-			bool release = false;
-			try {
-				safeHandle.DangerousAddRef (ref release);
-				return Available_internal (safeHandle.DangerousGetHandle (), out error);
-			} finally {
-				if (release)
-					safeHandle.DangerousRelease ();
-			}
-		}
-
-		/* Returns the amount of data waiting to be read on socket */
-		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		extern static int Available_internal (IntPtr socket, out int error);
 
 		// FIXME: import from referencesource
 		public bool EnableBroadcast {
@@ -273,61 +247,20 @@ namespace System.Net.Sockets
 				if (seed_endpoint == null)
 					return null;
 
-				int error;
-				SocketAddress sa = LocalEndPoint_internal (m_Handle, (int) addressFamily, out error);
-
-				if (error != 0)
-					throw new SocketException (error);
-
-				return seed_endpoint.Create (sa);
+				return seed_endpoint.Create (Mono.PAL.Sockets.GetLocalEndPoint (m_Handle, addressFamily));
 			}
 		}
-
-		static SocketAddress LocalEndPoint_internal (SafeSocketHandle safeHandle, int family, out int error)
-		{
-			bool release = false;
-			try {
-				safeHandle.DangerousAddRef (ref release);
-				return LocalEndPoint_internal (safeHandle.DangerousGetHandle (), family, out error);
-			} finally {
-				if (release)
-					safeHandle.DangerousRelease ();
-			}
-		}
-
-		/* Returns the local endpoint details in addr and port */
-		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		extern static SocketAddress LocalEndPoint_internal (IntPtr socket, int family, out int error);
 
 		public bool Blocking {
 			get { return is_blocking; }
 			set {
 				ThrowIfDisposedAndClosed ();
 
-				int error;
-				Blocking_internal (m_Handle, value, out error);
-
-				if (error != 0)
-					throw new SocketException (error);
+				Mono.PAL.Sockets.SetBlocking (m_Handle, value);
 
 				is_blocking = value;
 			}
 		}
-
-		static void Blocking_internal (SafeSocketHandle safeHandle, bool block, out int error)
-		{
-			bool release = false;
-			try {
-				safeHandle.DangerousAddRef (ref release);
-				Blocking_internal (safeHandle.DangerousGetHandle (), block, out error);
-			} finally {
-				if (release)
-					safeHandle.DangerousRelease ();
-			}
-		}
-
-		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		internal extern static void Blocking_internal(IntPtr socket, bool block, out int error);
 
 		public bool Connected {
 			get { return is_connected; }
@@ -359,31 +292,9 @@ namespace System.Net.Sockets
 				if (!is_connected || seed_endpoint == null)
 					return null;
 
-				int error;
-				SocketAddress sa = RemoteEndPoint_internal (m_Handle, (int) addressFamily, out error);
-
-				if (error != 0)
-					throw new SocketException (error);
-
-				return seed_endpoint.Create (sa);
+				return seed_endpoint.Create (Mono.PAL.Sockets.GetRemoteEndPoint (m_Handle, addressFamily));
 			}
 		}
-
-		static SocketAddress RemoteEndPoint_internal (SafeSocketHandle safeHandle, int family, out int error)
-		{
-			bool release = false;
-			try {
-				safeHandle.DangerousAddRef (ref release);
-				return RemoteEndPoint_internal (safeHandle.DangerousGetHandle (), family, out error);
-			} finally {
-				if (release)
-					safeHandle.DangerousRelease ();
-			}
-		}
-
-		/* Returns the remote endpoint details in addr and port */
-		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		extern static SocketAddress RemoteEndPoint_internal (IntPtr socket, int family, out int error);
 
 #endregion
 
@@ -519,13 +430,14 @@ namespace System.Net.Sockets
 		{
 			ThrowIfDisposedAndClosed ();
 
-			int error = 0;
-			SafeSocketHandle safe_handle = Accept_internal (this.m_Handle, out error, is_blocking);
-
-			if (error != 0) {
+			SafeSocketHandle safe_handle;
+			try {
+				safe_handle = Mono.PAL.Sockets.Accept (this.m_Handle, is_blocking);
+			} catch (SocketException) {
 				if (is_closed)
-					error = SOCKET_CLOSED_CODE;
-				throw new SocketException(error);
+					throw new SocketException (SocketError.Interrupted);
+
+				throw;
 			}
 
 			Socket accepted = new Socket (this.AddressFamily, this.SocketType, this.ProtocolType, safe_handle) {
@@ -540,13 +452,14 @@ namespace System.Net.Sockets
 		{
 			ThrowIfDisposedAndClosed ();
 
-			int error = 0;
-			SafeSocketHandle safe_handle = Accept_internal (this.m_Handle, out error, is_blocking);
-
-			if (error != 0) {
+			SafeSocketHandle safe_handle;
+			try {
+				safe_handle = Mono.PAL.Sockets.Accept (this.m_Handle, is_blocking);
+			} catch (SocketException) {
 				if (is_closed)
-					error = SOCKET_CLOSED_CODE;
-				throw new SocketException (error);
+					throw new SocketException (SocketError.Interrupted);
+
+				throw;
 			}
 
 			acceptSocket.addressFamily = this.AddressFamily;
@@ -733,21 +646,6 @@ namespace System.Net.Sockets
 			return sockares.AcceptedSocket;
 		}
 
-		static SafeSocketHandle Accept_internal (SafeSocketHandle safeHandle, out int error, bool blocking)
-		{
-			try {
-				safeHandle.RegisterForBlockingSyscall ();
-				var ret = Accept_internal (safeHandle.DangerousGetHandle (), out error, blocking);
-				return new SafeSocketHandle (ret, true);
-			} finally {
-				safeHandle.UnRegisterForBlockingSyscall ();
-			}
-		}
-
-		/* Creates a new system socket, returning the handle */
-		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		extern static IntPtr Accept_internal (IntPtr sock, out int error, bool blocking);
-
 #endregion
 
 #region Bind
@@ -766,34 +664,13 @@ namespace System.Net.Sockets
 			if (ipEndPoint != null) {
 				localEP = RemapIPEndPoint (ipEndPoint);	
 			}
-			
-			int error;
-			Bind_internal (m_Handle, localEP.Serialize(), out error);
+		
+			Mono.PAL.Sockets.Bind (m_Handle, localEP.Serialize ());
 
-			if (error != 0)
-				throw new SocketException (error);
-			if (error == 0)
-				is_bound = true;
-
+			is_bound = true;
 			seed_endpoint = localEP;
 #endif // FEATURE_NO_BSD_SOCKETS
 		}
-
-		private static void Bind_internal (SafeSocketHandle safeHandle, SocketAddress sa, out int error)
-		{
-			bool release = false;
-			try {
-				safeHandle.DangerousAddRef (ref release);
-				Bind_internal (safeHandle.DangerousGetHandle (), sa, out error);
-			} finally {
-				if (release)
-					safeHandle.DangerousRelease ();
-			}
-		}
-
-		// Creates a new system socket, returning the handle
-		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		private extern static void Bind_internal(IntPtr sock, SocketAddress sa, out int error);
 
 #endregion
 
@@ -867,17 +744,22 @@ namespace System.Net.Sockets
 
 			SocketAddress serial = remoteEP.Serialize ();
 
-			int error = 0;
-			Connect_internal (m_Handle, serial, out error, is_blocking);
+			try {
+				Mono.PAL.Sockets.Connect (m_Handle, serial, is_blocking);
+			} catch (SocketException e) {
+				if (e.SocketErrorCode == SocketError.WouldBlock) {
+					/* Keep the ep around for non-blocking sockets */
+					seed_endpoint = remoteEP;
+				}
 
-			if (error == 0 || error == 10035)
-				seed_endpoint = remoteEP; // Keep the ep around for non-blocking sockets
-
-			if (error != 0) {
 				if (is_closed)
-					error = SOCKET_CLOSED_CODE;
-				throw new SocketException (error);
+					throw new SocketException (SocketError.Interrupted);
+
+				throw;
 			}
+
+			/* Keep the ep around for non-blocking sockets */
+			seed_endpoint = remoteEP;
 
 			is_connected = !(socketType == SocketType.Dgram && ep != null && (ep.Address.Equals (IPAddress.Any) || ep.Address.Equals (IPAddress.IPv6Any)));
 			is_bound = true;
@@ -988,40 +870,40 @@ namespace System.Net.Sockets
 				end_point = RemapIPEndPoint (ep);
 			}
 
-			int error = 0;
-
 			if (connect_in_progress) {
 				// This could happen when multiple IPs are used
 				// Calling connect() again will reset the connection attempt and cause
 				// an error. Better to just close the socket and move on.
 				connect_in_progress = false;
 				m_Handle.Dispose ();
-				m_Handle = new SafeSocketHandle (Socket_internal (addressFamily, socketType, protocolType, out error), true);
-				if (error != 0)
-					throw new SocketException (error);
+				m_Handle = Mono.PAL.Sockets.Socket (addressFamily, socketType, protocolType);
 			}
 
-			bool blk = is_blocking;
-			if (blk)
-				Blocking = false;
-			Connect_internal (m_Handle, end_point.Serialize (), out error, false);
-			if (blk)
-				Blocking = true;
+			try {
+				bool blk = is_blocking;
+				if (blk)
+					Blocking = false;
 
-			if (error == 0) {
+				try {
+					Mono.PAL.Sockets.Connect (m_Handle, end_point.Serialize (), false);
+				} finally {
+					if (blk)
+						Blocking = true;
+				}
+
 				// succeeded synch
 				is_connected = true;
 				is_bound = true;
 				sockares.Complete (true);
 				return sockares;
-			}
-
-			if (error != (int) SocketError.InProgress && error != (int) SocketError.WouldBlock) {
-				// error synch
-				is_connected = false;
-				is_bound = false;
-				sockares.Complete (new SocketException (error), true);
-				return sockares;
+			} catch (SocketException e) {
+				if (e.SocketErrorCode != SocketError.InProgress && e.SocketErrorCode != SocketError.WouldBlock) {
+					// error synch
+					is_connected = false;
+					is_bound = false;
+					sockares.Complete (e, true);
+					return sockares;
+				}
 			}
 
 			// continue asynch
@@ -1153,20 +1035,6 @@ namespace System.Net.Sockets
 
 			sockares.CheckIfThrowDelayedException();
 		}
-
-		static void Connect_internal (SafeSocketHandle safeHandle, SocketAddress sa, out int error, bool blocking)
-		{
-			try {
-				safeHandle.RegisterForBlockingSyscall ();
-				Connect_internal (safeHandle.DangerousGetHandle (), sa, out error, blocking);
-			} finally {
-				safeHandle.UnRegisterForBlockingSyscall ();
-			}
-		}
-
-		/* Connects to the remote address */
-		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		extern static void Connect_internal(IntPtr sock, SocketAddress sa, out int error, bool blocking);
 
 		/* Returns :
 		 *  - false when it is ok to use RemoteEndPoint
@@ -1309,18 +1177,22 @@ namespace System.Net.Sockets
 			ThrowIfBufferNull (buffer);
 			ThrowIfBufferOutOfRange (buffer, offset, size);
 
-			int nativeError;
-			int ret = Receive_internal (m_Handle, buffer, offset, size, socketFlags, out nativeError, is_blocking);
+			errorCode = SocketError.Success;
 
-			errorCode = (SocketError) nativeError;
-			if (errorCode != SocketError.Success && errorCode != SocketError.WouldBlock && errorCode != SocketError.InProgress) {
-				is_connected = false;
-				is_bound = false;
-			} else {
-				is_connected = true;
+			try {
+				return Mono.PAL.Sockets.Receive (m_Handle, buffer, offset, size, socketFlags, is_blocking);
+			} catch (SocketException e) {
+				errorCode = e.SocketErrorCode;
+
+				if (errorCode != SocketError.Success && errorCode != SocketError.WouldBlock && errorCode != SocketError.InProgress) {
+					is_connected = false;
+					is_bound = false;
+				} else {
+					is_connected = true;
+				}
+
+				return 0;
 			}
-
-			return ret;
 		}
 
 		[CLSCompliant (false)]
@@ -1331,39 +1203,14 @@ namespace System.Net.Sockets
 			if (buffers == null || buffers.Count == 0)
 				throw new ArgumentNullException ("buffers");
 
-			int numsegments = buffers.Count;
-			int nativeError;
-			int ret;
-
-			/* Only example I can find of sending a byte array reference directly into an internal
-			 * call is in System.Runtime.Remoting/System.Runtime.Remoting.Channels.Ipc.Win32/NamedPipeSocket.cs,
-			 * so taking a lead from that... */
-			WSABUF[] bufarray = new WSABUF[numsegments];
-			GCHandle[] gch = new GCHandle[numsegments];
-
-			for (int i = 0; i < numsegments; i++) {
-				ArraySegment<byte> segment = buffers[i];
-
-				if (segment.Offset < 0 || segment.Count < 0 || segment.Count > segment.Array.Length - segment.Offset)
-					throw new ArgumentOutOfRangeException ("segment");
-
-				gch[i] = GCHandle.Alloc (segment.Array, GCHandleType.Pinned);
-				bufarray[i].len = segment.Count;
-				bufarray[i].buf = Marshal.UnsafeAddrOfPinnedArrayElement (segment.Array, segment.Offset);
-			}
+			errorCode = SocketError.Success;
 
 			try {
-				ret = Receive_internal (m_Handle, bufarray, socketFlags, out nativeError, is_blocking);
-			} finally {
-				for (int i = 0; i < numsegments; i++) {
-					if (gch[i].IsAllocated)
-						gch[i].Free ();
-				}
+				return Mono.PAL.Sockets.ReceiveBuffers (m_Handle, buffers, socketFlags, is_blocking);
+			} catch (SocketException e) {
+				errorCode = e.SocketErrorCode;
+				return 0;
 			}
-
-			errorCode = (SocketError) nativeError;
-
-			return ret;
 		}
 
 		public bool ReceiveAsync (SocketAsyncEventArgs e)
@@ -1441,8 +1288,12 @@ namespace System.Net.Sockets
 			SocketAsyncResult sockares = (SocketAsyncResult) ares;
 			int total = 0;
 
+			sockares.error = 0;
+
 			try {
-				total = Receive_internal (sockares.socket.m_Handle, sockares.Buffer, sockares.Offset, sockares.Size, sockares.SockFlags, out sockares.error, sockares.socket.is_blocking);
+				total = Mono.PAL.Sockets.Receive (sockares.socket.m_Handle, sockares.Buffer, sockares.Offset, sockares.Size, sockares.SockFlags, sockares.socket.is_blocking);
+			} catch (SocketException e) {
+				sockares.error = (int) e.SocketErrorCode;
 			} catch (Exception e) {
 				sockares.Complete (e);
 				return;
@@ -1508,32 +1359,6 @@ namespace System.Net.Sockets
 			return sockares.Total;
 		}
 
-		static int Receive_internal (SafeSocketHandle safeHandle, WSABUF[] bufarray, SocketFlags flags, out int error, bool blocking)
-		{
-			try {
-				safeHandle.RegisterForBlockingSyscall ();
-				return Receive_internal (safeHandle.DangerousGetHandle (), bufarray, flags, out error, blocking);
-			} finally {
-				safeHandle.UnRegisterForBlockingSyscall ();
-			}
-		}
-
-		[MethodImplAttribute (MethodImplOptions.InternalCall)]
-		extern static int Receive_internal (IntPtr sock, WSABUF[] bufarray, SocketFlags flags, out int error, bool blocking);
-
-		static int Receive_internal (SafeSocketHandle safeHandle, byte[] buffer, int offset, int count, SocketFlags flags, out int error, bool blocking)
-		{
-			try {
-				safeHandle.RegisterForBlockingSyscall ();
-				return Receive_internal (safeHandle.DangerousGetHandle (), buffer, offset, count, flags, out error, blocking);
-			} finally {
-				safeHandle.UnRegisterForBlockingSyscall ();
-			}
-		}
-
-		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		extern static int Receive_internal(IntPtr sock, byte[] buffer, int offset, int count, SocketFlags flags, out int error, bool blocking);
-
 #endregion
 
 #region ReceiveFrom
@@ -1560,11 +1385,12 @@ namespace System.Net.Sockets
 		{
 			SocketAddress sockaddr = remoteEP.Serialize();
 
-			int nativeError;
-			int cnt = ReceiveFrom_internal (m_Handle, buffer, offset, size, socketFlags, ref sockaddr, out nativeError, is_blocking);
+			int cnt;
+			try {
+				cnt = Mono.PAL.Sockets.ReceiveFrom (m_Handle, buffer, offset, size, socketFlags, ref sockaddr, is_blocking);
+			} catch (SocketException e) {
+				errorCode = e.SocketErrorCode;
 
-			errorCode = (SocketError) nativeError;
-			if (errorCode != SocketError.Success) {
 				if (errorCode != SocketError.WouldBlock && errorCode != SocketError.InProgress) {
 					is_connected = false;
 				} else if (errorCode == SocketError.WouldBlock && is_blocking) { // This might happen when ReceiveTimeout is set
@@ -1573,6 +1399,8 @@ namespace System.Net.Sockets
 
 				return 0;
 			}
+
+			errorCode = SocketError.Success;
 
 			is_connected = true;
 			is_bound = true;
@@ -1690,21 +1518,6 @@ namespace System.Net.Sockets
 			return sockares.Total;
 		}
 
-
-
-		static int ReceiveFrom_internal (SafeSocketHandle safeHandle, byte[] buffer, int offset, int count, SocketFlags flags, ref SocketAddress sockaddr, out int error, bool blocking)
-		{
-			try {
-				safeHandle.RegisterForBlockingSyscall ();
-				return ReceiveFrom_internal (safeHandle.DangerousGetHandle (), buffer, offset, count, flags, ref sockaddr, out error, blocking);
-			} finally {
-				safeHandle.UnRegisterForBlockingSyscall ();
-			}
-		}
-
-		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		extern static int ReceiveFrom_internal(IntPtr sock, byte[] buffer, int offset, int count, SocketFlags flags, ref SocketAddress sockaddr, out int error, bool blocking);
-
 #endregion
 
 #region ReceiveMessageFrom
@@ -1769,22 +1582,24 @@ namespace System.Net.Sockets
 			ThrowIfBufferNull (buffer);
 			ThrowIfBufferOutOfRange (buffer, offset, size);
 
-			if (size == 0) {
-				errorCode = SocketError.Success;
-				return 0;
-			}
+			errorCode = SocketError.Success;
 
-			int nativeError;
+			if (size == 0)
+				return 0;
+
 			int sent = 0;
 			do {
-				sent += Send_internal (
-m_Handle, buffer, offset + sent, size - sent, socketFlags, out nativeError, is_blocking);
-				errorCode = (SocketError)nativeError;
-				if (errorCode != SocketError.Success && errorCode != SocketError.WouldBlock && errorCode != SocketError.InProgress) {
-					is_connected = false;
-					is_bound = false;
-					break;
-				} else {
+				try {
+					sent += Mono.PAL.Sockets.Send (m_Handle, buffer, offset + sent, size - sent, socketFlags, is_blocking);
+				} catch (SocketException e) {
+					errorCode = e.SocketErrorCode;
+
+					if (errorCode != SocketError.WouldBlock && errorCode != SocketError.InProgress) {
+						is_connected = false;
+						is_bound = false;
+						return sent;
+					}
+
 					is_connected = true;
 				}
 			} while (sent < size);
@@ -1802,37 +1617,14 @@ m_Handle, buffer, offset + sent, size - sent, socketFlags, out nativeError, is_b
 			if (buffers.Count == 0)
 				throw new ArgumentException ("Buffer is empty", "buffers");
 
-			int numsegments = buffers.Count;
-			int nativeError;
-			int ret;
-
-			WSABUF[] bufarray = new WSABUF[numsegments];
-			GCHandle[] gch = new GCHandle[numsegments];
-
-			for(int i = 0; i < numsegments; i++) {
-				ArraySegment<byte> segment = buffers[i];
-
-				if (segment.Offset < 0 || segment.Count < 0 || segment.Count > segment.Array.Length - segment.Offset)
-					throw new ArgumentOutOfRangeException ("segment");
-
-				gch[i] = GCHandle.Alloc (segment.Array, GCHandleType.Pinned);
-				bufarray[i].len = segment.Count;
-				bufarray[i].buf = Marshal.UnsafeAddrOfPinnedArrayElement (segment.Array, segment.Offset);
-			}
+			errorCode = SocketError.Success;
 
 			try {
-				ret = Send_internal (m_Handle, bufarray, socketFlags, out nativeError, is_blocking);
-			} finally {
-				for(int i = 0; i < numsegments; i++) {
-					if (gch[i].IsAllocated) {
-						gch[i].Free ();
-					}
-				}
+				return Mono.PAL.Sockets.SendBuffers (m_Handle, buffers, socketFlags, is_blocking);
+			} catch (SocketException e) {
+				errorCode = e.SocketErrorCode;
+				return 0;
 			}
-
-			errorCode = (SocketError)nativeError;
-
-			return ret;
 		}
 
 		public bool SendAsync (SocketAsyncEventArgs e)
@@ -1909,8 +1701,12 @@ m_Handle, buffer, offset + sent, size - sent, socketFlags, out nativeError, is_b
 		{
 			int total = 0;
 
+			sockares.error = 0;
+
 			try {
-				total = Socket.Send_internal (sockares.socket.m_Handle, sockares.Buffer, sockares.Offset, sockares.Size, sockares.SockFlags, out sockares.error, false);
+				total = Mono.PAL.Sockets.Send (sockares.socket.m_Handle, sockares.Buffer, sockares.Offset, sockares.Size, sockares.SockFlags, false);
+			} catch (SocketException e) {
+				sockares.error = (int) e.SocketErrorCode;
 			} catch (Exception e) {
 				sockares.Complete (e);
 				return;
@@ -1998,32 +1794,6 @@ m_Handle, buffer, offset + sent, size - sent, socketFlags, out nativeError, is_b
 			return sockares.Total;
 		}
 
-		static int Send_internal (SafeSocketHandle safeHandle, WSABUF[] bufarray, SocketFlags flags, out int error, bool blocking)
-		{
-			try {
-				safeHandle.RegisterForBlockingSyscall ();
-				return Send_internal (safeHandle.DangerousGetHandle (), bufarray, flags, out error, blocking);
-			} finally {
-				safeHandle.UnRegisterForBlockingSyscall ();
-			}
-		}
-
-		[MethodImplAttribute (MethodImplOptions.InternalCall)]
-		extern static int Send_internal (IntPtr sock, WSABUF[] bufarray, SocketFlags flags, out int error, bool blocking);
-
-		static int Send_internal (SafeSocketHandle safeHandle, byte[] buf, int offset, int count, SocketFlags flags, out int error, bool blocking)
-		{
-			try {
-				safeHandle.RegisterForBlockingSyscall ();
-				return Send_internal (safeHandle.DangerousGetHandle (), buf, offset, count, flags, out error, blocking);
-			} finally {
-				safeHandle.UnRegisterForBlockingSyscall ();
-			}
-		}
-
-		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		extern static int Send_internal(IntPtr sock, byte[] buf, int offset, int count, SocketFlags flags, out int error, bool blocking);
-
 #endregion
 
 #region SendTo
@@ -2037,14 +1807,14 @@ m_Handle, buffer, offset + sent, size - sent, socketFlags, out nativeError, is_b
 			if (remoteEP == null)
 				throw new ArgumentNullException("remoteEP");
 
-			int error;
-			int ret = SendTo_internal (m_Handle, buffer, offset, size, socketFlags, remoteEP.Serialize (), out error, is_blocking);
-
-			SocketError err = (SocketError) error;
-			if (err != 0) {
-				if (err != SocketError.WouldBlock && err != SocketError.InProgress)
+			int ret;
+			try {
+				ret = Mono.PAL.Sockets.SendTo (m_Handle, buffer, offset, size, socketFlags, remoteEP.Serialize (), is_blocking);
+			} catch (SocketException e) {
+				if (e.SocketErrorCode != SocketError.WouldBlock && e.SocketErrorCode != SocketError.InProgress)
 					is_connected = false;
-				throw new SocketException (error);
+
+				throw;
 			}
 
 			is_connected = true;
@@ -2154,19 +1924,6 @@ m_Handle, buffer, offset + sent, size - sent, socketFlags, out nativeError, is_b
 			return sockares.Total;
 		}
 
-		static int SendTo_internal (SafeSocketHandle safeHandle, byte[] buffer, int offset, int count, SocketFlags flags, SocketAddress sa, out int error, bool blocking)
-		{
-			try {
-				safeHandle.RegisterForBlockingSyscall ();
-				return SendTo_internal (safeHandle.DangerousGetHandle (), buffer, offset, count, flags, sa, out error, blocking);
-			} finally {
-				safeHandle.UnRegisterForBlockingSyscall ();
-			}
-		}
-
-		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		extern static int SendTo_internal (IntPtr sock, byte[] buffer, int offset, int count, SocketFlags flags, SocketAddress sa, out int error, bool blocking);
-
 #endregion
 
 #region SendFile
@@ -2180,13 +1937,7 @@ m_Handle, buffer, offset + sent, size - sent, socketFlags, out nativeError, is_b
 			if (!is_blocking)
 				throw new InvalidOperationException ();
 
-			int error = 0;
-			if (!SendFile_internal (m_Handle, fileName, preBuffer, postBuffer, flags, out error, is_blocking) || error != 0) {
-				SocketException exc = new SocketException (error);
-				if (exc.ErrorCode == 2 || exc.ErrorCode == 3)
-					throw new FileNotFoundException ();
-				throw exc;
-			}
+			Mono.PAL.Sockets.SendFile (m_Handle, fileName, preBuffer, postBuffer, flags);
 		}
 
 		public IAsyncResult BeginSendFile (string fileName, byte[] preBuffer, byte[] postBuffer, TransmitFileOptions flags, AsyncCallback callback, object state)
@@ -2216,19 +1967,6 @@ m_Handle, buffer, offset + sent, size - sent, socketFlags, out nativeError, is_b
 
 			ares.Delegate.EndInvoke (ares.Original);
 		}
-
-		static bool SendFile_internal (SafeSocketHandle safeHandle, string filename, byte [] pre_buffer, byte [] post_buffer, TransmitFileOptions flags, out int error, bool blocking)
-		{
-			try {
-				safeHandle.RegisterForBlockingSyscall ();
-				return SendFile_internal (safeHandle.DangerousGetHandle (), filename, pre_buffer, post_buffer, flags, out error, blocking);
-			} finally {
-				safeHandle.UnRegisterForBlockingSyscall ();
-			}
-		}
-
-		[MethodImplAttribute(MethodImplOptions.InternalCall)]
-		extern static bool SendFile_internal (IntPtr sock, string filename, byte [] pre_buffer, byte [] post_buffer, TransmitFileOptions flags, out int error, bool blocking);
 
 		delegate void SendFileHandler (string fileName, byte [] preBuffer, byte [] postBuffer, TransmitFileOptions flags);
 
@@ -2733,12 +2471,6 @@ m_Handle, buffer, offset + sent, size - sent, socketFlags, out nativeError, is_b
 				return new IPEndPoint (input.Address.MapToIPv6 (), input.Port);
 			
 			return input;
-		}
-		
-		[StructLayout (LayoutKind.Sequential)]
-		struct WSABUF {
-			public int len;
-			public IntPtr buf;
 		}
 
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]

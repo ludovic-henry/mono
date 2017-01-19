@@ -309,6 +309,10 @@ Mono.Net.Security/MonoTlsStream.cs
 Mono.Net.Security/NoReflectionHelper.cs
 Mono.Net.Security/SystemCertificateValidator.cs
 
+Mono.PAL/Socket.cs
+Mono.PAL/Socket.Unix.cs
+Mono.PAL/Socket.Win32.cs
+
 Mono.Util/MonoPInvokeCallbackAttribute.cs
 
 ReferenceSources/AutoWebProxyScriptEngine.cs

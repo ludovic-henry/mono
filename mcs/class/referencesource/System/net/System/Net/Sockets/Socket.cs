@@ -151,8 +151,7 @@ namespace System.Net.Sockets {
             InitializeSockets();
 
 #if MONO
-            int error;
-            m_Handle = new SafeSocketHandle (Socket_internal (addressFamily, socketType, protocolType, out error), true);
+            m_Handle = Mono.PAL.Sockets.Socket (addressFamily, socketType, protocolType);
 #else
             m_Handle = SafeCloseSocket.CreateWSASocket(
                     addressFamily,

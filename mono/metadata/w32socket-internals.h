@@ -28,18 +28,6 @@
 #define TF_DISCONNECT 0x01
 #define TF_REUSE_SOCKET 0x02
 
-typedef struct {
-	guint32 len;
-	gpointer buf;
-} WSABUF, *LPWSABUF;
-
-typedef struct {
-	gpointer Head;
-	guint32 HeadLength;
-	gpointer Tail;
-	guint32 TailLength;
-} TRANSMIT_FILE_BUFFERS, *LPTRANSMIT_FILE_BUFFERS;
-
 #endif
 
 void
@@ -48,50 +36,7 @@ mono_w32socket_initialize (void);
 void
 mono_w32socket_cleanup (void);
 
-MonoSocket
-mono_w32socket_accept (MonoSocket s, struct sockaddr *addr, socklen_t *addrlen, gboolean blocking);
-
-int
-mono_w32socket_connect (MonoSocket s, const struct sockaddr *name, int namelen, gboolean blocking);
-
-int
-mono_w32socket_recv (MonoSocket s, char *buf, int len, int flags, gboolean blocking);
-
-int
-mono_w32socket_recvfrom (MonoSocket s, char *buf, int len, int flags, struct sockaddr *from, socklen_t *fromlen, gboolean blocking);
-
-int
-mono_w32socket_recvbuffers (MonoSocket s, LPWSABUF lpBuffers, guint32 dwBufferCount, guint32 *lpNumberOfBytesRecvd, guint32 *lpFlags, gpointer lpOverlapped, gpointer lpCompletionRoutine, gboolean blocking);
-
-int
-mono_w32socket_send (MonoSocket s, char *buf, int len, int flags, gboolean blocking);
-
-int
-mono_w32socket_sendto (MonoSocket s, const char *buf, int len, int flags, const struct sockaddr *to, int tolen, gboolean blocking);
-
-int
-mono_w32socket_sendbuffers (MonoSocket s, LPWSABUF lpBuffers, guint32 dwBufferCount, guint32 *lpNumberOfBytesRecvd, guint32 lpFlags, gpointer lpOverlapped, gpointer lpCompletionRoutine, gboolean blocking);
-
-#if G_HAVE_API_SUPPORT(HAVE_CLASSIC_WINAPI_SUPPORT | HAVE_UWP_WINAPI_SUPPORT)
-
-BOOL
-mono_w32socket_transmit_file (MonoSocket hSocket, gpointer hFile, LPTRANSMIT_FILE_BUFFERS lpTransmitBuffers, guint32 dwReserved, gboolean blocking);
-
-#endif
-
 #ifndef HOST_WIN32
-
-MonoSocket
-mono_w32socket_socket (int domain, int type, int protocol);
-
-gint
-mono_w32socket_bind (MonoSocket sock, struct sockaddr *addr, socklen_t addrlen);
-
-gint
-mono_w32socket_getpeername (MonoSocket sock, struct sockaddr *name, socklen_t *namelen);
-
-gint
-mono_w32socket_getsockname (MonoSocket sock, struct sockaddr *name, socklen_t *namelen);
 
 gint
 mono_w32socket_getsockopt (MonoSocket sock, gint level, gint optname, gpointer optval, socklen_t *optlen);
@@ -115,12 +60,6 @@ mono_w32socket_close (MonoSocket sock);
 
 gint
 mono_w32socket_disconnect (MonoSocket sock, gboolean reuse);
-
-gint
-mono_w32socket_set_blocking (MonoSocket socket, gboolean blocking);
-
-gint
-mono_w32socket_get_available (MonoSocket socket, guint64 *amount);
 
 void
 mono_w32socket_set_last_error (gint32 error);

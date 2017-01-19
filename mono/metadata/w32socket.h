@@ -166,10 +166,6 @@ typedef struct
 	gint gid;
 } MonoPeerCredData;
 
-gpointer
-ves_icall_System_Net_Sockets_Socket_Socket_internal (MonoObject *this_obj, gint32 family, gint32 type, gint32 proto,
-	gint32 *error);
-
 void
 ves_icall_System_Net_Sockets_Socket_Close_internal (gsize sock, gint32 *error);
 
@@ -182,47 +178,12 @@ ves_icall_System_Net_Sockets_Socket_Available_internal (gsize sock, gint32 *erro
 void
 ves_icall_System_Net_Sockets_Socket_Blocking_internal (gsize sock, gboolean block, gint32 *error);
 
-gpointer
-ves_icall_System_Net_Sockets_Socket_Accept_internal (gsize sock, gint32 *error, gboolean blocking);
-
 void
 ves_icall_System_Net_Sockets_Socket_Listen_internal (gsize sock, guint32 backlog, gint32 *error);
-
-MonoObject*
-ves_icall_System_Net_Sockets_Socket_LocalEndPoint_internal (gsize sock, gint32 af, gint32 *error);
-
-MonoObject*
-ves_icall_System_Net_Sockets_Socket_RemoteEndPoint_internal (gsize sock, gint32 af, gint32 *error);
-
-void
-ves_icall_System_Net_Sockets_Socket_Bind_internal (gsize sock, MonoObject *sockaddr, gint32 *error);
-
-void
-ves_icall_System_Net_Sockets_Socket_Connect_internal (gsize sock, MonoObject *sockaddr, gint32 *error, gboolean blocking);
-
-gint32
-ves_icall_System_Net_Sockets_Socket_Receive_internal (gsize sock, MonoArray *buffer, gint32 offset, gint32 count,
-	gint32 flags, gint32 *error, gboolean blocking);
-
-gint32
-ves_icall_System_Net_Sockets_Socket_Receive_array_internal (gsize sock, MonoArray *buffers, gint32 flags, gint32 *error,
-	gboolean blocking);
-
-gint32
-ves_icall_System_Net_Sockets_Socket_ReceiveFrom_internal (gsize sock, MonoArray *buffer, gint32 offset, gint32 count,
-	gint32 flags, MonoObject **sockaddr, gint32 *error, gboolean blocking);
-
-gint32
-ves_icall_System_Net_Sockets_Socket_Send_internal (gsize sock, MonoArray *buffer, gint32 offset, gint32 count,
-	gint32 flags, gint32 *error, gboolean blocking);
 
 gint32
 ves_icall_System_Net_Sockets_Socket_Send_array_internal (gsize sock, MonoArray *buffers, gint32 flags, gint32 *error,
 	gboolean blocking);
-
-gint32
-ves_icall_System_Net_Sockets_Socket_SendTo_internal (gsize sock, MonoArray *buffer, gint32 offset, gint32 count,
-	gint32 flags, MonoObject *sockaddr, gint32 *error, gboolean blocking);
 
 void
 ves_icall_System_Net_Sockets_Socket_Select_internal (MonoArray **sockets, gint32 timeout, gint32 *error);
@@ -263,10 +224,6 @@ ves_icall_System_Net_Sockets_Socket_Poll_internal (gsize sock, gint mode, gint t
 void
 ves_icall_System_Net_Sockets_Socket_Disconnect_internal (gsize sock, MonoBoolean reuse, gint32 *error);
 
-gboolean
-ves_icall_System_Net_Sockets_Socket_SendFile_internal (gsize sock, MonoString *filename, MonoArray *pre_buffer,
-	MonoArray *post_buffer, gint flags, gint32 *error, gboolean blocking);
-
 void
 icall_cancel_blocking_socket_operation (MonoThread *thread);
 
@@ -278,5 +235,85 @@ mono_network_init(void);
 
 void
 mono_network_cleanup(void);
+
+#ifndef HOST_WIN32
+
+gpointer
+ves_icall_Mono_PAL_Sockets_Unix_Socket (gint32 family, gint32 type, gint32 proto, gint32 *werror);
+
+gsize
+ves_icall_Mono_PAL_Sockets_Unix_Accept (gsize sock, gint32 *error);
+
+MonoObject*
+ves_icall_Mono_PAL_Sockets_Unix_GetLocalEndPoint (gsize sock, gint32 family, gint32 *werror);
+
+MonoObject*
+ves_icall_Mono_PAL_Sockets_Unix_GetRemoteEndPoint (gsize sock, gint32 family, gint32 *werror);
+
+void
+ves_icall_Mono_PAL_Sockets_Unix_SetBlocking (gsize sock, MonoBoolean blocking, gint32 *werror);
+
+gint32
+ves_icall_Mono_PAL_Sockets_Unix_GetAvailable (gsize sock, gint32 *werror);
+
+void
+ves_icall_Mono_PAL_Sockets_Unix_Bind (gsize sock, MonoObject *sockaddr, gint32 *werror);
+
+void
+ves_icall_Mono_PAL_Sockets_Unix_Connect (gsize sock, MonoObject *sockaddr, gint32 *werror);
+
+gint32
+ves_icall_Mono_PAL_Sockets_Unix_Receive (gsize sock, gpointer buffer, gint32 count, gint32 flags, gint32 *werror);
+
+gint32
+ves_icall_Mono_PAL_Sockets_Unix_ReceiveBuffers (gsize sock, gpointer buffers, gint32 count, gint32 flags, gint32 *werror);
+
+gint32
+ves_icall_Mono_PAL_Sockets_Unix_ReceiveFrom (gsize sock, gpointer buffer, gint32 count, gint32 flags, MonoObject **sockaddr, gint32 *werror);
+
+gint32
+ves_icall_Mono_PAL_Sockets_Unix_Send (gsize sock, gpointer buffer, gint32 count, gint32 flags, gint32 *werror);
+
+gint32
+ves_icall_Mono_PAL_Sockets_Unix_SendBuffers (gsize sock, gpointer buffers, gint32 count, gint32 flags, gint32 *werror);
+
+gint32
+ves_icall_Mono_PAL_Sockets_Unix_SendTo (gsize sock, gpointer buffer, gint32 count, gint32 flags, MonoObject *sockaddr, gint32 *werror);
+
+void
+ves_icall_Mono_PAL_Sockets_Unix_SendFile (gsize sock, gpointer file, gpointer buffers, gint flags, gint32 *werror);
+
+#else
+
+gsize
+ves_icall_Mono_PAL_Sockets_Win32_Accept (gsize sock, MonoBoolean blocking, gint32 *error);
+
+void
+ves_icall_Mono_PAL_Sockets_Win32_Connect (gsize sock, MonoObject *sockaddr, MonoBoolean blocking, gint32 *werror);
+
+gint32
+ves_icall_Mono_PAL_Sockets_Win32_Receive (gsize sock, gpointer buffer, gint32 len, gint32 flags, MonoBoolean blocking, gint32 *werror);
+
+gint32
+ves_icall_Mono_PAL_Sockets_Win32_ReceiveBuffers (gsize sock, gpointer buffers, gint32 count, gint32 flags, MonoBoolean blocking, gint32 *werror);
+
+gint32
+ves_icall_Mono_PAL_Sockets_Win32_ReceiveFrom (gsize sock, gpointer buffer, gint32 len, gint32 flags, gpointer sa,
+	gint32 sa_size, MonoBoolean blocking, gint32 *werror);
+
+gint32
+ves_icall_Mono_PAL_Sockets_Win32_Send (gsize sock, gpointer buffer, gint32 len, gint32 flags, MonoBoolean blocking, gint32 *werror);
+
+gint32
+ves_icall_Mono_PAL_Sockets_Win32_SendBuffers (gsize sock, gpointer buffers, gint32 count, gint32 flags, MonoBoolean blocking, gint32 *werror);
+
+gint32
+ves_icall_Mono_PAL_Sockets_Win32_SendTo (gsize sock, gpointer buffer, gint32 len, gint32 flags, gpointer sa,
+	gint32 sa_size, MonoBoolean blocking, gint32 *werror);
+
+void
+ves_icall_Mono_PAL_Sockets_Win32_SendFile (gsize sock, gpointer file, gpointer buffers, gint flags, gint32 *werror);
+
+#endif /* HOST_WIN32 */
 
 #endif /* _MONO_METADATA_W32SOCKET_H_ */
