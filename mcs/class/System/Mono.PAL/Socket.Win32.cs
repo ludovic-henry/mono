@@ -281,10 +281,10 @@ namespace Mono.PAL
 			[MethodImplAttribute(MethodImplOptions.InternalCall)]
 			static extern void SendFile (IntPtr socket, IntPtr file, IntPtr buffers, int flags, out int error);
 
-			internal static void SendFile (SafeSocketHandle socket, IntPtr file, IntPtr buffers, TransmitFileOptions flags)
+			internal static void SendFile (IntPtr socket, IntPtr file, IntPtr buffers, TransmitFileOptions flags)
 			{
 				int error;
-				SendFile (socket.DangerousGetHandle (), file, buffers, (int) flags, out error);
+				SendFile (socket, file, buffers, (int) flags, out error);
 				if (error != 0)
 					throw new SocketException (error);
 			}
@@ -292,31 +292,27 @@ namespace Mono.PAL
 			[DllImport ("Kernel32", CharSet = CharSet.Auto, SetLastError = true)]
 			static extern int select (int __ignored, IntPtr[] readfds, IntPtr[] writefds, IntPtr[] exceptfds, ref timeval timeout);
 
-			internal static bool Poll (SafeSocketHandle socket, int ms, SelectMode mode)
+			internal static bool Poll (IntPtr socket, int ustimeout, SelectMode mode)
 			{
-				bool release = false;
-				try {
-					socket.DangerousAddRef (ref release);
+				/* fd_set is as follow:
+				 *  - IntPtr fd_count
+				 *  - IntPtr[] fd_array */
+				IntPtr[] fd_set = new IntPtr[2] { (IntPtr) 1, socket };
 
-					/* fd_set is as follow:
-					 *  - IntPtr fd_count
-					 *  - IntPtr[] fd_array */
-					IntPtr[] fds = new IntPtr[2] { (IntPtr) 1, socket.DangerousGetHandle () };
+				timeval timeout = new timeval {
+					tv_sec  = ustimeout / 1000 / 1000,
+					tv_usec = ustimeout % (1000 * 1000),
+				};
 
-					timeval timeout = new timeval {
-						tv_sec  = (ms / 1000),
-						tv_usec = (ms % 1000) * 1000,
-					};
-
-					int ret = select (0, mode == SelectMode.SelectRead ? fds : null, mode == SelectMode.SelectWrite ? fds : null, mode == SelectMode.SelectError ? fds : null, ref timeout);
-					if (ret == (int) SocketError.SocketError)
-						throw new SocketException (Marshal.GetLastWin32Error ());
-
-					return fds [0] != IntPtr.Zero && fds [1] == socket.DangerousGetHandle ();
-				} finally {
-					if (release)
-						socket.DangerousRelease ();
+				unsafe {
+					fixed (IntPtr* fds = fd_set) {
+						int ret = select (0, mode == SelectMode.SelectRead ? fds : null, mode == SelectMode.SelectWrite ? fds : null, mode == SelectMode.SelectError ? fds : null, ref timeout);
+						if (ret == (int) SocketError.SocketError)
+							throw new SocketException (Marshal.GetLastWin32Error ());
+					}
 				}
+
+				return fd_set [0] != IntPtr.Zero && fd_set [1] == socket;
 			}
 
 			const int FIONREAD = unchecked ((int) 0x4004667F);

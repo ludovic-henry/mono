@@ -296,9 +296,9 @@ namespace Mono.PAL
 								socket.RegisterForBlockingSyscall (ref release, ref unregister);
 
 								if (Environment.IsRunningOnWindows)
-									Win32.SendFile (socket, file.DangerousGetHandle (), (IntPtr) (&buffers), flags);
+									Win32.SendFile (socket.DangerousGetHandle (), file.DangerousGetHandle (), (IntPtr) (&buffers), flags);
 								else
-									Unix.SendFile (socket, file.DangerousGetHandle (), (IntPtr) (&buffers), flags);
+									Unix.SendFile (socket.DangerousGetHandle (), file.DangerousGetHandle (), (IntPtr) (&buffers), flags);
 							} finally {
 								if (release)
 									socket.UnregisterForBlockingSyscall (unregister);
@@ -312,12 +312,20 @@ namespace Mono.PAL
 			}
 		}
 
-		internal static bool Poll (SafeSocketHandle socket, int ms, SelectMode mode)
+		internal static bool Poll (SafeSocketHandle socket, int ustimeout, SelectMode mode)
 		{
-			if (Environment.IsRunningOnWindows)
-				return Win32.Poll (socket, ms, mode);
-			else
-				return Unix.Poll (socket, ms, mode);
+			bool release = false;
+			try {
+				socket.DangerousAddRef (ref release);
+
+				if (Environment.IsRunningOnWindows)
+					return Win32.Poll (socket.DangerousGetHandle (), ustimeout, mode);
+				else
+					return Unix.Poll (socket.DangerousGetHandle (), ustimeout, mode);
+			} finally {
+				if (release)
+					socket.DangerousRelease ();
+			}
 		}
 
 		[StructLayout (LayoutKind.Sequential)]
