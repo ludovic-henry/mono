@@ -247,6 +247,11 @@ namespace Mono.PAL
 				if (error != 0)
 					throw new SocketException (error);
 			}
+
+			internal static bool Poll (SafeSocketHandle socket, int ms, SelectMode mode)
+			{
+				throw new NotImplementedException ();
+			}
 		}
 	}
 }

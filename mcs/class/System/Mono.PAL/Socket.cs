@@ -312,6 +312,14 @@ namespace Mono.PAL
 			}
 		}
 
+		internal static bool Poll (SafeSocketHandle socket, int ms, SelectMode mode)
+		{
+			if (Environment.IsRunningOnWindows)
+				return Win32.Poll (socket, ms, mode);
+			else
+				return Unix.Poll (socket, ms, mode);
+		}
+
 		[StructLayout (LayoutKind.Sequential)]
 		struct WSABUF {
 			public int len;
