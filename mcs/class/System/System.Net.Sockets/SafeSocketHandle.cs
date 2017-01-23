@@ -124,15 +124,14 @@ namespace System.Net.Sockets {
 				} while (Interlocked.CompareExchange (ref state, new_state, old_state) != old_state);
 
 				if ((new_state & RefCount_Mask) != 0) {
-					int error;
-
 					try {
 						Mono.PAL.Sockets.SetBlocking (this, false);
-					} catch (SocketException e) {
+					} catch (SocketException) {
 					}
 
 #if FULL_AOT_DESKTOP
 					/* It's only for platforms that do not have working syscall abort mechanism, like WatchOS and TvOS */
+					int error;
 					Socket.Shutdown_internal (handle, SocketShutdown.Both, out error);
 #endif
 
