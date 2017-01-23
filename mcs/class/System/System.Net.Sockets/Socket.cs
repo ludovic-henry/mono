@@ -875,6 +875,7 @@ namespace System.Net.Sockets
 				// Calling connect() again will reset the connection attempt and cause
 				// an error. Better to just close the socket and move on.
 				connect_in_progress = false;
+				m_Handle.InterruptBlockingSyscall ();
 				m_Handle.Dispose ();
 				m_Handle = Mono.PAL.Sockets.Socket (addressFamily, socketType, protocolType);
 			}
@@ -2331,6 +2332,7 @@ namespace System.Net.Sockets
 				if (was_connected)
 					Linger (x);
 
+				m_Handle.InterruptBlockingSyscall ();
 				m_Handle.Dispose ();
 			}
 		}

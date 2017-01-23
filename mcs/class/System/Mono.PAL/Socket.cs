@@ -20,15 +20,17 @@ namespace Mono.PAL
 
 		internal static SafeSocketHandle Accept (SafeSocketHandle socket, bool blocking)
 		{
+			bool release = false, unregister = false;
 			try {
-				socket.RegisterForBlockingSyscall ();
+				socket.RegisterForBlockingSyscall (ref release, ref unregister);
 
 				if (Environment.IsRunningOnWindows)
 					return Win32.Accept (socket, blocking);
 				else
 					return Unix.Accept (socket, blocking);
 			} finally {
-				socket.UnRegisterForBlockingSyscall ();
+				if (release)
+					socket.UnregisterForBlockingSyscall (unregister);
 			}
 		}
 
@@ -83,15 +85,17 @@ namespace Mono.PAL
 
 		internal static void Connect (SafeSocketHandle socket, SocketAddress addr, bool blocking)
 		{
+			bool release = false, unregister = false;
 			try {
-				socket.RegisterForBlockingSyscall ();
+				socket.RegisterForBlockingSyscall (ref release, ref unregister);
 
 				if (Environment.IsRunningOnWindows)
 					Win32.Connect (socket, addr, blocking);
 				else
 					Unix.Connect (socket, addr, blocking);
 			} finally {
-				socket.UnRegisterForBlockingSyscall ();
+				if (release)
+					socket.UnregisterForBlockingSyscall (unregister);
 			}
 		}
 
@@ -100,8 +104,9 @@ namespace Mono.PAL
 			if (buffer.Length < offset + count)
 				return 0;
 
+			bool release = false, unregister = false;
 			try {
-				socket.RegisterForBlockingSyscall ();
+				socket.RegisterForBlockingSyscall (ref release, ref unregister);
 
 				unsafe {
 					fixed (byte *buf = &buffer [offset]) {
@@ -112,7 +117,8 @@ namespace Mono.PAL
 					}
 				}
 			} finally {
-				socket.UnRegisterForBlockingSyscall ();
+				if (release)
+					socket.UnregisterForBlockingSyscall (unregister);
 			}
 		}
 
@@ -137,8 +143,9 @@ namespace Mono.PAL
 					wsaBuffers [i].buf = Marshal.UnsafeAddrOfPinnedArrayElement (segment.Array, segment.Offset);
 				}
 
+				bool release = false, unregister = false;
 				try {
-					socket.RegisterForBlockingSyscall ();
+					socket.RegisterForBlockingSyscall (ref release, ref unregister);
 
 					unsafe {
 						fixed (WSABUF* wsaBuf = wsaBuffers) {
@@ -149,7 +156,8 @@ namespace Mono.PAL
 						}
 					}
 				} finally {
-					socket.UnRegisterForBlockingSyscall ();
+					if (release)
+						socket.UnregisterForBlockingSyscall (unregister);
 				}
 			} finally {
 				for (int i = 0; i < buffers.Count; i++) {
@@ -164,8 +172,9 @@ namespace Mono.PAL
 			if (buffer.Length < offset + count)
 				return 0;
 
+			bool release = false, unregister = false;
 			try {
-				socket.RegisterForBlockingSyscall ();
+				socket.RegisterForBlockingSyscall (ref release, ref unregister);
 
 				unsafe {
 					fixed (byte *buf = &buffer [offset]) {
@@ -176,7 +185,8 @@ namespace Mono.PAL
 					}
 				}
 			} finally {
-				socket.UnRegisterForBlockingSyscall ();
+				if (release)
+					socket.UnregisterForBlockingSyscall (unregister);
 			}
 		}
 
@@ -185,8 +195,9 @@ namespace Mono.PAL
 			if (buffer.Length < offset + count)
 				return 0;
 
+			bool release = false, unregister = false;
 			try {
-				socket.RegisterForBlockingSyscall ();
+				socket.RegisterForBlockingSyscall (ref release, ref unregister);
 
 				unsafe {
 					fixed (byte *buf = &buffer [offset]) {
@@ -197,7 +208,8 @@ namespace Mono.PAL
 					}
 				}
 			} finally {
-				socket.UnRegisterForBlockingSyscall ();
+				if (release)
+					socket.UnregisterForBlockingSyscall (unregister);
 			}
 		}
 
@@ -222,8 +234,9 @@ namespace Mono.PAL
 					wsaBuffers [i].buf = Marshal.UnsafeAddrOfPinnedArrayElement (segment.Array, segment.Offset);
 				}
 
+				bool release = false, unregister = false;
 				try {
-					socket.RegisterForBlockingSyscall ();
+					socket.RegisterForBlockingSyscall (ref release, ref unregister);
 
 					unsafe {
 						fixed (WSABUF* wsaBuf = wsaBuffers) {
@@ -234,7 +247,8 @@ namespace Mono.PAL
 						}
 					}
 				} finally {
-					socket.UnRegisterForBlockingSyscall ();
+					if (release)
+						socket.UnregisterForBlockingSyscall (unregister);
 				}
 			} finally {
 				for (int i = 0; i < buffers.Count; i++) {
@@ -249,8 +263,9 @@ namespace Mono.PAL
 			if (buffer.Length < offset + count)
 				return 0;
 
+			bool release = false, unregister = false;
 			try {
-				socket.RegisterForBlockingSyscall ();
+				socket.RegisterForBlockingSyscall (ref release, ref unregister);
 
 				unsafe {
 					fixed (byte *buf = &buffer [offset]) {
@@ -261,7 +276,8 @@ namespace Mono.PAL
 					}
 				}
 			} finally {
-				socket.UnRegisterForBlockingSyscall ();
+				if (release)
+					socket.UnregisterForBlockingSyscall (unregister);
 			}
 		}
 
@@ -280,23 +296,24 @@ namespace Mono.PAL
 							TailLength = (uint) (postBuffer != null ? postBuffer.Length : 0),
 						};
 
-						bool release = false;
+						bool releaseFile = false;
 						try {
-							file.DangerousAddRef (ref release);
+							file.DangerousAddRef (ref releaseFile);
 
-
+							bool release = false, unregister = false;
 							try {
-								socket.RegisterForBlockingSyscall ();
+								socket.RegisterForBlockingSyscall (ref release, ref unregister);
 
 								if (Environment.IsRunningOnWindows)
 									Win32.SendFile (socket, file.DangerousGetHandle (), (IntPtr) (&buffers), flags);
 								else
 									Unix.SendFile (socket, file.DangerousGetHandle (), (IntPtr) (&buffers), flags);
 							} finally {
-								socket.UnRegisterForBlockingSyscall ();
+								if (release)
+									socket.UnregisterForBlockingSyscall (unregister);
 							}
 						} finally {
-							if (release)
+							if (releaseFile)
 								file.DangerousRelease ();
 						}
 					}

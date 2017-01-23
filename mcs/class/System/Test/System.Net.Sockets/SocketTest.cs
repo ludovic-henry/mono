@@ -2805,46 +2805,36 @@ namespace MonoTests.System.Net.Sockets
 			}
 		}
 
-		static Socket CWRSocket;
-		static bool CWRReceiving = true;
-		static ManualResetEvent CWRReady = new ManualResetEvent (false);
-		
-		private static void CWRReceiveThread ()
-		{
-			byte[] buf = new byte[256];
-			
-			try {
-				CWRSocket.Receive (buf);
-			} catch (SocketException) {
-				CWRReceiving = false;
-			}
-
-			CWRReady.Set ();
-		}
-		
 		[Test]
 #if FEATURE_NO_BSD_SOCKETS
 		[ExpectedException (typeof (PlatformNotSupportedException))]
 #endif
 		public void CloseWhileReceiving ()
 		{
-			CWRSocket = new Socket (AddressFamily.InterNetwork,
-						SocketType.Dgram,
-						ProtocolType.Udp);
-			CWRSocket.Bind (new IPEndPoint (IPAddress.Loopback,
-							NetworkHelpers.FindFreePort ()));
+			Socket socket = new Socket (AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+			socket.Bind (new IPEndPoint (IPAddress.Loopback, NetworkHelpers.FindFreePort ()));
 			
-			Thread recv_thread = new Thread (new ThreadStart (CWRReceiveThread));
-			CWRReady.Reset ();
-			recv_thread.Start ();
-			Thread.Sleep (250);	/* Wait for the thread to be already receiving */
+			bool receiving = true;
+			ManualResetEvent mre = new ManualResetEvent (false);
 
-			CWRSocket.Close ();
-			if (CWRReady.WaitOne (1000, false) == false) {
-				Assert.Fail ("CloseWhileReceiving wait timed out");
-			}
-			
-			Assert.IsFalse (CWRReceiving);
+			Task recv_task = Task.Run (() => {
+				byte[] buf = new byte[256];
+				
+				try {
+					mre.Set ();
+					socket.Receive (buf);
+				} catch (SocketException) {
+					receiving = false;
+				}
+			});
+
+			Assert.IsTrue (mre.WaitOne (1000));
+			Thread.Sleep (100);	/* Wait for the thread to be already receiving */
+
+			socket.Close ();
+
+			Assert.IsTrue (recv_task.Wait (1000), "CloseWhileReceiving wait timed out");
+			Assert.IsFalse (receiving);
 		}
 
 		static bool RRCLastRead = false;
