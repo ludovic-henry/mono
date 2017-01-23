@@ -118,17 +118,6 @@ namespace Mono.PAL
 			}
 
 			[DllImport ("Kernel32", CharSet = CharSet.Auto, SetLastError = true)]
-			static extern int ioctlsocket (IntPtr socket, int command, ref uint value);
-
-			internal static void SetBlocking (IntPtr socket, bool blocking)
-			{
-				uint nonBlocking = blocking ? 0u : 1u;
-				int res = ioctlsocket (socket, FIONBIO, ref nonBlocking);
-				if (res == -1)
-					throw new SocketException (Marshal.GetLastWin32Error ());
-			}
-
-			[DllImport ("Kernel32", CharSet = CharSet.Auto, SetLastError = true)]
 			static extern int ioctlsocket (SafeSocketHandle socket, int command, ref uint value);
 
 			internal static void SetBlocking (SafeSocketHandle socket, bool blocking)

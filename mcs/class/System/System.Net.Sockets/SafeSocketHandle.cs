@@ -127,7 +127,7 @@ namespace System.Net.Sockets {
 					int error;
 
 					try {
-						Mono.PAL.Sockets.SetBlocking (handle, false);
+						Mono.PAL.Sockets.SetBlocking (this, false);
 					} catch (SocketException e) {
 					}
 

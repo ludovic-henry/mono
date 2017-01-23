@@ -92,14 +92,6 @@ namespace Mono.PAL
 			[MethodImplAttribute(MethodImplOptions.InternalCall)]
 			static extern void SetBlocking (IntPtr socket, bool blocking, out int error);
 
-			internal static void SetBlocking (IntPtr socket, bool blocking)
-			{
-				int error;
-				SetBlocking (socket, blocking, out error);
-				if (error != 0)
-					throw new SocketException (error);
-			}
-
 			internal static void SetBlocking (SafeSocketHandle socket, bool blocking)
 			{
 				bool release = false;

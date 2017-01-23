@@ -58,15 +58,6 @@ namespace Mono.PAL
 				Unix.SetBlocking (socket, blocking);
 		}
 
-		[Obsolete ("Only for use by SafeSocketHandle")]
-		internal static void SetBlocking (IntPtr socket, bool blocking)
-		{
-			if (Environment.IsRunningOnWindows)
-				Win32.SetBlocking (socket, blocking);
-			else
-				Unix.SetBlocking (socket, blocking);
-		}
-
 		internal static int GetAvailable (SafeSocketHandle socket)
 		{
 			if (Environment.IsRunningOnWindows)
