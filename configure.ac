@@ -4351,6 +4351,7 @@ mono/unit-tests/Makefile
 mono/benchmark/Makefile
 mono/mini/Makefile
 mono/profiler/Makefile
+mono/pal/Makefile
 m4/Makefile
 ikvm-native/Makefile
 scripts/Makefile
