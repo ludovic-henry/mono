@@ -31,9 +31,6 @@ namespace System.Net.Sockets
 {
 	partial class Socket
 	{
-		internal const int DefaultCloseTimeout = -1;
-		// don't change for default, otherwise breaking change
-
 		// this version does not throw.
 		internal void InternalShutdown (SocketShutdown how)
 		{
@@ -100,5 +97,7 @@ namespace System.Net.Sockets
 			if (!silent && error != 0)
 				throw new SocketException (error);
 		}
+
+		internal static bool LegacySupportsIPv6 => OSSupportsIPv6;
 	}
 }

@@ -61,13 +61,13 @@ namespace System.Net.Sockets
 			private set;
 		}
 
-		internal IList<ArraySegment<byte>> m_BufferList;
+		internal IList<ArraySegment<byte>> _bufferList;
 		public IList<ArraySegment<byte>> BufferList {
-			get { return m_BufferList; }
+			get { return _bufferList; }
 			set {
 				if (Buffer != null && value != null)
 					throw new ArgumentException ("Buffer and BufferList properties cannot both be non-null.");
-				m_BufferList = value;
+				_bufferList = value;
 			}
 		}
 
