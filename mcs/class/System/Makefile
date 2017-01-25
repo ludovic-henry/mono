@@ -5,6 +5,9 @@ export __SECURITY_BOOTSTRAP_DB=$(topdir)/class/lib/$(PROFILE)
 
 LIBRARY = System.dll
 
+RESX_RESOURCE_STRING = \
+	../../../external/corefx/src/System.Net.Sockets/src/Resources/Strings.resx
+
 ifneq (2.1, $(FRAMEWORK_VERSION))
 RESOURCE_FILES = \
 	resources/Asterisk.wav	\
@@ -19,7 +22,7 @@ TEST_RESOURCES = \
 	Test/System/test-uri-props-manual.txt \
 	Test/System/test-uri-relative-props.txt
 
-LIB_MCS_FLAGS = -d:CONFIGURATION_2_0 $(REFERENCE_SOURCES_FLAGS) -unsafe $(RESOURCE_FILES:%=-resource:%) -nowarn:436
+LIB_MCS_FLAGS = -d:CONFIGURATION_2_0 $(REFERENCE_SOURCES_FLAGS) $(COREFX_SOURCES_FLAGS) -unsafe $(RESOURCE_FILES:%=-resource:%) -nowarn:436
 
 ifndef NO_MONO_SECURITY
 MONO_SECURITY=Mono.Security
@@ -70,6 +73,8 @@ ifndef NO_MULTIPLE_APPDOMAINS
 REFERENCE_SOURCES_FLAGS += -d:MONO_FEATURE_MULTIPLE_APPDOMAINS
 TEST_MCS_FLAGS += -d:MONO_FEATURE_MULTIPLE_APPDOMAINS
 endif
+
+COREFX_SOURCES_FLAGS = -d:SYSTEM_NET_SOCKETS_DLL
 
 TXT_RESOURCE_STRINGS = ../referencesource/System/System.txt
 
