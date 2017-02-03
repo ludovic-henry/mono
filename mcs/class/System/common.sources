@@ -925,6 +925,19 @@ ReferenceSources/Win32Exception.cs
 
 ../referencesource/System/compmod/microsoft/win32/safehandles/SafeProcessHandle.cs
 
+../../../external/corefx/src/System.IO.Compression/src/System/IO/Compression/CompressionLevel.cs
+../../../external/corefx/src/System.IO.Compression/src/System/IO/Compression/CompressionMode.cs
+../../../external/corefx/src/System.IO.Compression/src/System/IO/Compression/GZipStream.cs
+
+
+
+
+
+
+
+
+
+
 ../../../external/corefx/src/Common/src/Interop/Mono/Interop.Libraries.cs
 
 ../../../external/corefx/src/Common/src/Interop/Unix/Interop.Errors.cs
@@ -946,8 +959,6 @@ ReferenceSources/Win32Exception.cs
 ../../../external/corefx/src/Common/src/Interop/Unix/System.Native/Interop.SocketEvent.cs
 ../../../external/corefx/src/Common/src/Interop/Unix/System.Native/Interop.Write.cs
 
-../../../external/corefx/src/Common/src/Interop/Windows/Interop.Libraries.cs
-
 ../../../external/corefx/src/Common/src/Interop/Windows/Winsock/Interop.accept.cs
 ../../../external/corefx/src/Common/src/Interop/Windows/Winsock/Interop.bind.cs
 ../../../external/corefx/src/Common/src/Interop/Windows/Winsock/Interop.closesocket.cs
@@ -960,6 +971,8 @@ ReferenceSources/Win32Exception.cs
 ../../../external/corefx/src/Common/src/Interop/Windows/Winsock/Interop.WSAConnect.cs
 ../../../external/corefx/src/Common/src/Interop/Windows/Winsock/Interop.WSASocketW.cs
 ../../../external/corefx/src/Common/src/Interop/Windows/Winsock/Interop.WSASocketW.SafeCloseSocket.cs
+../../../external/corefx/src/Common/src/Interop/Windows/Winsock/SafeNativeOverlapped.cs
+../../../external/corefx/src/Common/src/Interop/Windows/Winsock/SafeNativeOverlapped.Mono.cs
 ../../../external/corefx/src/Common/src/Interop/Windows/Winsock/WSABuffer.cs
 
 ../../../external/corefx/src/Common/src/System/Net/ByteOrder.cs
@@ -980,8 +993,6 @@ ReferenceSources/Win32Exception.cs
 
 ../../../external/corefx/src/Common/src/System/Net/IPAddressParserStatics.cs
 ../../../external/corefx/src/Common/src/System/Net/SafeCloseSocket.cs
-../../../external/corefx/src/Common/src/System/Net/SafeCloseSocket.Unix.cs
-../../../external/corefx/src/Common/src/System/Net/SafeCloseSocket.Windows.cs
 ../../../external/corefx/src/Common/src/System/Net/SocketAddress.cs
 ../../../external/corefx/src/Common/src/System/Net/SocketAddressPal.Mono.cs
 ../../../external/corefx/src/Common/src/System/Net/SocketAddressPal.Unix.cs
@@ -989,18 +1000,24 @@ ReferenceSources/Win32Exception.cs
 
 ../../../external/corefx/src/Common/src/System/Net/Sockets/SocketErrorPal.Unix.cs
 
-../../../external/corefx/src/System.IO.Compression/src/System/IO/Compression/CompressionLevel.cs
-../../../external/corefx/src/System.IO.Compression/src/System/IO/Compression/CompressionMode.cs
-../../../external/corefx/src/System.IO.Compression/src/System/IO/Compression/GZipStream.cs
-
 ../../../external/corefx/src/System.Net.Sockets/src/System/Net/SocketPerfCounters.cs
 ../../../external/corefx/src/System.Net.Sockets/src/System/Net/DnsAPMExtensions.cs
 
+../../../external/corefx/src/System.Net.Sockets/src/System/Net/Sockets/AcceptOverlappedAsyncResult.cs
+../../../external/corefx/src/System.Net.Sockets/src/System/Net/Sockets/BaseOverlappedAsyncResult.cs
+../../../external/corefx/src/System.Net.Sockets/src/System/Net/Sockets/BaseOverlappedAsyncResult.Mono.cs
+../../../external/corefx/src/System.Net.Sockets/src/System/Net/Sockets/BaseOverlappedAsyncResult.Unix.cs
+../../../external/corefx/src/System.Net.Sockets/src/System/Net/Sockets/BaseOverlappedAsyncResult.Windows.cs
+../../../external/corefx/src/System.Net.Sockets/src/System/Net/Sockets/DisconnectOverlappedAsyncResult.cs
 ../../../external/corefx/src/System.Net.Sockets/src/System/Net/Sockets/MultipleConnectAsync.cs
 ../../../external/corefx/src/System.Net.Sockets/src/System/Net/Sockets/NetEventSource.Sockets.cs
+../../../external/corefx/src/System.Net.Sockets/src/System/Net/Sockets/OverlappedAsyncResult.cs
 ../../../external/corefx/src/System.Net.Sockets/src/System/Net/Sockets/SendPacketsElement.cs
 ../../../external/corefx/src/System.Net.Sockets/src/System/Net/Sockets/SendPacketsElementFlags.Windows.cs
 ../../../external/corefx/src/System.Net.Sockets/src/System/Net/Sockets/Socket.cs
+../../../external/corefx/src/System.Net.Sockets/src/System/Net/Sockets/Socket.Mono.cs
+../../../external/corefx/src/System.Net.Sockets/src/System/Net/Sockets/Socket.Unix.cs
+../../../external/corefx/src/System.Net.Sockets/src/System/Net/Sockets/Socket.Windows.cs
 ../../../external/corefx/src/System.Net.Sockets/src/System/Net/Sockets/SocketAsyncContext.Unix.cs
 ../../../external/corefx/src/System.Net.Sockets/src/System/Net/Sockets/SocketAsyncEngine.Unix.cs
 ../../../external/corefx/src/System.Net.Sockets/src/System/Net/Sockets/SocketAsyncOperation.cs
