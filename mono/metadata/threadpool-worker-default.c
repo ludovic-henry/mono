@@ -117,11 +117,9 @@ typedef struct {
 typedef union {
 	struct {
 		gint16 max_working; /* determined by heuristic */
-		gint16 starting; /* starting, but not yet in worker_thread */
 		gint16 working; /* executing worker_thread */
-		gint16 parked; /* parked */
 	} _;
-	gint64 as_gint64;
+	gint32 as_gint32;
 } ThreadPoolWorkerCounter;
 
 typedef struct {
@@ -172,7 +170,6 @@ static ThreadPoolWorker worker;
 #define COUNTER_CHECK(counter) \
 	do { \
 		g_assert (counter._.max_working > 0); \
-		g_assert (counter._.starting >= 0); \
 		g_assert (counter._.working >= 0); \
 	} while (0)
 
@@ -184,14 +181,14 @@ static ThreadPoolWorker worker;
 			(var) = __old; \
 			{ block; } \
 			COUNTER_CHECK (var); \
-		} while (InterlockedCompareExchange64 (&worker.counters.as_gint64, (var).as_gint64, __old.as_gint64) != __old.as_gint64); \
+		} while (InterlockedCompareExchange (&worker.counters.as_gint32, (var).as_gint32, __old.as_gint32) != __old.as_gint32); \
 	} while (0)
 
 static inline ThreadPoolWorkerCounter
 COUNTER_READ (void)
 {
 	ThreadPoolWorkerCounter counter;
-	counter.as_gint64 = InterlockedRead64 (&worker.counters.as_gint64);
+	counter.as_gint32 = InterlockedRead (&worker.counters.as_gint32);
 	return counter;
 }
 
@@ -467,7 +464,6 @@ worker_park (void)
 
 		COUNTER_ATOMIC (counter, {
 			counter._.working --;
-			counter._.parked ++;
 		});
 
 		InterlockedIncrement (&worker.parked_threads_count);
@@ -477,7 +473,6 @@ worker_park (void)
 
 		COUNTER_ATOMIC (counter, {
 			counter._.working ++;
-			counter._.parked --;
 		});
 
 		mono_thread_info_uninstall_interrupt (&interrupted);
@@ -532,7 +527,6 @@ worker_thread (gpointer unused)
 		return 0;
 
 	COUNTER_ATOMIC (counter, {
-		counter._.starting --;
 		counter._.working ++;
 	});
 
@@ -614,17 +608,12 @@ worker_try_create (void)
 			mono_coop_mutex_unlock (&worker.worker_creation_lock);
 			return FALSE;
 		}
-		counter._.starting ++;
 	});
 
 	thread = mono_thread_create_internal (mono_get_root_domain (), worker_thread, NULL, MONO_THREAD_CREATE_FLAGS_THREADPOOL, &error);
 	if (!thread) {
 		mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_THREADPOOL, "[%p] try create worker, failed: could not create thread due to %s", mono_native_thread_id_get (), mono_error_get_message (&error));
 		mono_error_cleanup (&error);
-
-		COUNTER_ATOMIC (counter, {
-			counter._.starting --;
-		});
 
 		mono_coop_mutex_unlock (&worker.worker_creation_lock);
 
@@ -746,8 +735,8 @@ monitor_thread (gpointer unused)
 		g_assert (worker.monitor_status != MONITOR_STATUS_NOT_RUNNING);
 
 		// counter = COUNTER_READ ();
-		// printf ("monitor_thread: starting = %d working = %d parked = %d max_working = %d\n",
-		// 	counter._.starting, counter._.working, counter._.parked, counter._.max_working);
+		// printf ("monitor_thread: working = %d max_working = %d\n",
+		// 	counter._.working, counter._.max_working);
 
 		do {
 			gint64 ts;
