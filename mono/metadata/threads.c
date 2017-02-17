@@ -3206,11 +3206,12 @@ build_abort_threads (gpointer key, gpointer value, gpointer user)
 	if (mono_gc_is_finalizer_internal_thread (thread))
 		return;
 
-	if ((thread->state & ThreadState_Background) && !(thread->flags & MONO_THREAD_FLAG_DONT_MANAGE)) {
-		wait->handles[wait->num] = mono_threads_open_thread_handle (thread->handle);
-		wait->threads[wait->num] = thread;
-		wait->num++;
-	}
+	if (thread->flags & MONO_THREAD_FLAG_DONT_MANAGE)
+		return;
+
+	wait->handles [wait->num] = mono_threads_open_thread_handle (thread->handle);
+	wait->threads [wait->num] = thread;
+	wait->num++;
 }
 
 /** 
