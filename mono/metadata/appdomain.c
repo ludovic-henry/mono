@@ -87,7 +87,7 @@
  * Changes which are already detected at runtime, like the addition
  * of icalls, do not require an increment.
  */
-#define MONO_CORLIB_VERSION 164
+#define MONO_CORLIB_VERSION 165
 
 typedef struct
 {
@@ -2542,8 +2542,6 @@ unload_thread_main (void *arg)
 
 	mono_domain_unlock (domain);
 	mono_loader_unlock ();
-
-	mono_threads_clear_cached_culture (domain);
 
 	domain->state = MONO_APPDOMAIN_UNLOADED;
 
