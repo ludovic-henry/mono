@@ -667,6 +667,7 @@ mono_thread_attach_internal (MonoThread *thread, gboolean force_attach, gboolean
 	info = mono_thread_info_current ();
 
 	internal = thread->internal_thread;
+
 	internal->handle = mono_threads_open_thread_handle (info->handle);
 #ifdef HOST_WIN32
 	internal->native_handle = OpenThread (THREAD_ALL_ACCESS, FALSE, GetCurrentThreadId ());
@@ -675,6 +676,8 @@ mono_thread_attach_internal (MonoThread *thread, gboolean force_attach, gboolean
 	internal->thread_info = info;
 	internal->small_id = info->small_id;
 	internal->stack_ptr = stack_ptr;
+
+	g_message ("%s: attach thread %p (tid: %p)", __func__, internal, (gpointer) thread_get_tid (internal));
 
 	THREAD_DEBUG (g_message ("%s: (%"G_GSIZE_FORMAT") Setting current_object_key to %p", __func__, mono_native_thread_id_get (), internal));
 
@@ -1116,7 +1119,7 @@ mono_thread_detach_internal (MonoInternalThread *thread)
 
 	g_assert (thread != NULL);
 
-	THREAD_DEBUG (g_message ("%s: mono_thread_detach for %p (%"G_GSIZE_FORMAT")", __func__, thread, (gsize)thread->tid));
+	g_message ("%s: detach thread %p (tid: %p)", __func__, thread, (gpointer) thread_get_tid(thread));
 
 #ifndef HOST_WIN32
 	mono_w32mutex_abandon ();
@@ -3133,7 +3136,7 @@ wait_for_tids (struct wait_data *wait, guint32 timeout, gboolean check_state_cha
 
 		mono_threads_lock ();
 		if (mono_g_hash_table_lookup (threads, (gpointer) internal->tid) == internal)
-			g_error ("%s: failed to call mono_thread_detach_internal on thread %p, InternalThread: %p", __func__, internal->tid, internal);
+			g_error ("%s: failed to call mono_thread_detach_internal on thread %p (tid: %p)", __func__, internal, (gpointer) thread_get_tid (internal));
 		mono_threads_unlock ();
 	}
 }

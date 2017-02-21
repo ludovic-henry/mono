@@ -81,7 +81,7 @@ public class TestDriver {
 		for (int iter = 0; iter < iterations; ++iter) {
 			for (i = 0; i < methods.Length; ++i) {
 				name = methods [i].Name;
-				if (!name.StartsWith ("test_", StringComparison.Ordinal))
+				if (!name.Equals ("test_43_thread_attach_detach_contested", StringComparison.Ordinal))
 					continue;
 				if (run_only.Count > 0) {
 					bool found = false;

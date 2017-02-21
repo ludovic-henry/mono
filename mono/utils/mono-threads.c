@@ -427,6 +427,8 @@ unregister_thread (void *arg)
 	g_assert (mono_thread_info_is_current (info));
 	g_assert (mono_thread_info_is_live (info));
 
+	g_message ("%s: detach info thread %p (tid: %p)", __func__, info, (gpointer) mono_thread_info_get_tid (info));
+
 	/* Pump the HP queue while the thread is alive.*/
 	mono_thread_hazardous_try_free_some ();
 
