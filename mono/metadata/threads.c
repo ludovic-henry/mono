@@ -1120,6 +1120,17 @@ mono_thread_attach_full (MonoDomain *domain, gboolean force_attach)
 }
 
 void
+thread_key_dtor (gpointer arg)
+{
+	MonoInternalThread *internal;
+
+	internal = (MonoInternalThread*) arg;
+	g_assert (internal);
+
+	mono_thread_detach_internal (arg);
+}
+
+void
 mono_thread_detach_internal (MonoInternalThread *thread)
 {
 	gboolean removed;
@@ -3056,6 +3067,8 @@ void mono_thread_init (MonoThreadStartCB start_cb,
 
 	mono_thread_start_cb = start_cb;
 	mono_thread_attach_cb = attach_cb;
+
+	mono_tls_init_thread_key (thread_key_dtor);
 }
 
 void mono_thread_cleanup (void)

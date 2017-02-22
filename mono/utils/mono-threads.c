@@ -613,7 +613,7 @@ mono_thread_info_attach (void *baseptr)
 		g_assert (mono_threads_inited);
 #endif
 	}
-	info = (MonoThreadInfo *) mono_native_tls_get_value (thread_info_key);
+	info = (MonoThreadInfo *) mono_tls_get_thread_info ();
 	if (!info) {
 		info = (MonoThreadInfo *) g_malloc0 (thread_info_size);
 		THREADS_DEBUG ("attaching %p\n", info);
@@ -636,7 +636,7 @@ mono_thread_info_detach (void)
 		THREADS_DEBUG ("mono_thread_info_detach called before mono_threads_init\n");
 		return;
 	}
-	info = (MonoThreadInfo *) mono_native_tls_get_value (thread_info_key);
+	info = (MonoThreadInfo *) mono_tls_get_thread_info ();
 	if (info) {
 		THREADS_DEBUG ("detaching %p\n", info);
 		unregister_thread (info);
@@ -660,20 +660,6 @@ mono_thread_info_is_exiting (void)
 	return FALSE;
 }
 
-#ifndef HOST_WIN32
-static void
-thread_info_key_dtor (void *arg)
-{
-	/* Put the MonoThreadInfo back for the duration of the
-	 * unregister code.  In some circumstances the thread needs to
-	 * take the GC lock which may block which requires a coop
-	 * state transition. */
-	mono_native_tls_set_value (thread_info_key, arg);
-	unregister_thread (arg);
-	mono_native_tls_set_value (thread_info_key, NULL);
-}
-#endif
-
 void
 mono_threads_init (MonoThreadInfoCallbacks *callbacks, size_t info_size)
 {
@@ -682,10 +668,8 @@ mono_threads_init (MonoThreadInfoCallbacks *callbacks, size_t info_size)
 	thread_info_size = info_size;
 	const char *sleepLimit;
 #ifdef HOST_WIN32
-	res = mono_native_tls_alloc (&thread_info_key, NULL);
 	res = mono_native_tls_alloc (&thread_exited_key, NULL);
 #else
-	res = mono_native_tls_alloc (&thread_info_key, (void *) thread_info_key_dtor);
 	res = mono_native_tls_alloc (&thread_exited_key, (void *) thread_exited_dtor);
 #endif
 

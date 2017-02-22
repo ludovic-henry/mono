@@ -25,7 +25,9 @@ typedef enum {
 	TLS_KEY_LMF = 3,
 	TLS_KEY_SGEN_THREAD_INFO = 4,
 	TLS_KEY_LMF_ADDR = 5,
-	TLS_KEY_NUM = 6
+	/* mono_thread_info_current_unckecked */
+	TLS_KEY_THREAD_INFO = 6,
+	TLS_KEY_NUM = 7
 } MonoTlsKey;
 
 #ifdef HAVE_KW_THREAD
@@ -85,6 +87,7 @@ gpointer mono_tls_get_tls_setter (MonoTlsKey key, gboolean name);
 gpointer mono_tls_get_tls_addr (MonoTlsKey key);
 
 gpointer mono_tls_get_thread (void);
+gpointer mono_tls_get_thread_info (void);
 gpointer mono_tls_get_jit_tls (void);
 gpointer mono_tls_get_domain (void);
 gpointer mono_tls_get_lmf (void);
@@ -92,6 +95,7 @@ gpointer mono_tls_get_sgen_thread_info (void);
 gpointer mono_tls_get_lmf_addr (void);
 
 void mono_tls_set_thread (gpointer value);
+void mono_tls_set_thread_info (gpointer value);
 void mono_tls_set_jit_tls (gpointer value);
 void mono_tls_set_domain (gpointer value);
 void mono_tls_set_lmf (gpointer value);
