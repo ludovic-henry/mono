@@ -948,7 +948,6 @@ ReferenceSources/Type.cs
 ../referencesource/mscorlib/system/datetimekind.cs
 ../referencesource/mscorlib/system/datetimeoffset.cs
 ../referencesource/mscorlib/system/dayofweek.cs
-../referencesource/mscorlib/system/decimal.cs
 ../referencesource/mscorlib/system/defaultbinder.cs
 ../referencesource/mscorlib/system/dbnull.cs
 ../referencesource/mscorlib/system/dividebyzeroexception.cs
@@ -1146,7 +1145,6 @@ ReferenceSources/Type.cs
 ../referencesource/mscorlib/system/globalization/culturetypes.cs
 ../referencesource/mscorlib/system/globalization/daylighttime.cs
 ../referencesource/mscorlib/system/globalization/datetimeformat.cs
-../referencesource/mscorlib/system/globalization/datetimeformatinfo.cs
 ../referencesource/mscorlib/system/globalization/datetimeformatinfoscanner.cs
 ../referencesource/mscorlib/system/globalization/datetimeparse.cs
 ../referencesource/mscorlib/system/globalization/datetimestyles.cs
@@ -1646,9 +1644,14 @@ ReferenceSources/Type.cs
 ../referencesource/mscorlib/microsoft/win32/safehandles/win32safehandles.cs
 
 corert/Debug.cs
+corert/Decimal.cs
 corert/SR.cs
 
 ../../../external/corert/src/Common/src/System/Numerics/Hashing/HashHelpers.cs
+
+../../../external/corert/src/Runtime.Base/src/System/Runtime/CompilerServices/StackOnlyAttribute.cs
+
+../../../external/corert/src/Common/src/System/Globalization/FormatProvider.Number.cs
 
 ../../../external/corert/src/System.Private.CoreLib/src/System/Collections/LowLevelComparer.cs
 ../../../external/corert/src/System.Private.CoreLib/src/System/Collections/ObjectEqualityComparer.cs
@@ -1660,3 +1663,15 @@ corert/SR.cs
 ../../../external/corert/src/System.Private.CoreLib/src/System/Runtime/CompilerServices/ITuple.cs
 ../../../external/corert/src/System.Private.CoreLib/src/System/Runtime/CompilerServices/TupleElementNamesAttribute.cs
 
+../../../external/corert/src/System.Private.CoreLib/src/System/Globalization/DateTimeFormatInfo.cs
+../../../external/corert/src/System.Private.CoreLib/src/System/Globalization/FormatProvider.cs
+../../../external/corert/src/System.Private.CoreLib/src/System/Globalization/FormatProvider.DateTimeFormat.cs
+../../../external/corert/src/System.Private.CoreLib/src/System/Globalization/FormatProvider.DateTimeParse.cs
+../../../external/corert/src/System.Private.CoreLib/src/System/Globalization/FormatProvider.FormatAndParse.cs
+../../../external/corert/src/System.Private.CoreLib/src/System/Globalization/FormatProvider.NumberBuffer.cs
+../../../external/corert/src/System.Private.CoreLib/src/System/Globalization/FormatProvider.TimeSpanFormat.cs
+../../../external/corert/src/System.Private.CoreLib/src/System/Globalization/FormatProvider.TimeSpanParse.cs
+../../../external/corert/src/System.Private.CoreLib/src/System/Globalization/InternalGlobalizationHelper.cs
+
+../../../external/corert/src/System.Private.CoreLib/src/System/Decimal.cs
+../../../external/corert/src/System.Private.CoreLib/src/System/Decimal.DecCalc.cs

@@ -59,17 +59,20 @@ namespace System {
     // throw an exception. A conversion from float or double to
     // Decimal throws an OverflowException if the value is not within
     // the range of the Decimal type.
+#if !MONO
     [StructLayout(LayoutKind.Sequential)]
     [Serializable]
     [System.Runtime.InteropServices.ComVisible(true)]
     [System.Runtime.Versioning.NonVersionable] // This only applies to field layout
+#endif
 #if GENERICS_WORK
-    public struct Decimal : IFormattable, IComparable, IConvertible, IDeserializationCallback
+    public partial struct Decimal : IFormattable, IComparable, IConvertible, IDeserializationCallback
             , IComparable<Decimal>, IEquatable<Decimal> {
 ///         , IArithmetic<Decimal>
 #else
     public struct Decimal : IFormattable, IComparable, IConvertible, IDeserializationCallback {
 #endif
+#if !MONO
         // Sign mask for the flags field. A value of zero in this bit indicates a
         // positive Decimal value, and a value of one in this bit indicates a
         // negative Decimal value.
@@ -104,24 +107,23 @@ namespace System {
             100000000,
             1000000000
         };                
-    
+
         // Constant representing the Decimal value 0.
         public const Decimal Zero = 0m;
-    
+
         // Constant representing the Decimal value 1.
         public const Decimal One = 1m;
-    
+
         // Constant representing the Decimal value -1.
         public const Decimal MinusOne = -1m;
-    
+
         // Constant representing the largest possible Decimal value. The value of
         // this constant is 79,228,162,514,264,337,593,543,950,335.
         public const Decimal MaxValue = 79228162514264337593543950335m;
-    
+
         // Constant representing the smallest possible Decimal value. The value of
         // this constant is -79,228,162,514,264,337,593,543,950,335.
         public const Decimal MinValue = -79228162514264337593543950335m;
-
 
         // Constant representing the negative number that is the closest possible
         // Decimal value to -0m.
@@ -173,7 +175,7 @@ namespace System {
             mid = 0;
             hi = 0;
         }
-    
+
         // Constructs a Decimal from an unsigned integer value.
         //
         [CLSCompliant(false)]
@@ -183,7 +185,7 @@ namespace System {
             mid = 0;
             hi = 0;
         }
-    
+
         // Constructs a Decimal from a long value.
         //
         public Decimal(long value) {
@@ -201,7 +203,7 @@ namespace System {
             mid = (int)(value_copy >> 32);
             hi = 0;
         }
-    
+
         // Constructs a Decimal from an unsigned long value.
         //
          [CLSCompliant(false)]
@@ -211,20 +213,21 @@ namespace System {
             mid = (int)(value >> 32);
             hi = 0;
         }
-    
+
         // Constructs a Decimal from a float value.
         //
         [System.Security.SecuritySafeCritical]  // auto-generated
         [ResourceExposure(ResourceScope.None)]
         [MethodImplAttribute(MethodImplOptions.InternalCall)]
         public extern Decimal(float value);
-    
+
         // Constructs a Decimal from a double value.
         //
         [System.Security.SecuritySafeCritical]  // auto-generated
         [ResourceExposure(ResourceScope.None)]
         [MethodImplAttribute(MethodImplOptions.InternalCall)]
         public extern Decimal(double value);
+#endif
 
 #if MONO
 	public static long ToOACurrency (decimal value)
@@ -259,7 +262,8 @@ namespace System {
             return Currency.ToDecimal(Currency.FromOACurrency(cy));
         }
 #endif
-    
+
+#if !MONO
         // Constructs a Decimal from an integer array containing a binary
         // representation. The bits argument must be a non-null integer
         // array with four elements. bits[0], bits[1], and
@@ -312,7 +316,7 @@ namespace System {
             }
             throw new ArgumentException(Environment.GetResourceString("Arg_DecBitCtor"));
         }
-    
+
         // Constructs a Decimal from its constituent parts.
         // 
         public Decimal(int lo, int mid, int hi, bool isNegative, byte scale) {
@@ -326,6 +330,7 @@ namespace System {
             if (isNegative)
                 this.flags |= SignMask;
         }
+#endif
 
 #if FEATURE_SERIALIZATION
         [OnSerializing]
@@ -348,7 +353,8 @@ namespace System {
             } 
         }
 #endif
-          
+
+#if !MONO
         // Constructs a Decimal from its constituent parts.
         private Decimal(int lo, int mid, int hi, int flags) {
             if ((flags & ~(SignMask | ScaleMask)) == 0 && (flags & ScaleMask) <= (28 << 16)) {
@@ -360,7 +366,7 @@ namespace System {
             }
             throw new ArgumentException(Environment.GetResourceString("Arg_DecBitCtor"));
         }
-    
+
         // Returns the absolute value of the given Decimal. If d is
         // positive, the result is d. If d is negative, the result
         // is -d.
@@ -368,7 +374,7 @@ namespace System {
         internal static Decimal Abs(Decimal d) {
             return new Decimal(d.lo, d.mid, d.hi, d.flags & ~SignMask);
         }
-    
+
         // Adds two Decimal values.
         //
         [System.Security.SecuritySafeCritical]  // auto-generated
@@ -377,7 +383,7 @@ namespace System {
             FCallAddSub (ref d1, ref d2, DECIMAL_ADD);
             return d1;
         }
-        
+
         // FCallAddSub adds or subtracts two decimal values.  On return, d1 contains the result
         // of the operation.  Passing in DECIMAL_ADD or DECIMAL_NEG for bSign indicates
         // addition or subtraction, respectively.
@@ -397,7 +403,7 @@ namespace System {
         public static Decimal Ceiling(Decimal d) {
             return (-(Decimal.Floor(-d)));
         }               
-        
+
         // Compares two Decimal values, returning an integer that indicates their
         // relationship.
         //
@@ -413,7 +419,7 @@ namespace System {
         [MethodImplAttribute(MethodImplOptions.InternalCall)]
         [ReliabilityContract(Consistency.WillNotCorruptState, Cer.Success)]
         private static extern int FCallCompare(ref Decimal d1, ref Decimal d2);
-    
+
         // Compares this object to another object, returning an integer that
         // indicates the relationship. 
         // Returns a value less than zero if this  object
@@ -437,7 +443,7 @@ namespace System {
         {
             return FCallCompare(ref this, ref value);
         }
-        
+
         // Divides two Decimal values.
         //
         [System.Security.SecuritySafeCritical]  // auto-generated
@@ -485,7 +491,7 @@ namespace System {
         [ResourceExposure(ResourceScope.None)]
         [MethodImplAttribute(MethodImplOptions.InternalCall)]
         public extern override int GetHashCode();
-    
+
         // Compares two Decimal values for equality. Returns true if the two
         // Decimal values are equal, or false if they are not equal.
         //
@@ -493,7 +499,7 @@ namespace System {
         public static bool Equals(Decimal d1, Decimal d2) {
             return FCallCompare(ref d1, ref d2) == 0;
         }
-           
+
         // Rounds a Decimal to an integer value. The Decimal argument is rounded
         // towards negative infinity.
         //
@@ -538,7 +544,6 @@ namespace System {
             return Number.FormatDecimal(this, format, NumberFormatInfo.GetInstance(provider));
         }
 
-   
         // Converts a string to a Decimal. The string must consist of an optional
         // minus sign ("-") followed by a sequence of digits ("0" - "9"). The
         // sequence of digits may optionally contain a single decimal point (".")
@@ -549,7 +554,7 @@ namespace System {
         public static Decimal Parse(String s) {
             return Number.ParseDecimal(s, NumberStyles.Number, NumberFormatInfo.CurrentInfo);
         }
-    
+
         public static Decimal Parse(String s, NumberStyles style) {
             NumberFormatInfo.ValidateParseStyleFloatingPoint(style);
             return Number.ParseDecimal(s, style, NumberFormatInfo.CurrentInfo);
@@ -558,12 +563,12 @@ namespace System {
         public static Decimal Parse(String s, IFormatProvider provider) {
             return Number.ParseDecimal(s, NumberStyles.Number, NumberFormatInfo.GetInstance(provider));
         }
-    
+
         public static Decimal Parse(String s, NumberStyles style, IFormatProvider provider) {
             NumberFormatInfo.ValidateParseStyleFloatingPoint(style);
             return Number.ParseDecimal(s, style, NumberFormatInfo.GetInstance(provider));
         }
-    
+
         public static Boolean TryParse(String s, out Decimal result) {
             return Number.TryParseDecimal(s, NumberStyles.Number, NumberFormatInfo.CurrentInfo, out result);
         }
@@ -586,6 +591,7 @@ namespace System {
         public static int[] GetBits(Decimal d) {
             return new int[] {d.lo, d.mid, d.hi, d.flags};
         }
+#endif
 
         internal static void GetBytes(Decimal d, byte [] buffer) {
             Contract.Requires((buffer != null && buffer.Length >= 16), "[GetBytes]buffer != null && buffer.Length >= 16");
@@ -618,7 +624,8 @@ namespace System {
             int flags = ((int)buffer[12]) | ((int)buffer[13] << 8) | ((int)buffer[14] << 16) | ((int)buffer[15] << 24);
             return new Decimal(lo,mid,hi,flags);
         }
-   
+
+#if !MONO
         // This method does a 'raw' and 'unchecked' addition of a UInt32 to a Decimal in place. 
         // 'raw' means that it operates on the internal 96-bit unsigned integer value and 
         // ingores the sign and scale. This means that it is not equivalent to just adding
@@ -663,7 +670,7 @@ namespace System {
             }
             return remainder;
         }
-        
+
         // Does an in-place round the specified number of digits, rounding mid-point values
         // away from zero
         private static void InternalRoundFromZero(ref Decimal d, int decimalCount) {
@@ -690,7 +697,7 @@ namespace System {
             // the scale becomes the desired decimal count
             d.flags = ((decimalCount << ScaleShift) & ScaleMask) | (d.flags & SignMask);
         }
-    
+
         // Returns the larger of two Decimal values.
         //
         [System.Security.SecuritySafeCritical]  // auto-generated
@@ -698,7 +705,7 @@ namespace System {
         internal static Decimal Max(Decimal d1, Decimal d2) {
             return FCallCompare(ref d1, ref d2) >= 0? d1: d2;
         }
-    
+
         // Returns the smaller of two Decimal values.
         //
         [System.Security.SecuritySafeCritical]  // auto-generated
@@ -706,7 +713,7 @@ namespace System {
         internal static Decimal Min(Decimal d1, Decimal d2) {
             return FCallCompare(ref d1, ref d2) < 0? d1: d2;
         }
-    
+
         public static Decimal Remainder(Decimal d1, Decimal d2) {
             // OleAut doesn't provide a VarDecMod.            
             
@@ -749,7 +756,7 @@ namespace System {
 
             return result;
         }
-        
+
         // Multiplies two Decimal values.
         //
         [System.Security.SecuritySafeCritical]  // auto-generated
@@ -766,7 +773,7 @@ namespace System {
         [ResourceExposure(ResourceScope.None)]
         [MethodImplAttribute(MethodImplOptions.InternalCall)]
         private static extern void FCallMultiply(ref Decimal d1, ref Decimal d2);
-    
+
         //[System.Security.SecurityCritical]  // auto-generated
         //[ResourceExposure(ResourceScope.None)]
         //[MethodImplAttribute(MethodImplOptions.InternalCall)]
@@ -778,6 +785,7 @@ namespace System {
         public static Decimal Negate(Decimal d) {
             return new Decimal(d.lo, d.mid, d.hi, d.flags ^ SignMask);
         }
+#endif
 
         // Rounds a Decimal value to a given number of decimal places. The value
         // given by d is rounded to the number of decimal places given by
@@ -790,18 +798,21 @@ namespace System {
         public static Decimal Round(Decimal d) {
             return Round(d, 0);
         }
-        
+
+#if !MONO
         [System.Security.SecuritySafeCritical]  // auto-generated
         public static Decimal Round(Decimal d, int decimals)
         {
             FCallRound (ref d, decimals);
             return d;
         }
+#endif
 
         public static Decimal Round(Decimal d, MidpointRounding mode) {
             return Round(d, 0, mode);
         }
 
+#if !MONO
         [System.Security.SecuritySafeCritical]  // auto-generated
         public static Decimal Round(Decimal d, int decimals, MidpointRounding mode) {
             if ((decimals < 0) || (decimals > 28))
@@ -824,7 +835,7 @@ namespace System {
         [ResourceExposure(ResourceScope.None)]
         [MethodImplAttribute(MethodImplOptions.InternalCall)]
         private static extern void FCallRound(ref Decimal d, int decimals);
-    
+
         // Subtracts two Decimal values.
         //
         [System.Security.SecuritySafeCritical]  // auto-generated
@@ -850,7 +861,7 @@ namespace System {
             return (byte)temp;
 
         }
-    
+
         // Converts a Decimal to a signed byte. The Decimal value is rounded
         // towards zero to the nearest integer value, and the result of this
         // operation is returned as a byte.
@@ -867,7 +878,7 @@ namespace System {
             if (temp < SByte.MinValue || temp > SByte.MaxValue) throw new OverflowException(Environment.GetResourceString("Overflow_SByte"));
             return (sbyte)temp;
         }
-        
+
         // Converts a Decimal to a short. The Decimal value is
         // rounded towards zero to the nearest integer value, and the result of
         // this operation is returned as a short.
@@ -883,8 +894,7 @@ namespace System {
             if (temp < Int16.MinValue || temp > Int16.MaxValue) throw new OverflowException(Environment.GetResourceString("Overflow_Int16"));
             return (short)temp;
         }
-    
-#if !MONO
+
         // Converts a Decimal to a Currency. Since a Currency
         // has fewer significant digits than a Decimal, this operation may
         // produce round-off errors.
@@ -901,8 +911,7 @@ namespace System {
         [ResourceExposure(ResourceScope.None)]
         [MethodImplAttribute(MethodImplOptions.InternalCall)]
         private static extern void FCallToCurrency(ref Currency result, Decimal d);
-#endif
-	
+
         // Converts a Decimal to a double. Since a double has fewer significant
         // digits than a Decimal, this operation may produce round-off errors.
         //
@@ -915,7 +924,7 @@ namespace System {
         [ResourceExposure(ResourceScope.None)]
         [MethodImplAttribute(MethodImplOptions.InternalCall)]
         internal static extern int FCallToInt32(Decimal d);
-    
+
         // Converts a Decimal to an integer. The Decimal value is rounded towards
         // zero to the nearest integer value, and the result of this operation is
         // returned as an integer.
@@ -935,7 +944,7 @@ namespace System {
             }
             throw new OverflowException(Environment.GetResourceString("Overflow_Int32"));
         }
-    
+
         // Converts a Decimal to a long. The Decimal value is rounded towards zero
         // to the nearest integer value, and the result of this operation is
         // returned as a long.
@@ -955,7 +964,7 @@ namespace System {
             }
             throw new OverflowException(Environment.GetResourceString("Overflow_Int64"));
         }
-    
+
         // Converts a Decimal to an ushort. The Decimal 
         // value is rounded towards zero to the nearest integer value, and the 
         // result of this operation is returned as an ushort.
@@ -972,7 +981,7 @@ namespace System {
             if (temp < UInt16.MinValue || temp > UInt16.MaxValue) throw new OverflowException(Environment.GetResourceString("Overflow_UInt16"));
             return (ushort)temp;
         }
-    
+
         // Converts a Decimal to an unsigned integer. The Decimal 
         // value is rounded towards zero to the nearest integer value, and the 
         // result of this operation is returned as an unsigned integer.
@@ -988,7 +997,7 @@ namespace System {
             }
             throw new OverflowException(Environment.GetResourceString("Overflow_UInt32"));
         }
-        
+
         // Converts a Decimal to an unsigned long. The Decimal 
         // value is rounded towards zero to the nearest integer value, and the 
         // result of this operation is returned as a long.
@@ -1004,7 +1013,7 @@ namespace System {
             }
             throw new OverflowException(Environment.GetResourceString("Overflow_UInt64"));
         }
-    
+
         // Converts a Decimal to a float. Since a float has fewer significant
         // digits than a Decimal, this operation may produce round-off errors.
         //
@@ -1024,26 +1033,24 @@ namespace System {
             return d;
         }
 
-
         [System.Security.SecurityCritical]  // auto-generated
         [ResourceExposure(ResourceScope.None)]
         [MethodImplAttribute(MethodImplOptions.InternalCall)]
         private static extern void FCallTruncate(ref Decimal d);
-    
-                
+
         public static implicit operator Decimal(byte value) {
             return new Decimal(value);
         }
-    
+
         [CLSCompliant(false)]
         public static implicit operator Decimal(sbyte value) {
             return new Decimal(value);
         }
-    
+
         public static implicit operator Decimal(short value) {
             return new Decimal(value);
         }
-    
+
         [CLSCompliant(false)]
         public static implicit operator Decimal(ushort value) {
             return new Decimal(value);
@@ -1088,7 +1095,7 @@ namespace System {
         public static explicit operator sbyte(Decimal value) {
             return ToSByte(value);
         }
-    
+
         public static explicit operator char(Decimal value) {
             UInt16 temp;
             try {
@@ -1292,6 +1299,7 @@ namespace System {
         Object IConvertible.ToType(Type type, IFormatProvider provider) {
             return Convert.DefaultToType((IConvertible)this, type, provider);
         }
+#endif
 
 ///#if GENERICS_WORK
 ///        //
