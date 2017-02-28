@@ -359,7 +359,7 @@ register_thread (MonoThreadInfo *info, gpointer baseptr)
 	guint8 *staddr = NULL;
 	int small_id = mono_thread_info_register_small_id ();
 	gboolean result;
-	mono_thread_info_set_tid (info, mono_native_thread_id_get ());
+	mono_thread_info_set_tid (info, mono_thread_platform_get_tid ());
 	info->small_id = small_id;
 
 	info->handle = g_new0 (MonoThreadHandle, 1);
@@ -528,7 +528,7 @@ mono_thread_info_current (void)
 	if (info)
 		return info;
 
-	info = mono_thread_info_lookup (mono_native_thread_id_get ()); /*info on HP1*/
+	info = mono_thread_info_lookup (mono_thread_platform_get_tid ()); /*info on HP1*/
 
 	/*
 	We might be called during thread cleanup, but we cannot be called after cleanup as happened.
@@ -714,7 +714,7 @@ mono_threads_init (MonoThreadInfoCallbacks *callbacks, size_t info_size)
 	mono_thread_smr_init ();
 	mono_threads_suspend_init ();
 	mono_threads_coop_init ();
-	mono_threads_platform_init ();
+	mono_thread_platform_init ();
 
 #if defined(__MACH__)
 	mono_mach_init (thread_info_key);
@@ -835,7 +835,7 @@ is_thread_in_critical_region (MonoThreadInfo *info)
 	gpointer stack_start;
 	MonoThreadUnwindState *state;
 
-	if (mono_threads_platform_in_critical_region (mono_thread_info_get_tid (info)))
+	if (mono_thread_platform_in_critical_region (mono_thread_info_get_tid (info)))
 		return TRUE;
 
 	/* Are we inside a system critical region? */
@@ -966,7 +966,7 @@ mono_thread_info_safe_suspend_and_run (MonoNativeThreadId id, gboolean interrupt
 
 	THREADS_SUSPEND_DEBUG ("SUSPENDING tid %p\n", (void*)id);
 	/*FIXME: unify this with self-suspend*/
-	g_assert (id != mono_native_thread_id_get ());
+	g_assert (id != mono_thread_platform_get_tid ());
 
 	/* This can block during stw */
 	mono_thread_info_suspend_lock ();
@@ -1128,7 +1128,7 @@ void
 mono_thread_info_get_stack_bounds (guint8 **staddr, size_t *stsize)
 {
 	guint8 *current = (guint8 *)&stsize;
-	mono_threads_platform_get_stack_bounds (staddr, stsize);
+	mono_thread_platform_get_stack_bounds (staddr, stsize);
 	if (!*staddr)
 		return;
 
@@ -1142,7 +1142,7 @@ mono_thread_info_get_stack_bounds (guint8 **staddr, size_t *stsize)
 gboolean
 mono_thread_info_yield (void)
 {
-	return mono_threads_platform_yield ();
+	return mono_thread_platform_yield ();
 }
 
 static mono_lazy_init_t sleep_init = MONO_LAZY_INIT_STATUS_NOT_INITIALIZED;
@@ -1327,7 +1327,7 @@ mono_thread_info_exit (gsize exit_code)
 
 	mono_thread_info_detach ();
 
-	mono_threads_platform_exit (0);
+	mono_thread_platform_exit (0);
 }
 
 /*
@@ -1557,7 +1557,7 @@ mono_thread_info_describe_interrupt_token (MonoThreadInfo *info, GString *text)
 gboolean
 mono_thread_info_is_current (MonoThreadInfo *info)
 {
-	return mono_thread_info_get_tid (info) == mono_native_thread_id_get ();
+	return mono_thread_info_get_tid (info) == mono_thread_platform_get_tid ();
 }
 
 MonoThreadInfoWaitRet

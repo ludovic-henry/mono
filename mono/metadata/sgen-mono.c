@@ -2051,7 +2051,7 @@ mono_sgen_register_moved_object (void *obj, void *destination)
 	 * lock-free data structure for the queue as multiple threads will be
 	 * adding to it at the same time.
 	 */
-	if (sgen_thread_pool_is_thread_pool_thread (mono_native_thread_id_get ())) {
+	if (sgen_thread_pool_is_thread_pool_thread (mono_thread_platform_get_tid ())) {
 		sgen_pointer_queue_add (&moved_objects_queue, obj);
 		sgen_pointer_queue_add (&moved_objects_queue, destination);
 	} else {
@@ -2311,7 +2311,7 @@ void
 sgen_client_thread_register_worker (void)
 {
 	mono_thread_info_register_small_id ();
-	mono_native_thread_set_name (mono_native_thread_id_get (), "SGen worker");
+	mono_native_thread_set_name (mono_thread_platform_get_tid (), "SGen worker");
 }
 
 /* Variables holding start/end nursery so it won't have to be passed at every call */

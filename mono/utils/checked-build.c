@@ -208,7 +208,7 @@ mono_fatal_with_history (const char *msg, ...)
 	int i;
 	GString* err = g_string_sized_new (100);
 
-	g_string_append_printf (err, "Assertion failure in thread %p due to: ", mono_native_thread_id_get ());
+	g_string_append_printf (err, "Assertion failure in thread %p due to: ", mono_thread_platform_get_tid ());
 
 	va_list args;
 	va_start (args, msg);

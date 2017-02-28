@@ -50,7 +50,7 @@ continuation_mark_frame (MonoContinuation *cont)
 	jit_tls = (MonoJitTlsData *)mono_tls_get_jit_tls ();
 	lmf = mono_get_lmf();
 	cont->domain = mono_domain_get ();
-	cont->thread_id = mono_native_thread_id_get ();
+	cont->thread_id = mono_thread_platform_get_tid ();
 
 	/* get to the frame that called Mark () */
 	memset (&rji, 0, sizeof (rji));
@@ -83,7 +83,7 @@ continuation_store (MonoContinuation *cont, int state, MonoException **e)
 		*e =  mono_get_exception_argument ("cont", "Continuation not initialized");
 		return 0;
 	}
-	if (cont->domain != mono_domain_get () || !mono_native_thread_id_equals (cont->thread_id, mono_native_thread_id_get ())) {
+	if (cont->domain != mono_domain_get () || !mono_native_thread_id_equals (cont->thread_id, mono_thread_platform_get_tid ())) {
 		*e = mono_get_exception_argument ("cont", "Continuation from another thread or domain");
 		return 0;
 	}
@@ -125,7 +125,7 @@ continuation_restore (MonoContinuation *cont, int state)
 
 	if (!cont->domain || !cont->return_sp)
 		return mono_get_exception_argument ("cont", "Continuation not initialized");
-	if (cont->domain != mono_domain_get () || !mono_native_thread_id_equals (cont->thread_id, mono_native_thread_id_get ()))
+	if (cont->domain != mono_domain_get () || !mono_native_thread_id_equals (cont->thread_id, mono_thread_platform_get_tid ()))
 		return mono_get_exception_argument ("cont", "Continuation from another thread or domain");
 
 	/*g_print ("restore: %p, state: %d\n", cont, state);*/

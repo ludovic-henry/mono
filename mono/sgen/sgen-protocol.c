@@ -369,7 +369,7 @@ protocol_entry (unsigned char type, gpointer data, int size)
 		 * If the thread is not a worker thread we insert 0, which is interpreted
 		 * as gc thread. Worker indexes are 1 based.
 		 */
-		buffer->buffer [index++] = (unsigned char) sgen_thread_pool_is_thread_pool_thread (mono_native_thread_id_get ());
+		buffer->buffer [index++] = (unsigned char) sgen_thread_pool_is_thread_pool_thread (mono_thread_platform_get_tid ());
 	}
 	memcpy (buffer->buffer + index, data, size);
 	index += size;

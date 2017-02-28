@@ -459,7 +459,7 @@ gboolean
 sgen_memgov_try_alloc_space (mword size, int space)
 {
 	if (sgen_memgov_available_free_space () < size) {
-		SGEN_ASSERT (4, !sgen_thread_pool_is_thread_pool_thread (mono_native_thread_id_get ()), "Memory shouldn't run out in worker thread");
+		SGEN_ASSERT (4, !sgen_thread_pool_is_thread_pool_thread (mono_thread_platform_get_tid ()), "Memory shouldn't run out in worker thread");
 		return FALSE;
 	}
 

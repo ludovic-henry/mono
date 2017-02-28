@@ -6,7 +6,7 @@
 #include <pthread.h>
 
 void
-mono_threads_platform_get_stack_bounds (guint8 **staddr, size_t *stsize)
+mono_thread_platform_get_stack_bounds (guint8 **staddr, size_t *stsize)
 {
 	pthread_attr_t attr;
 

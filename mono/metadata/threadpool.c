@@ -335,7 +335,7 @@ worker_callback (gpointer unused)
 		g_assert (tpdomain->outstanding_request >= 0);
 
 		mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_THREADPOOL, "[%p] worker running in domain %p (outstanding requests %d)",
-			mono_native_thread_id_get (), tpdomain->domain, tpdomain->outstanding_request);
+			mono_thread_platform_get_tid (), tpdomain->domain, tpdomain->outstanding_request);
 
 		g_assert (tpdomain->threadpool_jobs >= 0);
 		tpdomain->threadpool_jobs ++;

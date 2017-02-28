@@ -152,7 +152,7 @@ add_alloc_record (char *addr, size_t size, int reason)
 	alloc_records [idx].size = size;
 	alloc_records [idx].reason = reason;
 	alloc_records [idx].seq = idx;
-	alloc_records [idx].tid = mono_native_thread_id_get ();
+	alloc_records [idx].tid = mono_thread_platform_get_tid ();
 }
 
 static int

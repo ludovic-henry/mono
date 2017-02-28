@@ -211,7 +211,7 @@ mono_thread_platform_create_thread (MonoThreadStart thread_fn, gpointer thread_d
 
 
 MonoNativeThreadId
-mono_native_thread_id_get (void)
+mono_thread_platform_get_tid (void)
 {
 	return GetCurrentThreadId ();
 }
@@ -256,7 +256,7 @@ __readfsdword (unsigned long offset)
 #endif
 
 void
-mono_threads_platform_get_stack_bounds (guint8 **staddr, size_t *stsize)
+mono_thread_platform_get_stack_bounds (guint8 **staddr, size_t *stsize)
 {
 	MEMORY_BASIC_INFORMATION meminfo;
 #ifdef _WIN64
@@ -290,7 +290,7 @@ static gboolean is_wow64 = FALSE;
 
 /* We do this at init time to avoid potential races with module opening */
 void
-mono_threads_platform_init (void)
+mono_thread_platform_init (void)
 {
 #if SIZEOF_VOID_P == 4 && G_HAVE_API_SUPPORT(HAVE_CLASSIC_WINAPI_SUPPORT)
 	LPFN_ISWOW64PROCESS is_wow64_func = (LPFN_ISWOW64PROCESS) GetProcAddress (GetModuleHandle (TEXT ("kernel32")), "IsWow64Process");
@@ -308,7 +308,7 @@ mono_threads_platform_init (void)
  * We check CONTEXT_EXCEPTION_ACTIVE for this, which is highly undocumented.
  */
 gboolean
-mono_threads_platform_in_critical_region (MonoNativeThreadId tid)
+mono_thread_platform_in_critical_region (MonoNativeThreadId tid)
 {
 	gboolean ret = FALSE;
 #if SIZEOF_VOID_P == 4 && G_HAVE_API_SUPPORT(HAVE_CLASSIC_WINAPI_SUPPORT)
@@ -334,19 +334,19 @@ mono_threads_platform_in_critical_region (MonoNativeThreadId tid)
 }
 
 gboolean
-mono_threads_platform_yield (void)
+mono_thread_platform_yield (void)
 {
 	return SwitchToThread ();
 }
 
 void
-mono_threads_platform_exit (gsize exit_code)
+mono_thread_platform_exit (gsize exit_code)
 {
 	ExitThread (exit_code);
 }
 
 int
-mono_threads_get_max_stack_size (void)
+mono_thread_platform_get_stack_max_size (void)
 {
 	//FIXME
 	return INT_MAX;

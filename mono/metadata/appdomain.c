@@ -2619,7 +2619,7 @@ mono_domain_try_unload (MonoDomain *domain, MonoObject **exc)
 	MonoInternalThread *internal;
 	MonoDomain *caller_domain = mono_domain_get ();
 
-	/* printf ("UNLOAD STARTING FOR %s (%p) IN THREAD 0x%x.\n", domain->friendly_name, domain, mono_native_thread_id_get ()); */
+	/* printf ("UNLOAD STARTING FOR %s (%p) IN THREAD 0x%x.\n", domain->friendly_name, domain, mono_thread_platform_get_tid ()); */
 
 	/* Atomically change our state to UNLOADING */
 	prev_state = (MonoAppDomainState)InterlockedCompareExchange ((gint32*)&domain->state,

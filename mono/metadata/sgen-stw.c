@@ -118,7 +118,7 @@ sgen_client_stop_world (int generation)
 	update_current_thread_stack (&generation);
 
 	sgen_global_stop_count++;
-	SGEN_LOG (3, "stopping world n %d from %p %p", sgen_global_stop_count, mono_thread_info_current (), (gpointer) (gsize) mono_native_thread_id_get ());
+	SGEN_LOG (3, "stopping world n %d from %p %p", sgen_global_stop_count, mono_thread_info_current (), (gpointer) (gsize) mono_thread_platform_get_tid ());
 	TV_GETTIME (stop_world_time);
 
 	sgen_unified_suspend_stop_world ();

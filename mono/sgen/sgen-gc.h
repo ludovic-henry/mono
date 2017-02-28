@@ -590,7 +590,7 @@ sgen_update_reference (GCObject **p, GCObject *o, gboolean allow_null)
 {
 	if (!allow_null)
 		SGEN_ASSERT (0, o, "Cannot update a reference with a NULL pointer");
-	SGEN_ASSERT (0, !sgen_thread_pool_is_thread_pool_thread (mono_native_thread_id_get ()), "Can't update a reference in the worker thread");
+	SGEN_ASSERT (0, !sgen_thread_pool_is_thread_pool_thread (mono_thread_platform_get_tid ()), "Can't update a reference in the worker thread");
 	*p = o;
 }
 

@@ -81,7 +81,7 @@ set_state (WorkerData *data, State old_state, State new_state)
 	else if (new_state == STATE_WORKING)
 		SGEN_ASSERT (0, old_state == STATE_WORK_ENQUEUED, "We can only transition to WORKING from WORK ENQUEUED");
 	if (new_state == STATE_NOT_WORKING || new_state == STATE_WORKING)
-		SGEN_ASSERT (6, sgen_thread_pool_is_thread_pool_thread (mono_native_thread_id_get ()), "Only the worker thread is allowed to transition to NOT_WORKING or WORKING");
+		SGEN_ASSERT (6, sgen_thread_pool_is_thread_pool_thread (mono_thread_platform_get_tid ()), "Only the worker thread is allowed to transition to NOT_WORKING or WORKING");
 
 	return InterlockedCompareExchange (&data->state, new_state, old_state) == old_state;
 }

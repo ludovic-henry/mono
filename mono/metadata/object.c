@@ -388,7 +388,7 @@ mono_runtime_class_init_full (MonoVTable *vtable, MonoError *error)
 		return TRUE;
 	}
 
-	tid = mono_native_thread_id_get ();
+	tid = mono_thread_platform_get_tid ();
 
 	/*
 	 * Due some preprocessing inside a global lock. If we are the first thread

@@ -3673,7 +3673,7 @@ mini_init (const char *filename, const char *runtime_version)
 
 	if (mini_profiler_enabled ()) {
 		mono_profiler_load (mini_profiler_get_options ());
-		mono_profiler_thread_name (MONO_NATIVE_THREAD_ID_TO_UINT (mono_native_thread_id_get ()), "Main");
+		mono_profiler_thread_name (MONO_NATIVE_THREAD_ID_TO_UINT (mono_thread_platform_get_tid ()), "Main");
 	}
 
 	if (debug_options.collect_pagefault_stats)

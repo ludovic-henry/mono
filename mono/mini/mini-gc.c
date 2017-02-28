@@ -598,7 +598,7 @@ thread_attach_func (void)
 	TlsData *tls;
 
 	tls = g_new0 (TlsData, 1);
-	tls->tid = mono_native_thread_id_get ();
+	tls->tid = mono_thread_platform_get_tid ();
 	tls->info = mono_thread_info_current ();
 	stats.tlsdata_size += sizeof (TlsData);
 
@@ -623,7 +623,7 @@ thread_suspend_func (gpointer user_data, void *sigctx, MonoContext *ctx)
 		return;
 	}
 
-	if (tls->tid != mono_native_thread_id_get ()) {
+	if (tls->tid != mono_thread_platform_get_tid ()) {
 		/* Happens on osx because threads are not suspended using signals */
 #ifndef TARGET_WIN32
 		gboolean res;
