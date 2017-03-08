@@ -109,11 +109,6 @@ typedef struct {
 	gdouble accumulated_sample_duration;
 } ThreadPoolHillClimbing;
 
-typedef struct {
-	MonoThreadPoolWorkerCallback callback;
-	gpointer data;
-} ThreadPoolWorkItem;
-
 typedef union {
 	struct {
 		gint16 max_working; /* determined by heuristic */
@@ -125,15 +120,14 @@ typedef union {
 typedef struct {
 	MonoRefCount ref;
 
+	MonoThreadPoolWorkerCallback callback;
+
 	ThreadPoolWorkerCounter counters;
 
 	gint32 parked_threads_count;
 	MonoCoopSem parked_threads_sem;
 
-	ThreadPoolWorkItem *work_items; // ThreadPoolWorkItem []
 	gint32 work_items_count;
-	gint32 work_items_size;
-	MonoCoopMutex work_items_lock;
 
 	guint32 worker_creation_current_second;
 	guint32 worker_creation_current_count;
@@ -215,8 +209,6 @@ destroy (gpointer data)
 {
 	mono_coop_sem_destroy (&worker.parked_threads_sem);
 
-	mono_coop_mutex_destroy (&worker.work_items_lock);
-
 	mono_coop_mutex_destroy (&worker.worker_creation_lock);
 
 	mono_coop_mutex_destroy (&worker.heuristic_lock);
@@ -225,7 +217,7 @@ destroy (gpointer data)
 }
 
 void
-mono_threadpool_worker_init (void)
+mono_threadpool_worker_init (MonoThreadPoolWorkerCallback callback)
 {
 	ThreadPoolHillClimbing *hc;
 	const char *threads_per_cpu_env;
@@ -234,11 +226,12 @@ mono_threadpool_worker_init (void)
 
 	mono_refcount_init (&worker, destroy);
 
+	worker.callback = callback;
+
 	worker.parked_threads_count = 0;
 	mono_coop_sem_init (&worker.parked_threads_sem, 0);
 
-	/* worker.work_items_size is inited to 0 */
-	mono_coop_mutex_init (&worker.work_items_lock);
+	worker.work_items_count = 0;
 
 	worker.worker_creation_current_second = -1;
 	mono_coop_mutex_init (&worker.worker_creation_lock);
@@ -306,94 +299,49 @@ mono_threadpool_worker_cleanup (void)
 }
 
 static void
-work_item_lock (void)
+work_item_push (void)
 {
-	mono_coop_mutex_lock (&worker.work_items_lock);
-}
+	gint32 old, new;
 
-static void
-work_item_unlock (void)
-{
-	mono_coop_mutex_unlock (&worker.work_items_lock);
-}
+	do {
+		old = worker.work_items_count;
+		g_assert (old >= 0);
 
-static void
-work_item_push (MonoThreadPoolWorkerCallback callback, gpointer data)
-{
-	ThreadPoolWorkItem work_item;
+		new = old + 1;
+	} while (InterlockedCompareExchange (&worker.work_items_count, new, old) != old);
 
-	g_assert (callback);
-
-	work_item.callback = callback;
-	work_item.data = data;
-
-	work_item_lock ();
-
-	g_assert (worker.work_items_count <= worker.work_items_size);
-
-	if (G_UNLIKELY (worker.work_items_count == worker.work_items_size)) {
-		worker.work_items_size += 64;
-		worker.work_items = g_renew (ThreadPoolWorkItem, worker.work_items, worker.work_items_size);
-	}
-
-	g_assert (worker.work_items);
-
-	worker.work_items [worker.work_items_count ++] = work_item;
-
-	// printf ("[push] worker.work_items = %p, worker.work_items_count = %d, worker.work_items_size = %d\n",
-	// 	worker.work_items, worker.work_items_count, worker.work_items_size);
-
-	work_item_unlock ();
+	// printf ("[push] worker.work_items_count = %d\n", new);
 }
 
 static gboolean
-work_item_try_pop (ThreadPoolWorkItem *work_item)
+work_item_try_pop (void)
 {
-	g_assert (work_item);
+	gint32 old, new;
 
-	work_item_lock ();
+	// printf ("[pop]  worker.work_items_count = %d\n", worker.work_items_count);
 
-	// printf ("[pop]  worker.work_items = %p, worker.work_items_count = %d, worker.work_items_size = %d\n",
-	// 	worker.work_items, worker.work_items_count, worker.work_items_size);
+	do {
+		old = worker.work_items_count;
+		g_assert (old >= 0);
 
-	if (worker.work_items_count == 0) {
-		work_item_unlock ();
-		return FALSE;
-	}
+		if (old == 0)
+			return FALSE;
 
-	*work_item = worker.work_items [-- worker.work_items_count];
-
-	if (G_UNLIKELY (worker.work_items_count >= 64 * 3 && worker.work_items_count < worker.work_items_size / 2)) {
-		worker.work_items_size -= 64;
-		worker.work_items = g_renew (ThreadPoolWorkItem, worker.work_items, worker.work_items_size);
-	}
-
-	work_item_unlock ();
+		new = old - 1;
+	} while (InterlockedCompareExchange (&worker.work_items_count, new, old) != old);
 
 	return TRUE;
-}
-
-static gint32
-work_item_count (void)
-{
-	gint32 count;
-
-	work_item_lock ();
-	count = worker.work_items_count;
-	work_item_unlock ();
-
-	return count;
 }
 
 static void worker_request (void);
 
 void
-mono_threadpool_worker_enqueue (MonoThreadPoolWorkerCallback callback, gpointer data)
+mono_threadpool_worker_request (void)
 {
 	if (!mono_refcount_tryinc (&worker))
 		return;
 
-	work_item_push (callback, data);
+	work_item_push ();
 
 	worker_request ();
 
@@ -493,12 +441,10 @@ worker_thread (gpointer unused)
 	g_assert (thread);
 
 	while (!mono_runtime_is_shutting_down ()) {
-		ThreadPoolWorkItem work_item;
-
 		if (mono_thread_interruption_checkpoint ())
 			continue;
 
-		if (!work_item_try_pop (&work_item)) {
+		if (!work_item_try_pop ()) {
 			gboolean timeout;
 
 			timeout = worker_park ();
@@ -508,10 +454,10 @@ worker_thread (gpointer unused)
 			continue;
 		}
 
-		mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_THREADPOOL, "[%p] worker executing %p (%p)",
-			mono_native_thread_id_get (), work_item.callback, work_item.data);
+		mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_THREADPOOL, "[%p] worker executing",
+			mono_native_thread_id_get ());
 
-		work_item.callback (work_item.data);
+		worker.callback ();
 	}
 
 	COUNTER_ATOMIC (counter, {
@@ -624,7 +570,7 @@ monitor_should_keep_running (void)
 		if (mono_runtime_is_shutting_down ()) {
 			should_keep_running = FALSE;
 		} else {
-			if (work_item_count () == 0)
+			if (worker.work_items_count == 0)
 				should_keep_running = FALSE;
 
 			if (!should_keep_running) {
@@ -718,7 +664,7 @@ monitor_thread (gpointer unused)
 		if (worker.suspended)
 			continue;
 
-		if (work_item_count () == 0)
+		if (worker.work_items_count)
 			continue;
 
 		worker.cpu_usage = mono_cpu_usage (worker.cpu_usage_state);
