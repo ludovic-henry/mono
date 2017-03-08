@@ -400,54 +400,21 @@ mono_threadpool_worker_enqueue (MonoThreadPoolWorkerCallback callback, gpointer 
 	mono_refcount_dec (&worker);
 }
 
-static void
-worker_wait_interrupt (gpointer unused)
-{
-	/* If the runtime is not shutting down, we are not using this mechanism to wake up a unparked thread, and if the
-	 * runtime is shutting down, then we need to wake up ALL the threads.
-	 * It might be a bit wasteful, but I witnessed shutdown hang where the main thread would abort and then wait for all
-	 * background threads to exit (see mono_thread_manage). This would go wrong because not all threadpool threads would
-	 * be unparked. It would end up getting unstucked because of the timeout, but that would delay shutdown by 5-60s. */
-	if (!mono_runtime_is_shutting_down ())
-		return;
-
-	if (!mono_refcount_tryinc (&worker))
-		return;
-
-	for (;;) {
-		gint32 old, new;
-		do {
-			old = worker.parked_threads_count;
-			g_assert (old >= 0);
-
-			if (old == 0)
-				break;
-
-			new = old - 1;
-		} while (InterlockedCompareExchange (&worker.parked_threads_count, new, old) != old);
-
-		if (old == 0)
-			break;
-
-		mono_coop_sem_post (&worker.parked_threads_sem);
-	}
-
-	mono_refcount_dec (&worker);
-}
-
 /* return TRUE if timeout, FALSE otherwise (worker unpark or interrupt) */
 static gboolean
 worker_park (void)
 {
 	gboolean timeout = FALSE;
-	gboolean interrupted = FALSE;
+	gboolean alerted = FALSE;
 
 	mono_trace (G_LOG_LEVEL_INFO, MONO_TRACE_THREADPOOL, "[%p] worker parking", mono_native_thread_id_get ());
 
 	if (!mono_runtime_is_shutting_down ()) {
 		static gpointer rand_handle = NULL;
 		MonoInternalThread *thread;
+		MonoSemTimedwaitRet semres;
 		ThreadPoolWorkerCounter counter;
+		gint32 res;
 
 		if (!rand_handle)
 			rand_handle = rand_create ();
@@ -456,36 +423,28 @@ worker_park (void)
 		thread = mono_thread_internal_current ();
 		g_assert (thread);
 
-		mono_thread_info_install_interrupt (worker_wait_interrupt, NULL, &interrupted);
-		if (interrupted) {
-			mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_THREADPOOL, "[%p] worker unparking, interrupted", mono_native_thread_id_get ());
-			return FALSE;
-		}
-
 		COUNTER_ATOMIC (counter, {
 			counter._.working --;
 		});
 
 		InterlockedIncrement (&worker.parked_threads_count);
 
-		if (mono_coop_sem_timedwait (&worker.parked_threads_sem, rand_next (&rand_handle, 5 * 1000, 60 * 1000), MONO_SEM_FLAGS_ALERTABLE) == MONO_SEM_TIMEDWAIT_RET_TIMEDOUT)
+		semres = mono_coop_sem_timedwait (&worker.parked_threads_sem, rand_next (&rand_handle, 5 * 1000, 60 * 1000), MONO_SEM_FLAGS_ALERTABLE);
+		if (semres == MONO_SEM_TIMEDWAIT_RET_TIMEDOUT)
 			timeout = TRUE;
+		else if (semres == MONO_SEM_TIMEDWAIT_RET_ALERTED)
+			alerted = TRUE;
+
+		res = InterlockedDecrement (&worker.parked_threads_count);
+		g_assert (res >= 0);
 
 		COUNTER_ATOMIC (counter, {
 			counter._.working ++;
 		});
-
-		mono_thread_info_uninstall_interrupt (&interrupted);
-
-		if (timeout || interrupted) {
-			gint32 res;
-			res = InterlockedDecrement (&worker.parked_threads_count);
-			g_assert (res >= 0);
-		}
 	}
 
-	mono_trace (G_LOG_LEVEL_INFO, MONO_TRACE_THREADPOOL, "[%p] worker unparking, timeout? %s interrupted? %s",
-		mono_native_thread_id_get (), timeout ? "yes" : "no", interrupted ? "yes" : "no");
+	mono_trace (G_LOG_LEVEL_INFO, MONO_TRACE_THREADPOOL, "[%p] worker unparking, timeout? %s alerted? %s",
+		mono_native_thread_id_get (), timeout ? "yes" : "no", alerted ? "yes" : "no");
 
 	return timeout;
 }
