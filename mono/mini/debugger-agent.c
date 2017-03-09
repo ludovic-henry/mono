@@ -62,7 +62,6 @@
 #include <mono/metadata/runtime.h>
 #include <mono/metadata/verify-internals.h>
 #include <mono/metadata/reflection-internals.h>
-#include <mono/metadata/w32socket.h>
 #include <mono/utils/mono-coop-mutex.h>
 #include <mono/utils/mono-coop-semaphore.h>
 #include <mono/utils/mono-error-internals.h>
@@ -1245,7 +1244,7 @@ socket_transport_connect (const char *address)
 
 	if (host) {
 
-		mono_network_init ();
+		mono_networking_init ();
 
 		/* Obtain address(es) matching host/port */
 		s = mono_get_address_info (host, port, MONO_HINT_UNSPECIFIED, &result);

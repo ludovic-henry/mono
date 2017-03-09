@@ -33,7 +33,6 @@
 #include <mono/metadata/object-internals.h>
 #include <mono/metadata/threadpool.h>
 #include <mono/metadata/threadpool-worker.h>
-#include <mono/metadata/threadpool-io.h>
 #include <mono/metadata/w32event.h>
 #include <mono/utils/atomic.h>
 #include <mono/utils/mono-compiler.h>
@@ -401,9 +400,6 @@ worker_callback (gpointer unused)
 void
 mono_threadpool_cleanup (void)
 {
-#ifndef DISABLE_SOCKETS
-	mono_threadpool_io_cleanup ();
-#endif
 	mono_lazy_cleanup (&status, cleanup);
 }
 
@@ -518,14 +514,6 @@ mono_threadpool_remove_domain_jobs (MonoDomain *domain, int timeout)
 
 	if (timeout != -1)
 		end = mono_msec_ticks () + timeout;
-
-#ifndef DISABLE_SOCKETS
-	mono_threadpool_io_remove_domain_jobs (domain);
-	if (timeout != -1) {
-		if (mono_msec_ticks () > end)
-			return FALSE;
-	}
-#endif
 
 	/*
 	 * Wait for all threads which execute jobs in the domain to exit.

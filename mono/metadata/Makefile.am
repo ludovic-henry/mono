@@ -16,7 +16,6 @@ win32_sources = \
 	w32event-win32.c \
 	w32process-win32.c \
 	w32process-win32-internals.h \
-	w32socket-win32.c \
 	w32error-win32.c
 
 platform_sources = $(win32_sources)
@@ -50,7 +49,6 @@ unix_sources = \
 	w32process-unix-bsd.c \
 	w32process-unix-haiku.c \
 	w32process-unix-default.c \
-	w32socket-unix.c \
 	w32file-unix.c \
 	w32file-unix-glob.c \
 	w32file-unix-glob.h \
@@ -213,7 +211,6 @@ common_sources = \
 	property-bag.c	\
 	w32socket.c		\
 	w32socket.h		\
-	w32socket-internals.h		\
 	w32process.c		\
 	w32process.h		\
 	w32process-internals.h		\
@@ -241,8 +238,6 @@ common_sources = \
 	threadpool.h	\
 	threadpool-worker-default.c	\
 	threadpool-worker.h	\
-	threadpool-io.c	\
-	threadpool-io.h	\
 	verify.c		\
 	verify-internals.h	\
 	wrapper-types.h	\
@@ -352,4 +347,4 @@ libmonoruntimeinclude_HEADERS = \
 	verify.h		
 
 EXTRA_DIST = $(win32_sources) $(unix_sources) $(null_sources) runtime.h \
-		threadpool-io-poll.c threadpool-io-epoll.c threadpool-io-kqueue.c sgen-dynarray.h
+		sgen-dynarray.h

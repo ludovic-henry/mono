@@ -365,11 +365,10 @@ namespace System.Net.NetworkInformation {
 			lock (_lock) {
 				if (nl_sock != null)
 					return true;
-				IntPtr fd = CreateNLSocket ();
-				if (fd.ToInt64 () == -1)
-					return false;
 
-				var safeHandle = new SafeSocketHandle (fd, true);
+				SafeCloseSocket safeHandle = CreateNLSocket ();
+				if (safeHandle.IsInvalid)
+					return false;
 
 				nl_sock = new Socket (0, SocketType.Raw, ProtocolType.Udp, safeHandle);
 				nl_args = new SocketAsyncEventArgs ();
@@ -492,7 +491,7 @@ namespace System.Net.NetworkInformation {
 #endif
 
 		[DllImport (LIBNAME, CallingConvention=CallingConvention.Cdecl)]
-		static extern IntPtr CreateNLSocket ();
+		static extern SafeCloseSocket CreateNLSocket ();
 
 		[DllImport (LIBNAME, CallingConvention=CallingConvention.Cdecl)]
 		static extern EventType ReadEvents (IntPtr sock, IntPtr buffer, int count, int size);

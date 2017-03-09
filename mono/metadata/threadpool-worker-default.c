@@ -20,7 +20,6 @@
 #include <mono/metadata/object-internals.h>
 #include <mono/metadata/threadpool.h>
 #include <mono/metadata/threadpool-worker.h>
-#include <mono/metadata/threadpool-io.h>
 #include <mono/metadata/w32event.h>
 #include <mono/utils/atomic.h>
 #include <mono/utils/mono-compiler.h>

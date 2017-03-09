@@ -952,12 +952,17 @@ namespace System {
 			get;			
 		}
 
-		// private methods
 #if (MONOTOUCH || MONODROID || XAMMAC)
 		internal const bool IsRunningOnWindows = false;
+		internal const bool IsRunningOnUnix = true;
 #else
 		internal static bool IsRunningOnWindows {
 			get { return ((int) Platform < 4); }
+		}
+
+		// FIXME optimize away like IsRunningOnWindows
+		internal static bool IsRunningOnUnix {
+			get { return ((int) Platform >= 4); }
 		}
 #endif
 

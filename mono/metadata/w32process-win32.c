@@ -25,7 +25,6 @@
 #include <mono/metadata/image.h>
 #include <mono/metadata/cil-coff.h>
 #include <mono/metadata/exception.h>
-#include <mono/metadata/threadpool-io.h>
 #include <mono/utils/strenc.h>
 #include <mono/utils/mono-proclib.h>
 /* FIXME: fix this code to not depend so much on the internals */

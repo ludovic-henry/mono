@@ -59,7 +59,6 @@
 #include <mono/metadata/profiler-private.h>
 #include <mono/metadata/reflection-internals.h>
 #include <mono/metadata/abi-details.h>
-#include <mono/metadata/w32socket.h>
 #include <mono/utils/mono-uri.h>
 #include <mono/utils/mono-logger-internals.h>
 #include <mono/utils/mono-path.h>
@@ -72,6 +71,7 @@
 #include <mono/metadata/w32handle.h>
 #include <mono/metadata/w32error.h>
 #include <mono/utils/w32api.h>
+#include <mono/utils/networking.h>
 #ifdef HOST_WIN32
 #include <direct.h>
 #endif
@@ -315,7 +315,7 @@ mono_runtime_init_checked (MonoDomain *domain, MonoThreadStartCB start_cb, MonoT
 	mono_context_set (domain->default_context);
 
 #ifndef DISABLE_SOCKETS
-	mono_network_init ();
+	mono_networking_init ();
 #endif
 	
 	mono_console_init ();
@@ -425,7 +425,7 @@ mono_runtime_cleanup (MonoDomain *domain)
 	mono_thread_cleanup ();
 
 #ifndef DISABLE_SOCKETS
-	mono_network_cleanup ();
+	mono_networking_shutdown ();
 #endif
 	mono_marshal_cleanup ();
 
