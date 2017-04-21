@@ -164,6 +164,10 @@ parse_optimizations (guint32 opt, const char* p, gboolean cpu_opts)
 	if (!p)
 		return opt;
 
+#ifndef MONO_ARCH_FLOAT32_SUPPORTED
+	opt &= ~MONO_OPT_FLOAT32;
+#endif
+
 	parts = g_strsplit (p, ",", -1);
 	for (ptr = parts; ptr && *ptr; ptr ++) {
 		char *arg = *ptr;
