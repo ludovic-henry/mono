@@ -421,10 +421,10 @@ just "mono --debug".
 * Calling the compiler directly? Use $(MCS).
 
 Really, you should use $(CSCOMPILE) whenever possible, but $(MCS) is
-out there. $(BOOTSTRAP_MCS) is the C# compiler that we use to build
+out there. $(BUILDMCS) is the C# compiler that we use to build
 mcs.exe; on Linux, we then use mcs.exe to build everything else, but
 on Windows, we use csc.exe to build everything. Only use
-$(BOOTSTRAP_MCS) if you know what you're doing.
+$(BUILDMCS) if you know what you're doing.
 
 
 

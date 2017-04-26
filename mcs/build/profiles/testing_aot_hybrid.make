@@ -1,7 +1,6 @@
 #! -*- makefile -*-
 
-BOOTSTRAP_MCS = MONO_PATH="$(topdir)/class/lib/$(BUILDPROFILE)-$(BUILDPLATFORM)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH" $(INTERNAL_CSC)
-MCS = $(BOOTSTRAP_MCS)
+MCS = $(BUILDMCS)
 
 profile-check:
 	@:

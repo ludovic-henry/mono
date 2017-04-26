@@ -15,18 +15,18 @@ CSC_LOCATION = $(monolite_path)/mcs.exe
 endif
 
 PROFILE_RUNTIME = $(with_mono_path_monolite) $(RUNTIME)
-BOOTSTRAP_MCS = $(PROFILE_RUNTIME) $(RUNTIME_FLAGS) $(CSC_LOCATION)
+BUILDMCS = $(PROFILE_RUNTIME) $(RUNTIME_FLAGS) $(CSC_LOCATION)
 
 else
 PROFILE_RUNTIME = $(EXTERNAL_RUNTIME)
 ifdef MCS_MODE
-BOOTSTRAP_MCS = mcs
+BUILDMCS = mcs
 else
-BOOTSTRAP_MCS = $(PROFILE_RUNTIME) $(RUNTIME_FLAGS) $(CSC_LOCATION)
+BUILDMCS = $(PROFILE_RUNTIME) $(RUNTIME_FLAGS) $(CSC_LOCATION)
 endif
 endif
 
-MCS = $(BOOTSTRAP_MCS)
+MCS = $(BUILDMCS)
 
 DEFAULT_REFERENCES = -r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/mscorlib.dll
 
@@ -111,7 +111,7 @@ endif
 
 $(PROFILE_EXE): $(topdir)/build/common/basic-profile-check.cs
 	$(MAKE) $(MAKE_Q) -C $(topdir)/packages
-	$(BOOTSTRAP_MCS) /warn:0 /noconfig /r:System.dll /r:mscorlib.dll /out:$@ $<
+	$(BUILDMCS) /warn:0 /noconfig /r:System.dll /r:mscorlib.dll /out:$@ $<
 
 $(PROFILE_OUT): $(PROFILE_EXE)
 	$(PROFILE_RUNTIME) $< > $@ 2>&1
