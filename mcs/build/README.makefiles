@@ -121,7 +121,7 @@ can customize your build without CVS trying to commit your modified
 `config-default.make' all the time.  Platform-specific variables are
 defined in `$(topdir)/build/platforms/$(BUILD_PLATFORM).make', where
 $(BUILD_PLATFORM) is detected in config-default.make. (Currently, the only
-choices are linux.make, win32.make and darwin.make.)
+choices are linux.make, win32.make and macos.make.)
 
 The best way to learn what the configuration variables are is to read
 `config.make' and `platform.make'. There aren't too many and hopefully
