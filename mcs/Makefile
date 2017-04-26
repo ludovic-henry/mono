@@ -24,6 +24,24 @@ xbuild_14_SUBDIRS := build class tools/xbuild
 winaot_SUBDIRS := build class
 orbis_SUBDIRS := build class
 
+monodroid_PLATFORMS := android
+monotouch_PLATFORMS := ios
+monotouch_watch_PLATFORMS := watchos
+monotouch_tv_PLATFORMS := tvos
+monotouch_runtime_PLATFORMS := macos
+monotouch_watch_runtime_PLATFORMS := macos
+monotouch_tv_runtime_PLATFORMS := macos
+xammac_PLATFORMS := macos
+testing_aot_hybrid_PLATFORMS := macos win32 linux
+testing_aot_full_PLATFORMS := macos win32 linux
+binary_reference_assemblies_PLATFORMS := macos win32 linux
+net_4_x_PLATFORMS := macos win32 linux
+xammac_net_4_5_PLATFORMS := macos
+xbuild_12_PLATFORMS := macos win32 linux
+xbuild_14_PLATFORMS := macos win32 linux
+winaot_PLATFORMS := winaot
+orbis_PLATFORMS := orbis
+
 include build/rules.make
 
 all-recursive $(STD_TARGETS:=-recursive): dir-check platform-check profile-check
@@ -43,41 +61,69 @@ PROFILES = net_4_x binary_reference_assemblies xbuild_12 xbuild_14
 all-profiles $(STD_TARGETS:=-profiles): %-profiles: profiles-do--%
 	@:
 
-profiles-do--%:
-	$(MAKE) $(PROFILES:%=profile-do--%--$*)
+# $(1): the profile
+define ListPlaformForProfile
+$(if $(filter basic build,$(1)), $(BUILD_PLATFORM), $(or $(filter $($(1)_PLATFORMS),$(PLATFORMS)),$(error nothing to build for profile "$(1)" and platforms "$(PLATFORMS)")))
+endef
 
-# The % below looks like profile-name--target-name
-profile-do--%:
-	$(MAKE) PROFILE=$(subst --, ,$*)
+# Call every profile-do--%, for example:
+#   `make PROFILES='basic build net_4_x' PLATFORMS='macos win32' profiles-do--all`
+# from a macos machine will generate
+#   `make profile-do--basic--macos--all profile-do--build--macos--all profile-do--net_4_x--macos--all profile-do--net_4_x--win32--all`
+profiles-do--%:
+	$(MAKE) \
+		$(foreach profile,$(PROFILES), \
+			$(foreach platform,$(call ListPlaformForProfile,$(profile)), \
+				profile-do--$(profile)--$(platform)--$*))
 
 # xbuild_12 and xbuild_14 will try to install the same files, so they need
 # to be ordered
-profile-do--xbuild_14--install: profile-do--xbuild_12--install
+profile-do--xbuild_14--%-install: profile-do--xbuild_12--%--install
 
 # We don't want to run the tests in parallel.  We want behaviour like -k.
 profiles-do--run-test:
-	ret=:; $(foreach p,$(PROFILES), { $(MAKE) PROFILE=$(p) run-test || ret=false; }; ) $$ret
+	ret=:; \
+	$(foreach profile,$(PROFILES), \
+		$(foreach platform,$(call ListPlaformForProfile,$(profile)), \
+			$(MAKE) PROFILE=$(profile) PLATFORM=$(platform) run-test || ret=false;)) \
+	$$ret
 
 # Orchestrate the bootstrap here.
-_boot_ = all clean install
-$(_boot_:%=profile-do--xbuild_14--%):         profile-do--xbuild_14--%:         profile-do--net_4_x--%
-$(_boot_:%=profile-do--xbuild_12--%):         profile-do--xbuild_12--%:         profile-do--net_4_x--%
-$(_boot_:%=profile-do--binary_reference_assemblies--%):           profile-do--binary_reference_assemblies--%:           profile-do--build--%
-$(_boot_:%=profile-do--net_4_x--%):           profile-do--net_4_x--%:           profile-do--build--%
-$(_boot_:%=profile-do--monodroid--%):         profile-do--monodroid--%:         profile-do--build--%
-$(_boot_:%=profile-do--monotouch--%):         profile-do--monotouch--%:         profile-do--build--%
-$(_boot_:%=profile-do--monotouch_watch--%):   profile-do--monotouch_watch--%:   profile-do--build--%
-$(_boot_:%=profile-do--monotouch_tv--%):      profile-do--monotouch_tv--%:      profile-do--build--%
-$(_boot_:%=profile-do--monotouch_runtime--%):  profile-do--monotouch_runtime--%:  profile-do--build--%
-$(_boot_:%=profile-do--monotouch_watch_runtime--%):  profile-do--monotouch_watch_runtime--%:  profile-do--build--%
-$(_boot_:%=profile-do--monotouch_tv_runtime--%):     profile-do--monotouch_tv_runtime--%:     profile-do--build--%
-$(_boot_:%=profile-do--xammac--%):            profile-do--xammac--%:            profile-do--build--%
-$(_boot_:%=profile-do--xammac_net_4_5--%):    profile-do--xammac_net_4_5--%:           profile-do--build--%
-$(_boot_:%=profile-do--testing_aot_hybrid--%):        profile-do--testing_aot_hybrid--%:        profile-do--build--%
-$(_boot_:%=profile-do--testing_aot_full--%):          profile-do--testing_aot_full--%:          profile-do--build--%
-$(_boot_:%=profile-do--winaot--%):              profile-do--winaot--%:              profile-do--build--%
-$(_boot_:%=profile-do--orbis--%):              profile-do--orbis--%:              profile-do--build--%
-$(_boot_:%=profile-do--build--%):             profile-do--build--%:             profile-do--basic--%
+
+# $(1): the profile to build
+# $(2): the profile to depend on
+# $(3): the platform to build
+define BuildProfileForPlatform
+.NOTPARALLEL: $(foreach target,all clean install,profile-do--$(1)--$(3)--$(target))
+$(foreach target,all clean install,profile-do--$(1)--$(3)--$(target)): profile-do--$(1)--$(3)--%: $(if $(filter basic,$(1)),,profile-do--$(2)--$(if $(filter build,$(2)),$(BUILD_PLATFORM),$(3))--%)
+	$$(MAKE) PROFILE=$(1) PLATFORM=$(3) $$*
+endef
+
+# $(1): the profile to build
+# $(2): the profile to depend on
+define BuildProfile
+$(foreach platform,$(if $(filter basic build,$(1)),$(BUILD_PLATFORM),$($(1)_PLATFORMS)),$(eval $(call BuildProfileForPlatform,$(1),$(2),$(platform))))
+endef
+
+$(call BuildProfile,xbuild_14,net_4_x)
+$(call BuildProfile,xbuild_12,net_4_x)
+$(call BuildProfile,binary_reference_assemblies,build)
+$(call BuildProfile,net_4_x,build)
+$(call BuildProfile,monodroid,build)
+$(call BuildProfile,monotouch,build)
+$(call BuildProfile,monotouch_watch,build)
+$(call BuildProfile,monotouch_tv,build)
+$(call BuildProfile,monotouch_runtime,build)
+$(call BuildProfile,monotouch_watch_runtime,build)
+$(call BuildProfile,monotouch_tv_runtime,build)
+$(call BuildProfile,xammac,build)
+$(call BuildProfile,xammac_net_4_5,build)
+$(call BuildProfile,testing_aot_hybrid,build)
+$(call BuildProfile,testing_aot_full,build)
+$(call BuildProfile,winaot,build)
+$(call BuildProfile,orbis,build)
+$(call BuildProfile,build,basic)
+$(call BuildProfile,basic)
 
 testcorlib:
 	@cd class/corlib && $(MAKE) test run-test

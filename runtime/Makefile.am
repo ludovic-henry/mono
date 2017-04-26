@@ -26,46 +26,57 @@ $(symlinks):
 SUPPORT_FILES = $(symlinks) mono-wrapper etc/mono/config
 
 build_profiles = 
+build_platforms = 
 
 if INSTALL_4_x
 build_profiles += binary_reference_assemblies net_4_x xbuild_12 xbuild_14
+build_platforms += macos win32 linux
 net_profile = net_4_x
 endif
 
 if INSTALL_MONODROID
 build_profiles += monodroid
+build_platforms += android
 endif
 
 if INSTALL_MONOTOUCH
 build_profiles += monotouch monotouch_runtime
+build_platforms += ios
 endif
 
 if INSTALL_MONOTOUCH_WATCH
 build_profiles += monotouch_watch monotouch_watch_runtime
+build_platforms += watchos
 endif
 
 if INSTALL_MONOTOUCH_TV
 build_profiles += monotouch_tv monotouch_tv_runtime
+build_platforms += tvos
 endif
 
 if INSTALL_TESTING_AOT_HYBRID
 build_profiles += testing_aot_hybrid
+build_platforms += macos win32 linux
 endif
 
 if INSTALL_TESTING_AOT_FULL
 build_profiles += testing_aot_full
+build_platforms += macos win32 linux
 endif
 
 if INSTALL_WINAOT
 build_profiles += winaot
+build_platforms += winaot
 endif
 
 if INSTALL_XAMMAC
 build_profiles += xammac xammac_net_4_5
+build_platforms += macos
 endif
 
 if INSTALL_ORBIS
 build_profiles += orbis
+build_platforms += orbis
 endif
 
 test_profiles = $(build_profiles)
@@ -77,14 +88,14 @@ MAKE_FLAGS=$(if $(V),,--no-print-directory -s)
 # The write check is to foil 'make distcheck'
 all-local: $(SUPPORT_FILES) $(TEST_SUPPORT_FILES)
 	if test -w $(mcs_topdir); then :; else chmod -R +w $(mcs_topdir); fi
-	cd $(mcs_topdir) && $(MAKE) $(MAKE_FLAGS) NO_DIR_CHECK=1 PROFILES='$(build_profiles)' CC='$(CC)' all-profiles
+	cd $(mcs_topdir) && $(MAKE) $(MAKE_FLAGS) NO_DIR_CHECK=1 PROFILES='$(build_profiles)' PLATFORMS='$(sort $(build_platforms))' CC='$(CC)' all-profiles
 
 # override automake
 install: install-exec install-data
 
 # override automake
 install-exec: $(SUPPORT_FILES) $(TEST_SUPPORT_FILES)
-	cd $(mcs_topdir) && $(MAKE) NO_DIR_CHECK=1 PROFILES='$(build_profiles)' RUNTIME_HAS_CONSISTENT_GACDIR=yes prefix=$(prefix) install-profiles
+	cd $(mcs_topdir) && $(MAKE) NO_DIR_CHECK=1 PROFILES='$(build_profiles)' PLATFORMS='$(sort $(build_platforms))' RUNTIME_HAS_CONSISTENT_GACDIR=yes prefix=$(prefix) install-profiles
 
 # override automake
 install-data:
