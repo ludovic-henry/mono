@@ -13,11 +13,11 @@ MDOC_COMMON_FLAGS = \
 	/resource:Resources/overview.xsl,overview.xsl                               \
 	/resource:Resources/stylesheet.xsl,stylesheet.xsl                           \
 
-LIB_REFS = monodoc System System.Xml System.Core Mono.Cecil ICSharpCode.SharpZipLib System.Xml.Linq System.Web
+LIB_REFS = monodoc System System.Xml System.Core Mono.Cecil ICSharpCode.SharpZipLib System.Xml.Linq
 	
 LOCAL_MCS_FLAGS = $(MDOC_COMMON_FLAGS)
-PROGRAM = $(topdir)/class/lib/$(PROFILE)/mdoc.exe
-PROGRAM_DEPS = $(topdir)/class/lib/$(PROFILE)/monodoc.dll
+PROGRAM = $(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/mdoc.exe
+PROGRAM_DEPS = $(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/monodoc.dll
 
 ifdef NET
 all : copy-with-deps
@@ -25,10 +25,10 @@ all : copy-with-deps
 copy-with-deps:
 	-mkdir mdoc-net
 	cp $(PROGRAM) mdoc-net
-	cp $(topdir)/class/lib/$(PROFILE)/Commons.Xml.Relaxng.dll mdoc-net
-	cp $(topdir)/class/lib/$(PROFILE)/ICSharpCode.SharpZipLib.dll mdoc-net
-	cp $(topdir)/class/lib/$(PROFILE)/Mono.Cecil.dll mdoc-net
-	cp $(topdir)/class/lib/$(PROFILE)/monodoc.dll mdoc-net
+	cp $(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/Commons.Xml.Relaxng.dll mdoc-net
+	cp $(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/ICSharpCode.SharpZipLib.dll mdoc-net
+	cp $(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/Mono.Cecil.dll mdoc-net
+	cp $(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/monodoc.dll mdoc-net
 endif
 
 MONODOC_RESOURCES = \
@@ -67,7 +67,7 @@ PROGRAM_COMPILE = $(CSCOMPILE) -platform:x86
 include ../../build/executable.make
 
 MONO = \
-	MONO_PATH="$(topdir)/class/lib/$(PROFILE)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH" \
+	MONO_PATH="$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH" \
 	$(RUNTIME) $(RUNTIME_FLAGS)
 
 DIFF = diff -rup
@@ -135,7 +135,7 @@ Test/DocTest-DropNS-classic-deletetest-V2.dll:
 	$(CSCOMPILE) $(TEST_CSCFLAGS) -unsafe -target:library -out:Test/DocTest-DropNS-classic-deletetest.dll Test/DocTest-DropNS-classic.cs /define:DELETETEST,V2
 
 Test/DocTest.dll: 
-	$(CSCOMPILE) $(TEST_CSCFLAGS) -unsafe -target:library -out:$@ Test/DocTest.cs -r:$(topdir)/class/lib/$(PROFILE)/System.Core.dll -r:$(topdir)/class/lib/$(PROFILE)/Microsoft.CSharp.dll
+	$(CSCOMPILE) $(TEST_CSCFLAGS) -unsafe -target:library -out:$@ Test/DocTest.cs -r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/System.Core.dll -r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/Microsoft.CSharp.dll
 
 Test/DocTest-InternalInterface.dll: 
 	$(CSCOMPILE) $(TEST_CSCFLAGS) -unsafe -target:library -out:$@ Test/DocTest-InternalInterface.cs

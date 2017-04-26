@@ -2,7 +2,7 @@ thisdir = class/System.Web/Test/tools
 
 include ../../../../build/rules.make
 
-CLASSLIB_DIR = $(topdir)/class/lib/$(PROFILE)
+CLASSLIB_DIR = $(topdir)/class/lib/$(PROFILE)-$(PLATFORM)
 STANDALONE_RUNNER_SUPPORT_ASSEMBLY = $(CLASSLIB_DIR)/standalone-runner-support.dll
 
 STANDALONE_RUNNER_SOURCES = \

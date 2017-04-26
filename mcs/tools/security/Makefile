@@ -24,7 +24,7 @@ PROGRAM_INSTALL_DIR = $(mono_libdir)/mono/$(FRAMEWORK_VERSION)
 DISTFILES = README TESTS $(SECURITY_SOURCES)
 
 ifeq (build, $(PROFILE))
-all-local: $(topdir)/class/lib/$(PROFILE)/sn.exe
+all-local: $(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/sn.exe
 else
 all-local: $(SECURITY_TARGETS)
 endif
@@ -55,15 +55,15 @@ run-test-local run-test-ondotnet-local csproj-local:
 
 clean-local:
 	rm -f *.exe *.mdb *.pdb
-	rm -f $(topdir)/class/lib/$(PROFILE)/sn.exe*
+	rm -f $(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/sn.exe*
 
 dist-local: dist-default
 
-sn.exe $(topdir)/class/lib/$(PROFILE)/sn.exe: $(SN_SOURCES)
-	$(CSCOMPILE) -r:$(topdir)/class/lib/$(PROFILE)/Mono.Security.dll /out:$@ $(SN_SOURCES)
+sn.exe $(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/sn.exe: $(SN_SOURCES)
+	$(CSCOMPILE) -r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/Mono.Security.dll /out:$@ $(SN_SOURCES)
 
 permview.exe: permview.cs
-	$(CSCOMPILE) $^ $(HELPER_SOURCES) -r:$(topdir)/class/lib/$(PROFILE)/Mono.Cecil.dll
+	$(CSCOMPILE) $^ $(HELPER_SOURCES) -r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/Mono.Cecil.dll
 
 %.exe: %.cs $(HELPER_SOURCES)
-	$(CSCOMPILE) -r:$(topdir)/class/lib/$(PROFILE)/Mono.Security.dll -r:$(topdir)/class/lib/$(PROFILE)/System.dll $^
+	$(CSCOMPILE) -r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/Mono.Security.dll -r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/System.dll $^

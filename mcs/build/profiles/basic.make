@@ -11,7 +11,7 @@ MONOLITE_MSCORLIB = $(monolite_path)/mscorlib.dll
 
 ifdef use_monolite
 ifdef MCS_MODE
-	CSC_LOCATION = $(monolite_path)/mcs.exe
+CSC_LOCATION = $(monolite_path)/mcs.exe
 endif
 
 PROFILE_RUNTIME = $(with_mono_path_monolite) $(RUNTIME)
@@ -20,15 +20,15 @@ BOOTSTRAP_MCS = $(PROFILE_RUNTIME) $(RUNTIME_FLAGS) $(CSC_LOCATION)
 else
 PROFILE_RUNTIME = $(EXTERNAL_RUNTIME)
 ifdef MCS_MODE
-	BOOTSTRAP_MCS = mcs
+BOOTSTRAP_MCS = mcs
 else
-	BOOTSTRAP_MCS = $(PROFILE_RUNTIME) $(RUNTIME_FLAGS) $(CSC_LOCATION)
+BOOTSTRAP_MCS = $(PROFILE_RUNTIME) $(RUNTIME_FLAGS) $(CSC_LOCATION)
 endif
 endif
 
 MCS = $(BOOTSTRAP_MCS)
 
-DEFAULT_REFERENCES = -r:$(topdir)/class/lib/$(PROFILE)/mscorlib.dll
+DEFAULT_REFERENCES = -r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/mscorlib.dll
 
 PROFILE_MCS_FLAGS = -d:NET_4_0 -d:NET_4_5 -d:MONO -d:WIN_PLATFORM -d:BOOTSTRAP_BASIC -nowarn:1699 -nostdlib $(DEFAULT_REFERENCES)
 NO_SIGN_ASSEMBLY = yes

@@ -7,7 +7,7 @@ all-local:
 PROFILE_DIR=$(DESTDIR)$(mono_libdir)/mono
 
 build-reference-assemblies:
-	$(MAKE) -C ../../../external/binary-reference-assemblies CSC="MONO_PATH=$(abspath $(topdir)/class/lib/$(BUILDPROFILE)) $(INTERNAL_CSC)"
+	$(MAKE) -C ../../../external/binary-reference-assemblies CSC="MONO_PATH=$(abspath $(topdir)/class/lib/$(BUILDPROFILE)-$(BUILDPLATFORM)) $(INTERNAL_CSC)"
 
 install-local:
 	$(MKINSTALLDIRS) $(PROFILE_DIR)/2.0-api

@@ -22,7 +22,7 @@ EXTRA_DISTFILES = \
 CLEAN_FILES = Test/resources/TestTasks-$(PROFILE).dll Test/resources/TestTasks-$(PROFILE).dll.mdb Test/resources/TestTasks-$(PROFILE).pdb
 
 Test/resources/TestTasks-$(PROFILE).dll: Test/resources/TestTasks.cs
-	$(CSCOMPILE) /out:$@ Test/resources/TestTasks.cs /r:$(topdir)/class/lib/$(PROFILE)/$(XBUILD_FRAMEWORK).dll /r:$(topdir)/class/lib/$(PROFILE)/$(XBUILD_UTILITIES).dll /target:library
+	$(CSCOMPILE) /out:$@ Test/resources/TestTasks.cs /r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/$(XBUILD_FRAMEWORK).dll /r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/$(XBUILD_UTILITIES).dll /target:library
 
 test-local: compile-resources
 

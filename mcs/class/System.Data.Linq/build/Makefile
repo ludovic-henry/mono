@@ -3,7 +3,7 @@ include ../../../build/rules.make
 
 ASSEMBLY     = System.Data.Linq.dll
 ASSEMBLY_EXT = .dll
-the_assembly = $(topdir)/class/lib/$(PROFILE)/$(ASSEMBLY)
+the_assembly = $(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/$(ASSEMBLY)
 
 include ../../../build/tests.make
 
@@ -25,7 +25,7 @@ sqlite_tests_dep = \
 
 $(sqlite_tests): $(sqlite_tests_dep)
 	$(TEST_COMPILE) -target:library -out:$@ \
-		-r:$(topdir)/class/lib/$(PROFILE)/System.Data.dll -r:$(the_assembly) -r:$(topdir)/class/lib/$(PROFILE)/Mono.Data.Sqlite.dll -r:$(topdir)/class/lib/$(PROFILE)/System.Core.dll -r:$(topdir)/class/lib/$(PROFILE)/System.dll -r:$(topdir)/class/lib/$(PROFILE)/System.Xml.dll $(test_nunit_ref) \
+		-r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/System.Data.dll -r:$(the_assembly) -r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/Mono.Data.Sqlite.dll -r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/System.Core.dll -r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/System.dll -r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/System.Xml.dll $(test_nunit_ref) \
 		$(TEST_MCS_FLAGS) -d:MONO_STRICT -d:SQLITE \
 		@$< $(TEST_SOURCES_WITH_SPACES)
 

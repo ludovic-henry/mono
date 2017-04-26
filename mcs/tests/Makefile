@@ -9,10 +9,10 @@ include ../build/rules.make
 DISTFILES = $(wildcard dlls/**/*.cs) $(wildcard dlls/*.cs) $(wildcard dlls/*.inc) $(wildcard dlls/*.il)
 DISTFILES += $(wildcard *.cs) $(wildcard *.il) $(wildcard *.xml) $(wildcard *.inc) $(wildcard known-issues-*) $(wildcard *.snk)
 
-with_mono_path = MONO_PATH="$(topdir)/class/lib/$(PROFILE)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH"
+with_mono_path = MONO_PATH="$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH"
 
-ilasm = $(topdir)/class/lib/$(PROFILE)/ilasm.exe
-ILASM = MONO_PATH="$(topdir)/class/lib/$(PROFILE)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH" $(RUNTIME) $(RUNTIME_FLAGS) $(ilasm)
+ilasm = $(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/ilasm.exe
+ILASM = MONO_PATH="$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH" $(RUNTIME) $(RUNTIME_FLAGS) $(ilasm)
 
 -include $(mcs_topdir)/build/config.make
 
@@ -54,8 +54,8 @@ DEFINES = -compiler-options:"-d:NET_4_0;NET_4_5 -debug"
 endif
 
 LOCAL_RUNTIME_FLAGS = --verify-all
-COMPILER = $(topdir)/class/lib/$(PROFILE)/mcs.exe
-TESTER = MONO_RUNTIME='$(RUNTIME)' $(TEST_RUNTIME) $(RUNTIME_FLAGS) $(LOCAL_RUNTIME_FLAGS) $(topdir)/class/lib/$(PROFILE)/compiler-tester.exe
+COMPILER = $(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/mcs.exe
+TESTER = MONO_RUNTIME='$(RUNTIME)' $(TEST_RUNTIME) $(RUNTIME_FLAGS) $(LOCAL_RUNTIME_FLAGS) $(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/compiler-tester.exe
 
 TEST_ILS := $(wildcard *-lib.il)
 
@@ -95,7 +95,7 @@ csproj-local:
 %-lib.dll: %-lib.il
 	$(ILASM) /dll /out:$@ $<
 
-CSCOMPILE_UTIL = $(CSCOMPILE) -noconfig -nologo -r:$(topdir)/class/lib/$(PROFILE)/mscorlib.dll
+CSCOMPILE_UTIL = $(CSCOMPILE) -noconfig -nologo -r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/mscorlib.dll
 
 setup:
 	$(CSCOMPILE_UTIL) -t:library dlls/test-679-2/test-679-lib-2.cs -out:dlls/test-679-2/test-679-lib-2.dll

@@ -1,5 +1,5 @@
 PROFILE = net_4_x
-RUNTIME = MONO_PATH=../../../../lib/$(PROFILE) mono --debug
+RUNTIME = MONO_PATH=../../../../lib/$(PROFILE)-$(PLATFORM) mono --debug
 MCS = mcs
 TESTS = xsd-test-suite/suntest/SunTestsAll/xsiType1.xsd
 MASTERS = xsd-test-suite/suntest/tests-all.xml

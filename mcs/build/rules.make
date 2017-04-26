@@ -22,8 +22,8 @@ VERSION = 0.93
 
 Q=$(if $(V),,@)
 # echo -e "\\t" does not work on some systems, so use 5 spaces
-Q_MCS=$(if $(V),,@echo "$(if $(MCS_MODE),MCS,CSC)     [$(intermediate)$(PROFILE)] $(notdir $(@))";)
-Q_AOT=$(if $(V),,@echo "AOT     [$(intermediate)$(PROFILE)] $(notdir $(@))";)
+Q_MCS=$(if $(V),,@echo "$(if $(MCS_MODE),MCS,CSC)     [$(intermediate)$(PROFILE)-$(PLATFORM)] $(notdir $(@))";)
+Q_AOT=$(if $(V),,@echo "AOT     [$(intermediate)$(PROFILE)-$(PLATFORM)] $(notdir $(@))";)
 
 ifndef BUILDPROFILE
 BUILDPROFILE = build
@@ -33,7 +33,7 @@ USE_MCS_FLAGS = /codepage:$(CODEPAGE) /nologo /noconfig /deterministic $(LOCAL_M
 USE_MBAS_FLAGS = /codepage:$(CODEPAGE) $(LOCAL_MBAS_FLAGS) $(PLATFORM_MBAS_FLAGS) $(PROFILE_MBAS_FLAGS) $(MBAS_FLAGS)
 USE_CFLAGS = $(LOCAL_CFLAGS) $(CFLAGS) $(CPPFLAGS)
 CSCOMPILE = $(Q_MCS) $(MCS) $(USE_MCS_FLAGS)
-CSC_RUNTIME_FLAGS = --aot-path=$(abspath $(topdir)/class/lib/$(BUILDPROFILE)) --gc-params=nursery-size=64m
+CSC_RUNTIME_FLAGS = --aot-path=$(abspath $(topdir)/class/lib/$(BUILDPROFILE)-$(BUILDPLATFORM)) --gc-params=nursery-size=64m
 BASCOMPILE = $(MBAS) $(USE_MBAS_FLAGS)
 CCOMPILE = $(CC) $(USE_CFLAGS)
 BOOT_COMPILE = $(Q_MCS) $(BOOTSTRAP_MCS) $(USE_MCS_FLAGS)
@@ -43,20 +43,22 @@ INSTALL_BIN = $(INSTALL) -c -m 755
 INSTALL_LIB = $(INSTALL_BIN)
 MKINSTALLDIRS = $(SHELL) $(topdir)/mkinstalldirs
 INTERNAL_MBAS = $(RUNTIME) $(RUNTIME_FLAGS) $(topdir)/mbas/mbas.exe
-INTERNAL_ILASM = $(RUNTIME) $(RUNTIME_FLAGS) $(topdir)/class/lib/$(PROFILE)/ilasm.exe
+INTERNAL_ILASM = $(RUNTIME) $(RUNTIME_FLAGS) $(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/ilasm.exe
 INTERNAL_CSC_LOCATION = $(CSC_LOCATION)
 
 # Using CSC_SDK_PATH_DISABLED for sanity check that all references have path specified
 INTERNAL_CSC = CSC_SDK_PATH_DISABLED= $(RUNTIME) $(RUNTIME_FLAGS) $(CSC_RUNTIME_FLAGS) $(INTERNAL_CSC_LOCATION)
 
-RESGEN = MONO_PATH="$(topdir)/class/lib/$(BUILDPROFILE)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH" $(RUNTIME) $(RUNTIME_FLAGS) $(RESGEN_EXE) $(topdir)/class/lib/$(BUILDPROFILE)/resgen.exe
-STRING_REPLACER = MONO_PATH="$(topdir)/class/lib/$(BUILDPROFILE)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH" $(RUNTIME) $(RUNTIME_FLAGS) $(topdir)/class/lib/$(BUILDPROFILE)/cil-stringreplacer.exe
+RESGEN = MONO_PATH="$(topdir)/class/lib/$(BUILDPROFILE)-$(BUILDPLATFORM)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH" $(RUNTIME) $(RUNTIME_FLAGS) $(RESGEN_EXE) $(topdir)/class/lib/$(BUILDPROFILE)-$(BUILDPLATFORM)/resgen.exe
+STRING_REPLACER = MONO_PATH="$(topdir)/class/lib/$(BUILDPROFILE)-$(BUILDPLATFORM)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH" $(RUNTIME) $(RUNTIME_FLAGS) $(topdir)/class/lib/$(BUILDPROFILE)-$(BUILDPLATFORM)/cil-stringreplacer.exe
 
 depsdir = $(topdir)/build/deps
 
 # Make sure these propagate if set manually
 
+export BUILDPROFILE
 export BUILDPLATFORM
+export PLATFORM
 export PROFILE
 export MCS
 export MCS_FLAGS
@@ -123,7 +125,7 @@ PROFILE_MCS_FLAGS += -optimize
 endif
 
 ifdef MCS_MODE
-INTERNAL_CSC_LOCATION = $(topdir)/class/lib/$(BOOTSTRAP_PROFILE)/mcs.exe
+INTERNAL_CSC_LOCATION = $(topdir)/class/lib/$(BOOTSTRAP_PROFILE)-$(BUILDPLATFORM)/mcs.exe
 
 ifdef PLATFORM_DEBUG_FLAGS
 PLATFORM_DEBUG_FLAGS = /debug:full
@@ -145,7 +147,7 @@ endif
 # recursive make call in order to prevent this recursive call from trying
 # to build aot in each of the subdirs. After this is done, we will aot
 # everything that our building produced by aoting everything in
-# mcs/class/lib/$(PROFILE)/
+# mcs/class/lib/$(PROFILE)-$(PLATFORM)/
 ifndef TOP_LEVEL_DO
 
 ifdef ALWAYS_AOT
@@ -165,8 +167,8 @@ endif
 ifdef NO_INSTALL
 GACUTIL = :
 else
-gacutil = $(topdir)/class/lib/$(BUILDPROFILE)/gacutil.exe
-GACUTIL = MONO_PATH="$(topdir)/class/lib/$(BUILDPROFILE)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH" $(RUNTIME) $(RUNTIME_FLAGS) $(gacutil)
+gacutil = $(topdir)/class/lib/$(BUILDPROFILE)-$(BUILDPLATFORM)/gacutil.exe
+GACUTIL = MONO_PATH="$(topdir)/class/lib/$(BUILDPROFILE)-$(BUILDPLATFORM)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH" $(RUNTIME) $(RUNTIME_FLAGS) $(gacutil)
 endif
 
 STD_TARGETS = test run-test run-test-ondotnet clean install uninstall doc-update
@@ -182,9 +184,9 @@ do-all-aot:
 # When we recursively call $(MAKE) aot-all-profile
 # we will have created this directory, and so will
 # be able to evaluate the .dylibs to make
-ifneq ("$(wildcard $(topdir)/class/lib/$(PROFILE))","")
+ifneq ("$(wildcard $(topdir)/class/lib/$(PROFILE)-$(PLATFORM))","")
 
-AOT_PROFILE_ASSEMBLIES := $(sort $(patsubst .//%,%,$(filter-out %.dll.dll %.exe.dll %bare% %plaincore% %secxml% %Facades% %ilasm%,$(filter %.dll %.exe,$(wildcard $(topdir)/class/lib/$(PROFILE)/*)))))
+AOT_PROFILE_ASSEMBLIES := $(sort $(patsubst .//%,%,$(filter-out %.dll.dll %.exe.dll %bare% %plaincore% %secxml% %Facades% %ilasm%,$(filter %.dll %.exe,$(wildcard $(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/*)))))
 
 # This can run in parallel
 .PHONY: aot-all-profile
@@ -205,7 +207,7 @@ endif
 	$(Q_AOT) MONO_PATH="$(dir $<)" $(RUNTIME) $(RUNTIME_FLAGS) $(AOT_BUILD_FLAGS),temp-path=$<_bitcode_tmp --verbose $< > $@.aot-log
 	@ rm -rf $<_bitcode_tmp
 
-endif #ifneq ("$(wildcard $(topdir)/class/lib/$(PROFILE))","")
+endif #ifneq ("$(wildcard $(topdir)/class/lib/$(PROFILE)-$(PLATFORM))","")
 
 endif # PLATFORM_AOT_SUFFIX
 
@@ -325,5 +327,5 @@ dist-default:
 ## Documentation stuff
 
 Q_MDOC =$(if $(V),,@echo "MDOC    [$(PROFILE)] $(notdir $(@))";)
-MDOC   =$(Q_MDOC) MONO_PATH="$(topdir)/class/lib/$(DEFAULT_PROFILE)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH" $(RUNTIME) $(topdir)/class/lib/$(DEFAULT_PROFILE)/mdoc.exe
+MDOC   =$(Q_MDOC) MONO_PATH="$(topdir)/class/lib/$(BUILDPROFILE)-$(BUILDPLATFORM)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH" $(RUNTIME) $(topdir)/class/lib/$(BUILDPROFILE)-$(BUILDPLATFORM)/mdoc.exe
 

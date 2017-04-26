@@ -2,9 +2,9 @@ thisdir = errors
 SUBDIRS = 
 include ../build/rules.make
 
-with_mono_path = MONO_PATH="$(topdir)/class/lib/$(PROFILE)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH"
+with_mono_path = MONO_PATH="$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH"
 
-ilasm = $(topdir)/class/lib/$(PROFILE)/ilasm.exe
+ilasm = $(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/ilasm.exe
 ILASM = $(with_mono_path) $(RUNTIME) $(RUNTIME_FLAGS) $(ilasm)
 
 DISTFILES = \
@@ -68,8 +68,8 @@ check: run-test-local
 TEST_PATTERN = 'v4'
 TESTER_OPTIONS = -compiler-options:"-v --break-on-ice -d:NET_4_0;NET_4_5"
 
-COMPILER = $(topdir)/class/lib/$(PROFILE)/mcs.exe
-TESTER = MONO_RUNTIME='$(RUNTIME)' $(TEST_RUNTIME) $(RUNTIME_FLAGS) $(LOCAL_RUNTIME_FLAGS) $(topdir)/class/lib/$(PROFILE)/compiler-tester.exe
+COMPILER = $(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/mcs.exe
+TESTER = MONO_RUNTIME='$(RUNTIME)' $(TEST_RUNTIME) $(RUNTIME_FLAGS) $(LOCAL_RUNTIME_FLAGS) $(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/compiler-tester.exe
 
 run-mcs-tests: $(TEST_SUPPORT_FILES)
 	$(TESTER) -mode:neg -files:$(TEST_PATTERN) -compiler:$(COMPILER) -issues:known-issues-$(PROFILE) -log:$(PROFILE).log $(TESTER_OPTIONS) $(TOPTIONS)
@@ -87,7 +87,7 @@ CS0029-26-lib.dll : CS0029-26-lib.cs
 	$(CSCOMPILE) /target:library /publicsign /keyfile:key.snk /out:$@ $<
 
 CS0266-25-lib.dll: CS0266-25-lib.cs
-	$(CSCOMPILE) /target:library /r:$(topdir)/class/lib/$(PROFILE)/System.Core.dll /out:$@ $<
+	$(CSCOMPILE) /target:library /r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/System.Core.dll /out:$@ $<
 
 dlls/first/CS1701-lib.dll: dlls/first/CS1701-lib.cs
 	$(CSCOMPILE) /target:library /warn:0 /publicsign /keyfile:key.snk /out:$@ $<

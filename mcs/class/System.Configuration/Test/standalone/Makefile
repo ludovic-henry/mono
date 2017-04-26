@@ -10,7 +10,7 @@ check:	local compare
 local: $(TESTS)
 	@for i in $(TESTS); do \
 		echo running test $$i; \
-		MONO_PATH="$(topdir)/class/lib/$(PROFILE)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH" $(RUNTIME) $(RUNTIME_FLAGS) $$i > $$i.result; \
+		MONO_PATH="$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH" $(RUNTIME) $(RUNTIME_FLAGS) $$i > $$i.result; \
 	done
 
 compare:
@@ -25,13 +25,13 @@ clean:
 	rm -f *.exe *.mdb *.result
 
 t36.exe : t36.cs t36-lib.cs
-	$(CSCOMPILE) -r:$(topdir)/class/lib/$(PROFILE)/System.Configuration.dll -t:library t36-lib.cs
-	$(CSCOMPILE) -r:$(topdir)/class/lib/$(PROFILE)/System.Configuration.dll -r:t36-lib.dll t36.cs
+	$(CSCOMPILE) -r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/System.Configuration.dll -t:library t36-lib.cs
+	$(CSCOMPILE) -r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/System.Configuration.dll -r:t36-lib.dll t36.cs
 
 t46.exe : t46.cs t46-lib.cs
-	$(CSCOMPILE) -r:$(topdir)/class/lib/$(PROFILE)/System.Configuration.dll -t:library t46-lib.cs
-	$(CSCOMPILE) -r:$(topdir)/class/lib/$(PROFILE)/System.Configuration.dll -r:t46-lib.dll /out:$@ Assert.cs t46.cs
+	$(CSCOMPILE) -r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/System.Configuration.dll -t:library t46-lib.cs
+	$(CSCOMPILE) -r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/System.Configuration.dll -r:t46-lib.dll /out:$@ Assert.cs t46.cs
 
 %.exe: %.cs
-	$(CSCOMPILE) /out:$@ Assert.cs $< -r:$(topdir)/class/lib/$(PROFILE)/System.Configuration.dll -r:$(topdir)/class/lib/$(PROFILE)/System.Web.dll -r:$(topdir)/class/lib/$(PROFILE)/System.Data.dll -r:$(topdir)/class/lib/$(PROFILE)/System.dll -r:$(topdir)/class/lib/$(PROFILE)/System.Xml.dll
+	$(CSCOMPILE) /out:$@ Assert.cs $< -r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/System.Configuration.dll -r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/System.Web.dll -r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/System.Data.dll -r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/System.dll -r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/System.Xml.dll
 

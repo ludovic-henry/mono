@@ -1,7 +1,7 @@
 XBUILD_DATA_DIR=$(topdir)/tools/xbuild/data
-XBUILD_PROFILE_DIR=$(topdir)/class/lib/$(PROFILE)
+XBUILD_PROFILE_DIR=$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)
 
-# makes xbuild look in the class/lib/$PROFILE build directories for targets etc
+# makes xbuild look in the class/lib/$PROFILE-$PLATFORM build directories for targets etc
 export TESTING_MONO=a
 export MSBuildExtensionsPath=$(XBUILD_DATA_DIR)
 export XBUILD_FRAMEWORK_FOLDERS_PATH= $(topdir)/class/Microsoft.Build/xbuild-testing

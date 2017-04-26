@@ -9,7 +9,7 @@ include subdirs.make
 # 
 # The output directory for the facade assemblies
 #
-target_dir = $(topdir)/class/lib/$(PROFILE)/Facades
+target_dir = $(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/Facades
 
 #
 # Contains the expanded version of the target dll for each profile

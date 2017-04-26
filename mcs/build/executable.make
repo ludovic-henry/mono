@@ -19,7 +19,7 @@ executable_CLEAN_FILES += $(response)
 endif
 
 ifndef the_libdir
-the_libdir = $(topdir)/class/lib/$(PROFILE)/
+the_libdir = $(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/
 ifdef PROGRAM_USE_INTERMEDIATE_FILE
 build_libdir = $(the_libdir)tmp/
 else
@@ -31,8 +31,8 @@ ifdef base_prog_config
 PROGRAM_config := $(build_libdir)$(PROGRAM).config
 endif
 
-sn = $(topdir)/class/lib/$(BUILDPROFILE)/sn.exe
-SN = MONO_PATH="$(topdir)/class/lib/$(BUILDPROFILE)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH" $(RUNTIME) $(RUNTIME_FLAGS) $(sn) -q
+sn = $(topdir)/class/lib/$(BUILDPROFILE)-$(BUILDPLATFORM)/sn.exe
+SN = MONO_PATH="$(topdir)/class/lib/$(BUILDPROFILE)-$(BUILDPLATFORM)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH" $(RUNTIME) $(RUNTIME_FLAGS) $(sn) -q
 
 the_lib = $(the_libdir)$(base_prog)
 build_lib = $(build_libdir)$(base_prog)
@@ -42,8 +42,8 @@ executable_CLEAN_FILES += $(build_lib) $(build_lib).so $(build_lib).mdb $(build_
 
 makefrag = $(depsdir)/$(PROFILE)_$(base_prog).makefrag
 
-MCS_REFERENCES = $(patsubst %,-r:$(topdir)/class/lib/$(PROFILE)/%.dll,$(LIB_REFS))
-MCS_REFERENCES += $(patsubst %,-r:$(topdir)/class/lib/$(PROFILE)/%.exe,$(EXE_REFS))
+MCS_REFERENCES = $(patsubst %,-r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/%.dll,$(LIB_REFS))
+MCS_REFERENCES += $(patsubst %,-r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/%.exe,$(EXE_REFS))
 
 ifndef NO_BUILD
 all-local: $(the_lib) $(PROGRAM_config)
@@ -177,6 +177,7 @@ csproj-local:
 	echo $(build_lib); \
 	echo $(FRAMEWORK_VERSION); \
 	echo $(PROFILE); \
+	echo $(PLATFORM); \
 	echo $(RESOURCE_DEFS); \
 	echo $(response)) > $(topdir)/../msvc/scripts/inputs/$$config_file
 

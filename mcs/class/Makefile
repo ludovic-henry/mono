@@ -40,7 +40,10 @@ build_SUBDIRS :=  \
 	$(MCS_MODE_dirs) \
 	Mono.CompilerServices.SymbolWriter	\
 	PEAPI \
-	../tools/cil-stringreplacer
+	../tools/cil-stringreplacer \
+	ICSharpCode.SharpZipLib		\
+	monodoc \
+	../tools/mdoc
 
 ifdef MCS_MODE
 basic_PARALLEL_SUBDIRS := ../mcs
@@ -424,7 +427,7 @@ $(monolite_files): lib/$(monolite_dir)/%: lib/build/%
 	cp -p $< $@
 
 lib/$(monolite_dir)/mcs.exe:
-	$(MAKE) -C ../mcs PROFILE=build
+	$(MAKE) -C ../mcs PROFILE=build PLATFORM=$(BUILDPLATFORM)
 	cp -p lib/build/mcs.exe lib/$(monolite_dir)
 
 $(build_files:%=lib/build/%):
@@ -444,4 +447,4 @@ dist-local: dist-default
 csproj-local:
 
 do-clean:
-	$(RM) -rf $(topdir)/class/lib/$(PROFILE)
+	$(RM) -rf $(topdir)/class/lib/$(PROFILE)-$(PLATFORM)

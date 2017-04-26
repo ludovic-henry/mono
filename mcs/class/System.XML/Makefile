@@ -4,7 +4,7 @@ include ../../build/rules.make
 
 LIBRARY = System.Xml.dll
 
-lib_file := $(wildcard ../lib/$(PROFILE)/System.Xml.dll)
+lib_file := $(wildcard ../lib/$(PROFILE)-$(PLATFORM)/System.Xml.dll)
 ifndef lib_file
 USE_BOOT_COMPILE = yes
 endif

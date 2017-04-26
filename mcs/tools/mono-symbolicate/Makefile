@@ -10,7 +10,7 @@ LIB_REFS = System.Xml System.Core System
 
 include ../../build/executable.make
 
-LIB_PATH = $(topdir)/class/lib/$(PROFILE)
+LIB_PATH = $(topdir)/class/lib/$(PROFILE)-$(PLATFORM)
 
 MONO = MONO_PATH="$(LIB_PATH)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH" $(RUNTIME) -O=-inline
 

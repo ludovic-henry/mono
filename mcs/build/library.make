@@ -23,16 +23,16 @@ _FILTER_OUT = $(foreach x,$(2),$(if $(findstring $(1),$(x)),,$(x)))
 LIB_REFS_FULL = $(call _FILTER_OUT,=, $(LIB_REFS))
 LIB_REFS_ALIAS = $(filter-out $(LIB_REFS_FULL),$(LIB_REFS))
 
-LIB_MCS_FLAGS += $(patsubst %,-r:$(topdir)/class/lib/$(PROFILE)/%.dll,$(LIB_REFS_FULL))
-LIB_MCS_FLAGS += $(patsubst %,-r:%.dll, $(subst =,=$(topdir)/class/lib/$(PROFILE)/,$(LIB_REFS_ALIAS)))
+LIB_MCS_FLAGS += $(patsubst %,-r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/%.dll,$(LIB_REFS_FULL))
+LIB_MCS_FLAGS += $(patsubst %,-r:%.dll, $(subst =,=$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/,$(LIB_REFS_ALIAS)))
 
 sourcefile = $(LIBRARY).sources
 
 # If the directory contains the per profile include file, generate list file.
-PROFILE_sources := $(wildcard $(PROFILE)_$(LIBRARY).sources)
+PROFILE_sources := $(firstword $(wildcard $(PLATFORM)_$(PROFILE)_$(LIBRARY).sources $(PROFILE)_$(LIBRARY).sources))
 ifdef PROFILE_sources
-PROFILE_excludes = $(wildcard $(PROFILE)_$(LIBRARY).exclude.sources)
-sourcefile = $(depsdir)/$(PROFILE)_$(LIBRARY).sources
+PROFILE_excludes = $(firstword $(wildcard $(PLATFORM)_$(PROFILE)_$(LIBRARY).exclude.sources $(PROFILE)_$(LIBRARY).exclude.sources))
+sourcefile = $(depsdir)/$(PLATFORM)_$(PROFILE)_$(LIBRARY).sources
 library_CLEAN_FILES += $(sourcefile)
 
 # Note, gensources.sh can create a $(sourcefile).makefrag if it sees any '#include's
@@ -66,9 +66,9 @@ lib_dir = lib
 endif
 
 ifdef LIBRARY_SUBDIR
-the_libdir_base = $(topdir)/class/$(lib_dir)/$(PROFILE)/$(LIBRARY_SUBDIR)/
+the_libdir_base = $(topdir)/class/$(lib_dir)/$(PROFILE)-$(PLATFORM)/$(LIBRARY_SUBDIR)/
 else
-the_libdir_base = $(topdir)/class/$(lib_dir)/$(PROFILE)/
+the_libdir_base = $(topdir)/class/$(lib_dir)/$(PROFILE)-$(PLATFORM)/
 endif
 
 ifdef RESOURCE_STRINGS
@@ -105,8 +105,8 @@ ifdef NO_SIGN_ASSEMBLY
 SN = :
 else
 ifeq ("$(SN)","")
-sn = $(topdir)/class/lib/$(BUILDPROFILE)/sn.exe
-SN = MONO_PATH="$(topdir)/class/lib/$(BUILDPROFILE)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH" $(RUNTIME) $(RUNTIME_FLAGS) $(sn) -q
+sn = $(topdir)/class/lib/$(BUILDPROFILE)-$(BUILDPLATFORM)/sn.exe
+SN = MONO_PATH="$(topdir)/class/lib/$(BUILDPROFILE)-$(BUILDPLATFORM)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH" $(RUNTIME) $(RUNTIME_FLAGS) $(sn) -q
 endif
 endif
 
@@ -365,7 +365,7 @@ $(makefrag) $(test_response) $(test_makefrag) $(btest_response) $(btest_makefrag
 
 Q_MDOC_UP=$(if $(V),,@echo "MDOC-UP [$(PROFILE)] $(notdir $(@))";)
 MDOC_UP  =$(Q_MDOC_UP) \
-		MONO_PATH="$(topdir)/class/lib/$(DEFAULT_PROFILE)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH" $(RUNTIME) $(topdir)/class/lib/$(DEFAULT_PROFILE)/mdoc.exe \
+		MONO_PATH="$(topdir)/class/lib/$(BUILDPROFILE)-$(BUILDPLATFORM)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH" $(RUNTIME) $(topdir)/class/lib/$(BUILDPROFILE)-$(BUILDPLATFORM)/mdoc.exe \
 		update --delete -o Documentation/en $(the_lib)
 
 doc-update-local: $(the_libdir)/.doc-stamp
@@ -382,7 +382,7 @@ gen-deps:
 resx2sr=$(topdir)/class/lib/net_4_x/resx2sr.exe
 
 update-corefx-sr: $(resx2sr) $(RESX_RESOURCE_STRING)
-	MONO_PATH="$(topdir)/class/lib/$(BUILDPROFILE)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH" $(RUNTIME) $(RUNTIME_FLAGS) $(resx2sr) $(RESX_RESOURCE_STRING) >corefx/SR.cs
+	MONO_PATH="$(topdir)/class/lib/$(BUILDPROFILE)-$(BUILDPLATFORM)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH" $(RUNTIME) $(RUNTIME_FLAGS) $(resx2sr) $(RESX_RESOURCE_STRING) >corefx/SR.cs
 
 $(resx2sr):
 	$(MAKE) -C $(topdir)/tools/resx2sr

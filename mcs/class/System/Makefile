@@ -1,7 +1,7 @@
 thisdir = class/System
 SUBDIRS =
 include ../../build/rules.make
-export __SECURITY_BOOTSTRAP_DB=$(topdir)/class/lib/$(PROFILE)
+export __SECURITY_BOOTSTRAP_DB=$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)
 
 LIBRARY = System.dll
 
@@ -183,7 +183,7 @@ regex-check:
 
 #Debuging target
 fresh: clean
-	rm -rf ../../class/lib/$(PROFILE)/bare ../../class/lib/$(PROFILE)/bare/ $(system_library_deps)
+	rm -rf ../../class/lib/$(PROFILE)-$(PLATFORM)/bare ../../class/lib/$(PROFILE)-$(PLATFORM)/bare/ $(system_library_deps)
 
 ifndef intermediate
 ifneq ($(PROFILE),basic)

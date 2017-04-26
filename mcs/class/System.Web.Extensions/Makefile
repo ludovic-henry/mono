@@ -36,10 +36,10 @@ NUNIT_RESOURCE_FILES= \
 	$(wildcard ../System.Web/Test/mainsoft/NunitWeb/NunitWeb/Resources/*.as?x) \
 	$(wildcard ../System.Web/Test/mainsoft/NunitWeb/NunitWeb/Resources/*.master)
 
-CLASSLIB_DIR = $(topdir)/class/lib/$(PROFILE)
+CLASSLIB_DIR = $(topdir)/class/lib/$(PROFILE)-$(PLATFORM)
 
 STANDALONE_RUNNER_SUPPORT_ASSEMBLY = $(CLASSLIB_DIR)/standalone-runner-support.dll
-STANDALONE_TEST_MCS_FLAGS = $(LIB_MCS_FLAGS) $(PROFILE_MCS_FLAGS) -r:$(STANDALONE_RUNNER_SUPPORT_ASSEMBLY) -r:$(topdir)/class/lib/$(PROFILE)/System.Web.dll -r:$(topdir)/class/lib/$(PROFILE)/System.Web.Extensions.dll -r:$(topdir)/class/lib/$(PROFILE)/nunit.framework.dll
+STANDALONE_TEST_MCS_FLAGS = $(LIB_MCS_FLAGS) $(PROFILE_MCS_FLAGS) -r:$(STANDALONE_RUNNER_SUPPORT_ASSEMBLY) -r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/System.Web.dll -r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/System.Web.Extensions.dll -r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/nunit.framework.dll
 STANDALONE_TEST_ASSEMBLY = System.Web.Extensions_standalone_test_$(PROFILE).dll
 STANDALONE_TEST_MAKEFRAG = $(depsdir)/$(STANDALONE_TEST_ASSEMBLY).makefrag
 

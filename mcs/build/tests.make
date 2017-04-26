@@ -25,15 +25,15 @@ xunit_deps := System.Runtime
 xunit_class_deps := Xunit.NetCore.Extensions
 
 xunit_libs_ref = $(patsubst %,-r:$(topdir)/../external/xunit-binaries/%.dll,$(xunit_core))
-xunit_libs_ref += $(patsubst %,-r:$(topdir)/class/lib/$(PROFILE)/Facades/%.dll,$(xunit_deps))
+xunit_libs_ref += $(patsubst %,-r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/Facades/%.dll,$(xunit_deps))
 
-xunit_libs_dep = $(xunit_class_deps:%=$(topdir)/class/lib/$(PROFILE)/$(PARENT_PROFILE)%.dll)
+xunit_libs_dep = $(xunit_class_deps:%=$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/$(PARENT_PROFILE)%.dll)
 xunit_libs_ref += $(xunit_libs_dep:%=-r:%)
 
-TEST_LIB_MCS_FLAGS = $(patsubst %,-r:$(topdir)/class/lib/$(PROFILE)/%.dll,$(TEST_LIB_REFS))
-XTEST_LIB_MCS_FLAGS = $(patsubst %,-r:$(topdir)/class/lib/$(PROFILE)/%.dll,$(XTEST_LIB_REFS))
+TEST_LIB_MCS_FLAGS = $(patsubst %,-r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/%.dll,$(TEST_LIB_REFS))
+XTEST_LIB_MCS_FLAGS = $(patsubst %,-r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/%.dll,$(XTEST_LIB_REFS))
 
-test_nunit_dep = $(test_nunit_lib:%=$(topdir)/class/lib/$(PROFILE)/$(PARENT_PROFILE)%)
+test_nunit_dep = $(test_nunit_lib:%=$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/$(PARENT_PROFILE)%)
 test_nunit_ref = $(test_nunit_dep:%=-r:%)
 tests_CLEAN_FILES += TestResult*.xml
 
@@ -87,7 +87,7 @@ endif
 
 tests_CLEAN_FILES += $(topdir)/build/deps/nunit-$(PROFILE).stamp
 
-$(topdir)/class/lib/$(PROFILE)/$(PARENT_PROFILE)Xunit.NetCore.Extensions.dll:
+$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/$(PARENT_PROFILE)Xunit.NetCore.Extensions.dll:
 	$(MAKE) -C $(topdir)/class/Xunit.NetCore.Extensions
 
 endif
@@ -130,7 +130,7 @@ test-local-aot-compile: $(topdir)/build/deps/nunit-$(PROFILE).stamp
 
 endif # ALWAYS_AOT
 
-NUNITLITE_CONFIG_FILE=$(topdir)/class/lib/$(PROFILE)/$(PARENT_PROFILE)nunit-lite-console.exe.config
+NUNITLITE_CONFIG_FILE=$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/$(PARENT_PROFILE)nunit-lite-console.exe.config
 
 patch-nunitlite-appconfig:
 	cp -f $(topdir)/tools/nunit-lite/nunit-lite-console/nunit-lite-console.exe.config.tmpl $(NUNITLITE_CONFIG_FILE)

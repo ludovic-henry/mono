@@ -1,5 +1,5 @@
 PROFILE = net_4_x
-RUNTIME = MONO_PATH=../../../lib/$(PROFILE) mono --debug 
+RUNTIME = MONO_PATH=../../../lib/$(PROFILE)-$(PLATFORM) mono --debug 
 #XMLDSIG_EXE_OPTIONS =
 XMLDSIG_EXE_OPTIONS = --decent-reader
 
@@ -17,7 +17,7 @@ run-test: c14n.exe xmldsig.exe merlin-xmldsig-twenty-three
 	$(RUNTIME) $(RUNTIME_FLAGS) xmldsig.exe $(XMLDSIG_EXE_OPTIONS)
 
 ms-test: c14n.exe xmldsig.exe merlin-xmldsig-twenty-three
-	cp ../../../lib/$(PROFILE)/Mono.Security.dll .
+	cp ../../../lib/$(PROFILE)-$(PLATFORM)/Mono.Security.dll .
 	./c14n.exe merlin-xmldsig-twenty-three/signature-enveloped-dsa.xml SignedInfo | cmp merlin-xmldsig-twenty-three/signature-enveloped-dsa-c14n-1.txt
 	./c14n.exe merlin-xmldsig-twenty-three/signature-enveloping-b64-dsa.xml SignedInfo | cmp merlin-xmldsig-twenty-three/signature-enveloping-b64-dsa-c14n-0.txt
 	./c14n.exe merlin-xmldsig-twenty-three/signature-enveloping-dsa.xml SignedInfo | cmp merlin-xmldsig-twenty-three/signature-enveloping-dsa-c14n-1.txt

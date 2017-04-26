@@ -22,7 +22,7 @@ test-local: Mono.Options-PCL.dll
 clean-local: clean-pcl
 
 Mono.Options-PCL.dll: Mono.Options.dll.sources $(shell cat Mono.Options.dll.sources)
-	$(CSCOMPILE) -target:library -out:$@ -debug+ -d:PCL -r:../lib/$(PROFILE)/System.dll @$<
+	$(CSCOMPILE) -target:library -out:$@ -debug+ -d:PCL -r:../lib/$(PROFILE)-$(PLATFORM)/System.dll @$<
 
 clean-pcl:
 	-rm Mono.Options-PCL.dll
@@ -57,8 +57,8 @@ Documentation/en/examples/Mono.Options.dll: $(the_lib)
 	cp $^ $@
 
 %.exe: %.cs Documentation/en/examples/Mono.Options.dll
-	$(CSCOMPILE) -debug:portable -r:$(topdir)/class/lib/$(PROFILE)/Mono.Posix.dll -r:$(topdir)/class/lib/$(PROFILE)/System.Core.dll -r:$(topdir)/class/lib/$(PROFILE)/System.dll \
-	-r:$(topdir)/class/lib/$(PROFILE)/Mono.Options.dll -out:$@ $<
+	$(CSCOMPILE) -debug:portable -r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/Mono.Posix.dll -r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/System.Core.dll -r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/System.dll \
+	-r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/Mono.Options.dll -out:$@ $<
 
 Documentation/en/examples/locale/es/LC_MESSAGES/localization.mo: Documentation/en/examples/localization-es.po
 	msgfmt $< -o $@

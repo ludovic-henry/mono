@@ -319,13 +319,13 @@ ifdef DEVEL
 LIB_MCS_FLAGS += -define:DEVEL
 endif
 
-CLASSLIB_DIR = $(topdir)/class/lib/$(PROFILE)
+CLASSLIB_DIR = $(topdir)/class/lib/$(PROFILE)-$(PLATFORM)
 
-STANDALONE_RUNNER_SUPPORT_MCS_FLAGS = $(LIB_MCS_FLAGS) $(PROFILE_MCS_FLAGS) -d:STANDALONE_TEST -r:$(topdir)/class/lib/$(PROFILE)/System.Web.dll -r:$(topdir)/class/lib/$(PROFILE)/nunit.framework.dll
+STANDALONE_RUNNER_SUPPORT_MCS_FLAGS = $(LIB_MCS_FLAGS) $(PROFILE_MCS_FLAGS) -d:STANDALONE_TEST -r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/System.Web.dll -r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/nunit.framework.dll
 STANDALONE_RUNNER_SUPPORT_ASSEMBLY = $(CLASSLIB_DIR)/standalone-runner-support.dll
 STANDALONE_RUNNER_SUPPORT_MAKEFRAG = $(depsdir)/$(PROFILE)_standalone-runner-support.dll.makefrag
 
-STANDALONE_TEST_MCS_FLAGS = $(LIB_MCS_FLAGS) $(PROFILE_MCS_FLAGS) -r:$(STANDALONE_RUNNER_SUPPORT_ASSEMBLY) -r:$(topdir)/class/lib/$(PROFILE)/System.Web.dll -r:$(topdir)/class/lib/$(PROFILE)/nunit.framework.dll
+STANDALONE_TEST_MCS_FLAGS = $(LIB_MCS_FLAGS) $(PROFILE_MCS_FLAGS) -r:$(STANDALONE_RUNNER_SUPPORT_ASSEMBLY) -r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/System.Web.dll -r:$(topdir)/class/lib/$(PROFILE)-$(PLATFORM)/nunit.framework.dll
 STANDALONE_TEST_ASSEMBLY = System.Web_standalone_test_$(PROFILE).dll
 STANDALONE_TEST_MAKEFRAG = $(depsdir)/$(STANDALONE_TEST_ASSEMBLY).makefrag
 
@@ -370,7 +370,7 @@ $(RESX_RES): %.resources: %.resx
 	$(RESGEN) `echo $< | $(PLATFORM_CHANGE_SEPARATOR_CMD)`
 
 System.Web/UplevelHelper.cs: UplevelHelperDefinitions.xml
-	MONO_PATH="$(topdir)/class/lib/$(BOOTSTRAP_PROFILE)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH" $(RUNTIME) $(RUNTIME_FLAGS) $(topdir)/class/lib/$(BUILDPROFILE)/culevel.exe -o $@ $^
+	MONO_PATH="$(topdir)/class/lib/$(BUILDPROFILE)-$(BUILDPLATFORM)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH" $(RUNTIME) $(RUNTIME_FLAGS) $(topdir)/class/lib/$(BUILDPROFILE)-$(BUILDPLATFORM)/culevel.exe -o $@ $^
 
 run-aaa: test
 	$(TEST_RUNTIME) $(TEST_HARNESS) $(TEST_HARNESS_FLAGS) $(LOCAL_TEST_HARNESS_FLAGS) \
