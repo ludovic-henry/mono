@@ -56,7 +56,7 @@ depsdir = $(topdir)/build/deps
 
 # Make sure these propagate if set manually
 
-export PLATFORM
+export BUILDPLATFORM
 export PROFILE
 export MCS
 export MCS_FLAGS
@@ -75,31 +75,31 @@ export RESGEN
 default: all
 
 # Get initial configuration. pre-config is so that the builder can
-# override PLATFORM or PROFILE
+# override BUILDPLATFORM or PROFILE
 
 include $(topdir)/build/config-default.make
 -include $(topdir)/build/pre-config.make
 -include $(topdir)/build/config.make
 
-# Default PLATFORM and PROFILE if they're not already defined.
+# Default BUILDPLATFORM if they're not already defined.
 
-ifndef PLATFORM
+ifndef BUILDPLATFORM
 ifeq ($(OS),Windows_NT)
 ifneq ($(V),)
-$(info *** Assuming PLATFORM is 'win32'.)
+$(info *** Assuming BUILDPLATFORM is 'win32'.)
 endif
-PLATFORM = win32
+BUILDPLATFORM = win32
 else
 ifneq ($(V),)
-$(info *** Assuming PLATFORM is 'linux'.)
+$(info *** Assuming BUILDPLATFORM is 'linux'.)
 endif
-PLATFORM = linux
+BUILDPLATFORM = linux
 endif
 endif
 
 # Platform config
 
-include $(topdir)/build/platforms/$(PLATFORM).make
+include $(topdir)/build/platforms/$(BUILDPLATFORM).make
 
 ifdef PLATFORM_CORLIB
 corlib = $(PLATFORM_CORLIB)
