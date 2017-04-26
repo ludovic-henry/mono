@@ -25,9 +25,7 @@ Q=$(if $(V),,@)
 Q_MCS=$(if $(V),,@echo "$(if $(MCS_MODE),MCS,CSC)     [$(intermediate)$(PROFILE)-$(PLATFORM)] $(notdir $(@))";)
 Q_AOT=$(if $(V),,@echo "AOT     [$(intermediate)$(PROFILE)-$(PLATFORM)] $(notdir $(@))";)
 
-ifndef BUILDPROFILE
 BUILDPROFILE = build
-endif
 
 USE_MCS_FLAGS = /codepage:$(CODEPAGE) /nologo /noconfig /deterministic $(LOCAL_MCS_FLAGS) $(PLATFORM_MCS_FLAGS) $(PROFILE_MCS_FLAGS) $(MCS_FLAGS)
 USE_MBAS_FLAGS = /codepage:$(CODEPAGE) $(LOCAL_MBAS_FLAGS) $(PLATFORM_MBAS_FLAGS) $(PROFILE_MBAS_FLAGS) $(MBAS_FLAGS)
@@ -56,8 +54,6 @@ depsdir = $(topdir)/build/deps
 
 # Make sure these propagate if set manually
 
-export BUILDPROFILE
-export BUILDPLATFORM
 export PLATFORM
 export PROFILE
 export MCS
@@ -125,7 +121,7 @@ PROFILE_MCS_FLAGS += -optimize
 endif
 
 ifdef MCS_MODE
-INTERNAL_CSC_LOCATION = $(topdir)/class/lib/$(BOOTSTRAP_PROFILE)-$(BUILDPLATFORM)/mcs.exe
+INTERNAL_CSC_LOCATION = $(topdir)/class/lib/$(BUILDPROFILE)-$(BUILDPLATFORM)/mcs.exe
 
 ifdef PLATFORM_DEBUG_FLAGS
 PLATFORM_DEBUG_FLAGS = /debug:full
