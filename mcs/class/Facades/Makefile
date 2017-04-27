@@ -42,5 +42,3 @@ System.ComponentModel.Composition System.ServiceModel System.Xml.Linq System.Dat
 System.ServiceProcess System.Security System.Net.Http.WebRequest System.Net.Http System.ServiceProcess System.IO.Compression \
 System.Web.Services:
 
-all-local-aot:
-

@@ -395,8 +395,6 @@ DISTFILES = \
 all-local $(STD_TARGETS:=-local):
 	@:
 
-all-local-aot:
-
 monolite_dir := monolite/$(MONO_CORLIB_VERSION)
 
 # Files needed to bootstrap C# compiler

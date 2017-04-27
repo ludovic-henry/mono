@@ -47,6 +47,7 @@ MCS_REFERENCES += $(patsubst %,-r:$(topdir)/class/lib/$(PROFILE)/%.exe,$(EXE_REF
 
 ifndef NO_BUILD
 all-local: $(the_lib) $(PROGRAM_config)
+aot-local: $(the_lib)$(PLATFORM_AOT_SUFFIX)
 endif
 
 install-local: all-local

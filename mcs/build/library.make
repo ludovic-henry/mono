@@ -121,6 +121,7 @@ endif
 
 ifndef NO_BUILD
 all-local: $(the_lib) $(extra_targets)
+aot-local: $(the_lib)$(PLATFORM_AOT_SUFFIX)
 endif
 
 ifeq ($(LIBRARY_COMPILE),$(BOOT_COMPILE))
@@ -158,18 +159,14 @@ install-local uninstall-local:
 
 else
 
-aot_lib = $(the_lib)$(PLATFORM_AOT_SUFFIX)
-aot_libname = $(LIBRARY_NAME)$(PLATFORM_AOT_SUFFIX)
-
 ifdef LIBRARY_INSTALL_DIR
 install-local:
 	$(MKINSTALLDIRS) $(DESTDIR)$(LIBRARY_INSTALL_DIR)
 	$(INSTALL_LIB) $(the_lib) $(DESTDIR)$(LIBRARY_INSTALL_DIR)/$(LIBRARY_NAME)
 	test ! -f $(the_lib).mdb || $(INSTALL_LIB) $(the_lib).mdb $(DESTDIR)$(LIBRARY_INSTALL_DIR)/$(LIBRARY_NAME).mdb
 	test ! -f $(the_lib:.dll=.pdb) || $(INSTALL_LIB) $(the_lib:.dll=.pdb) $(DESTDIR)$(LIBRARY_INSTALL_DIR)/$(LIBRARY_NAME:.dll=.pdb)
-
 ifdef PLATFORM_AOT_SUFFIX
-	test ! -f $(aot_lib) || $(INSTALL_LIB) $(aot_lib) $(DESTDIR)$(LIBRARY_INSTALL_DIR)
+	test ! -f $(the_lib)$(PLATFORM_AOT_SUFFIX) || $(INSTALL_LIB) $(the_lib)$(PLATFORM_AOT_SUFFIX) $(DESTDIR)$(LIBRARY_INSTALL_DIR)
 endif
 
 uninstall-local:
@@ -314,13 +311,6 @@ $(the_lib): $(build_lib)
 endif
 
 library_CLEAN_FILES += $(PROFILE)_aot.log
-
-ifdef PLATFORM_AOT_SUFFIX
-$(the_lib)$(PLATFORM_AOT_SUFFIX): $(the_lib)
-	$(Q_AOT) MONO_PATH='$(the_libdir_base)' > $(PROFILE)_$(LIBRARY_NAME)_aot.log 2>&1 $(RUNTIME) $(AOT_BUILD_FLAGS) --debug $(the_lib)
-
-all-local-aot: $(the_lib)$(PLATFORM_AOT_SUFFIX)
-endif
 
 
 makefrag = $(depsdir)/$(PROFILE)_$(LIBRARY_SUBDIR)_$(LIBRARY).makefrag

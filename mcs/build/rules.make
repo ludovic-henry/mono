@@ -131,35 +131,10 @@ endif
 
 endif
 
-# Design:
-# Problem: We want to be able to build aot
-# assemblies as part of the build system. 
-#
-# For this to be done safely, we really need two passes. This
-# ensures that all of the .dlls are compiled before trying to
-# aot them. Because we want this to be the
-# default target for some profiles(testing_aot_full) we have a
-# two-level build system. The do-all-aot target is what
-# gets invoked at the top-level when someone tries to build with aot.
-# It will invoke the do-all target, and will set TOP_LEVEL_DO for this
-# recursive make call in order to prevent this recursive call from trying
-# to build aot in each of the subdirs. After this is done, we will aot
-# everything that our building produced by aoting everything in
-# mcs/class/lib/$(PROFILE)/
-ifndef TOP_LEVEL_DO
-
-ifdef ALWAYS_AOT
-TOP_LEVEL_DO = do-all-aot
-else
-TOP_LEVEL_DO = do-all
-endif # ALWAYS_AOT
-
-endif # !TOP_LEVEL_DO
-
 ifdef OVERRIDE_TARGET_ALL
 all: all.override
 else
-all: $(TOP_LEVEL_DO)
+all: do-all
 endif
 
 ifdef NO_INSTALL
@@ -169,45 +144,23 @@ gacutil = $(topdir)/class/lib/$(BUILDPROFILE)/gacutil.exe
 GACUTIL = MONO_PATH="$(topdir)/class/lib/$(BUILDPROFILE)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH" $(RUNTIME) $(RUNTIME_FLAGS) $(gacutil)
 endif
 
-STD_TARGETS = test run-test run-test-ondotnet clean install uninstall doc-update
+STD_TARGETS = test run-test run-test-ondotnet clean install uninstall doc-update aot
 
 $(STD_TARGETS): %: do-%
 
 ifdef PLATFORM_AOT_SUFFIX
-
-do-all-aot:
-	$(MAKE) do-all TOP_LEVEL_DO=do-all
-	$(MAKE) aot-all-profile
-
-# When we recursively call $(MAKE) aot-all-profile
-# we will have created this directory, and so will
-# be able to evaluate the .dylibs to make
-ifneq ("$(wildcard $(topdir)/class/lib/$(PROFILE))","")
-
-AOT_PROFILE_ASSEMBLIES := $(sort $(patsubst .//%,%,$(filter-out %.dll.dll %.exe.dll %bare% %plaincore% %secxml% %Facades% %ilasm%,$(filter %.dll %.exe,$(wildcard $(topdir)/class/lib/$(PROFILE)/*)))))
-
-# This can run in parallel
-.PHONY: aot-all-profile
-ifdef AOT_BUILD_FLAGS
-aot-all-profile: $(patsubst %,%$(PLATFORM_AOT_SUFFIX),$(AOT_PROFILE_ASSEMBLIES))
-else
-aot-all-profile:
-	echo AOT_BUILD_FLAGS not set, skipping AOT.
-endif
-
 %.dll$(PLATFORM_AOT_SUFFIX): %.dll
 	@ mkdir -p $<_bitcode_tmp
-	$(Q_AOT) MONO_PATH="$(dir $<)" $(RUNTIME) $(RUNTIME_FLAGS) $(AOT_BUILD_FLAGS),temp-path=$<_bitcode_tmp --verbose $< > $@.aot-log
+	$(Q_AOT) MONO_PATH="$(topdir)/class/lib/$(PROFILE)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH" $(RUNTIME) $(RUNTIME_FLAGS) $(AOT_BUILD_FLAGS),temp-path=$<_bitcode_tmp  --debug --verbose $< > $@_$(PROFILE).aot-log 2>&1
 	@ rm -rf $<_bitcode_tmp
+endif
 
+ifdef PLATFORM_AOT_SUFFIX
 %.exe$(PLATFORM_AOT_SUFFIX): %.exe
 	@ mkdir -p $<_bitcode_tmp
-	$(Q_AOT) MONO_PATH="$(dir $<)" $(RUNTIME) $(RUNTIME_FLAGS) $(AOT_BUILD_FLAGS),temp-path=$<_bitcode_tmp --verbose $< > $@.aot-log
+	$(Q_AOT) MONO_PATH="$(topdir)/class/lib/$(PROFILE)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH" $(RUNTIME) $(RUNTIME_FLAGS) $(AOT_BUILD_FLAGS),temp-path=$<_bitcode_tmp  --debug --verbose $< > $@_$(PROFILE).aot-log 2>&1
 	@ rm -rf $<_bitcode_tmp
-
-endif #ifneq ("$(wildcard $(topdir)/class/lib/$(PROFILE))","")
-
-endif # PLATFORM_AOT_SUFFIX
+endif
 
 do-run-test:
 	ok=:; $(MAKE) run-test-recursive || ok=false; $(MAKE) run-test-local || ok=false; $$ok

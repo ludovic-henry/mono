@@ -50,8 +50,16 @@ endif
 
 all-recursive $(STD_TARGETS:=-recursive): dir-check platform-check profile-check
 
-.PHONY: all-local $(STD_TARGETS:=-local)
-all-local $(STD_TARGETS:=-local):
+.PHONY: all-local
+all-local:
+ifdef ALWAYS_AOT
+	$(MAKE) do-aot
+else
+	@:
+endif
+
+.PHONY: $(STD_TARGETS:=-local)
+$(STD_TARGETS:=-local):
 	@:
 
 dir-check:
