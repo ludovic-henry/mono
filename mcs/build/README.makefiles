@@ -418,16 +418,9 @@ just "mono --debug".
 
 
 
-* Calling the compiler directly? Use $(MCS).
+* Calling the compiler directly? Use $(BUILDMCS).
 
-Really, you should use $(CSCOMPILE) whenever possible, but $(MCS) is
-out there. $(BUILDMCS) is the C# compiler that we use to build
-mcs.exe; on Linux, we then use mcs.exe to build everything else, but
-on Windows, we use csc.exe to build everything. Only use
-$(BUILDMCS) if you know what you're doing.
-
-
-
+$(BUILDMCS) is the C# compiler that we use to build the profile.
 
 
 * Compiling C code? Use $(CCOMPILE)

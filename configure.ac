@@ -1025,6 +1025,49 @@ fi
 DEFAULT_PROFILE=$default_profile
 AC_SUBST(DEFAULT_PROFILE)
 
+default_platform=
+case "$host" in
+	*-mingw*|*-*-cygwin*)
+		default_platform = win32
+		;;
+	*-*-*netbsd*)
+		default_platform = netbsd
+		;;
+	*-*-*freebsd*|*-*-kfreebsd*-gnu)
+		default_platform = freebsd
+		;;
+	*-*-*openbsd*)
+		default_platform = openbsd
+		;;
+	*-*-linux-android*)
+		default_platform = android
+		;;
+	*-*-linux*)
+		default_platform = linux
+		;;
+	*-*-nacl*)
+		default_platform = nacl
+		;;
+	*-*-hpux*)
+		default_platform = hpux
+		;;
+	*-*-solaris*)
+		default_platform = solaris
+		;;
+	*-*-darwin*)
+		AC_MSG_WARN([*** Please add ios/tvos/watchos checks!!])
+		default_platform = darwin
+		;;
+	*-*-haiku*)
+		default_platform = haiku
+		;;
+	*)
+		AC_MSG_ERROR([*** Please add $host to configure.ac checks!])
+		;;
+esac
+DEFAULT_PLATFORM=$default_platform
+AC_SUBST(DEFAULT_PLATFORM)
+
 #
 # End build profile configuration
 #
@@ -4578,6 +4621,7 @@ fi
     fi
     
     echo "DEFAULT_PROFILE = $default_profile" >> $srcdir/$mcsdir/build/config.make
+    echo "DEFAULT_PLATFORM = $default_platform" >> $srcdir/$mcsdir/build/config.make
     
     if test "x$test_bcl_opt" = "xyes"; then    
       echo "BCL_OPTIMIZE = 1" >> $srcdir/$mcsdir/build/config.make

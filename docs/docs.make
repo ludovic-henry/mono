@@ -13,10 +13,10 @@ ASSEMBLED_DOCS = \
 	monoapi.tree monoapi.zip
 
 convert.exe: $(srcdir)/convert.cs AgilityPack.dll
-	$(CSCOMPILE) -r:$(topdir)/class/lib/$(PROFILE)/System.Xml.dll -out:$@ $< -r:AgilityPack.dll
+	$(BUILDMCS) -r:$(topdir)/class/lib/$(BUILDPROFILE)-$(BUILDPLATFORM)/System.Xml.dll -out:$@ $< -r:AgilityPack.dll
 
 AgilityPack.dll:
-	$(CSCOMPILE) -r:$(topdir)/class/lib/$(PROFILE)/System.dll -r:$(topdir)/class/lib/$(PROFILE)/System.Xml.dll -target:library -out:$@ $(srcdir)/HtmlAgilityPack/*.cs
+	$(BUILDMCS) -r:$(topdir)/class/lib/$(BUILDPROFILE)-$(BUILDPLATFORM)/System.dll -r:$(topdir)/class/lib/$(BUILDPROFILE)-$(BUILDPLATFORM)/System.Xml.dll -target:library -out:$@ $(srcdir)/HtmlAgilityPack/*.cs
 
 monoapi.zip: monoapi.tree
 	@test -f $@ || { rm -f $< && $(MAKE) $<; }

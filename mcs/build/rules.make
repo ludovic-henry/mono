@@ -34,7 +34,7 @@ endif
 USE_MCS_FLAGS = /codepage:$(CODEPAGE) /nologo /noconfig /deterministic $(LOCAL_MCS_FLAGS) $(PLATFORM_MCS_FLAGS) $(PROFILE_MCS_FLAGS) $(MCS_FLAGS)
 USE_MBAS_FLAGS = /codepage:$(CODEPAGE) $(LOCAL_MBAS_FLAGS) $(PLATFORM_MBAS_FLAGS) $(PROFILE_MBAS_FLAGS) $(MBAS_FLAGS)
 USE_CFLAGS = $(LOCAL_CFLAGS) $(CFLAGS) $(CPPFLAGS)
-CSCOMPILE = $(Q_MCS) $(MCS) $(USE_MCS_FLAGS)
+CSCOMPILE = $(Q_MCS) $(BUILDMCS) $(USE_MCS_FLAGS)
 CSC_RUNTIME_FLAGS = --aot-path=$(abspath $(topdir)/class/lib/$(BUILDPROFILE)-$(BUILDPLATFORM)) --gc-params=nursery-size=64m
 BASCOMPILE = $(MBAS) $(USE_MBAS_FLAGS)
 CCOMPILE = $(CC) $(USE_CFLAGS)
@@ -60,8 +60,6 @@ depsdir = $(topdir)/build/deps
 
 export PLATFORM
 export PROFILE
-export MCS
-export MCS_FLAGS
 export CC
 export CFLAGS
 export INSTALL
@@ -85,17 +83,7 @@ include $(topdir)/build/config-default.make
 # Default BUILDPLATFORM if they're not already defined.
 
 ifndef BUILDPLATFORM
-ifeq ($(OS),Windows_NT)
-ifneq ($(V),)
-$(info *** Assuming BUILDPLATFORM is 'win32'.)
-endif
-BUILDPLATFORM = win32
-else
-ifneq ($(V),)
-$(info *** Assuming BUILDPLATFORM is 'linux'.)
-endif
-BUILDPLATFORM = linux
-endif
+BUILDPLATFORM = $(DEFAULT_PLATFORM)
 endif
 
 # Platform config

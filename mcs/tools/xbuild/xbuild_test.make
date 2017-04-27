@@ -27,9 +27,9 @@ copy-targets: copy-targets-$(XBUILD_VERSION)
 
 clean-targets: clean-targets-$(XBUILD_VERSION)
 
-XBUILD_4_0_PROFILE_DIR=$(topdir)/class/lib/net_4_x
-XBUILD_12_0_PROFILE_DIR=$(topdir)/class/lib/xbuild_12
-XBUILD_14_0_PROFILE_DIR=$(topdir)/class/lib/xbuild_14
+XBUILD_4_0_PROFILE_DIR=$(topdir)/class/lib/net_4_x-$(PLATFORM)
+XBUILD_12_0_PROFILE_DIR=$(topdir)/class/lib/xbuild_12-$(PLATFORM)
+XBUILD_14_0_PROFILE_DIR=$(topdir)/class/lib/xbuild_14-$(PLATFORM)
 
 copy-targets-4.0:
 	cp $(XBUILD_DATA_DIR)/4.0/Microsoft.Common.targets $(XBUILD_4_0_PROFILE_DIR)
@@ -69,7 +69,7 @@ clean-targets-14.0:
 
 #allow tests to find older versions of libs and targets
 ifneq (4.0, $(XBUILD_VERSION))
-TEST_MONO_PATH := $(topdir)/class/lib/net_4_x$(PLATFORM_PATH_SEPARATOR)$(TEST_MONO_PATH)
+TEST_MONO_PATH := $(topdir)/class/lib/net_4_x-$(PLATFORM)$(PLATFORM_PATH_SEPARATOR)$(TEST_MONO_PATH)
 copy-targets: copy-targets-4.0
 clean-targets: clean-targets-4.0
 endif

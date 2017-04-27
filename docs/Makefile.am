@@ -52,7 +52,7 @@ EXTRA_DIST = \
 
 -include $(mcs_topdir)/build/config.make
 
-CLASS=$(mcs_topdir)/class/lib/$(DEFAULT_PROFILE)
+CLASS=$(mcs_topdir)/class/lib/$(DEFAULT_PROFILE)-$(DEFAULT_PLATFORM)
 
 dist-hook:
 	$(mkdir_p)  $(distdir)/sources

@@ -1,9 +1,5 @@
 # -*- makefile -*-
 
-MCS = $(BUILDMCS)
-
-# nuttzing!
-
 profile-check:
 	@:
 

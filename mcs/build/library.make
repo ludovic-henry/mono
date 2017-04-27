@@ -303,12 +303,12 @@ $(build_lib): $(response) $(sn) $(BUILT_SOURCES) $(build_libdir:=/.stamp) $(GEN_
 ifdef RESOURCE_STRINGS_FILES
 	$(Q) $(STRING_REPLACER) $(RESOURCE_STRINGS_FILES) $@
 endif
-	$(Q) $(SN) -R $@ $(LIBRARY_SNK)
+	echo $(Q) $(SN) -R $@ $(LIBRARY_SNK)
 
 ifdef LIBRARY_USE_INTERMEDIATE_FILE
 $(the_lib): $(build_lib)
 	$(Q) cp $(build_lib) $@
-	$(Q) $(SN) -v $@
+	echo $(Q) $(SN) -v $@
 	$(Q) test ! -f $(build_lib).mdb || mv $(build_lib).mdb $@.mdb
 	$(Q) test ! -f $(build_lib:.dll=.pdb) || mv $(build_lib:.dll=.pdb) $(the_lib:.dll=.pdb)
 endif
@@ -379,7 +379,7 @@ gen-deps:
 	@echo "$(DEPS_TARGET_DIR): $(DEP_DIRS) $(DEP_LIBS)" >> $(DEPS_FILE)
 
 # Should be $(BUILDPROFILE) but still missing System.Windows.Forms
-resx2sr=$(topdir)/class/lib/net_4_x/resx2sr.exe
+resx2sr=$(topdir)/class/lib/net_4_x-$(PLATFORM)/resx2sr.exe
 
 update-corefx-sr: $(resx2sr) $(RESX_RESOURCE_STRING)
 	MONO_PATH="$(topdir)/class/lib/$(BUILDPROFILE)-$(BUILDPLATFORM)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH" $(RUNTIME) $(RUNTIME_FLAGS) $(resx2sr) $(RESX_RESOURCE_STRING) >corefx/SR.cs

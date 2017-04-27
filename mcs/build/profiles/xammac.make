@@ -1,6 +1,4 @@
 
-MCS = $(BUILDMCS)
-
 profile-check:
 	@:
 

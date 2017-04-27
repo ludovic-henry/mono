@@ -1,7 +1,5 @@
 # -*- makefile -*-
 
-MCS = $(BUILDMCS)
-
 profile-check:
 	@:
 
