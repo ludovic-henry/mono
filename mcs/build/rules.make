@@ -26,13 +26,11 @@ Q_MCS=$(if $(V),,@echo "$(if $(MCS_MODE),MCS,CSC)     [$(intermediate)$(PROFILE)
 Q_AOT=$(if $(V),,@echo "AOT     [$(intermediate)$(PROFILE)] $(notdir $(@))";)
 
 BUILD_PROFILE = build
-
 BUILD_MCS = MONO_PATH="$(topdir)/class/lib/$(BUILD_PROFILE)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH" $(INTERNAL_CSC)
-
 USE_MCS_FLAGS = /codepage:$(CODEPAGE) /nologo /noconfig /deterministic $(LOCAL_MCS_FLAGS) $(PLATFORM_MCS_FLAGS) $(PROFILE_MCS_FLAGS) $(MCS_FLAGS)
 USE_MBAS_FLAGS = /codepage:$(CODEPAGE) $(LOCAL_MBAS_FLAGS) $(PLATFORM_MBAS_FLAGS) $(PROFILE_MBAS_FLAGS) $(MBAS_FLAGS)
 USE_CFLAGS = $(LOCAL_CFLAGS) $(CFLAGS) $(CPPFLAGS)
-CSCOMPILE = $(Q_MCS) $(MCS) $(USE_MCS_FLAGS)
+CSCOMPILE = $(Q_MCS) $(BUILD_MCS) $(USE_MCS_FLAGS)
 CSC_RUNTIME_FLAGS = --aot-path=$(abspath $(topdir)/class/lib/$(BUILD_PROFILE)) --gc-params=nursery-size=64m
 BASCOMPILE = $(MBAS) $(USE_MBAS_FLAGS)
 CCOMPILE = $(CC) $(USE_CFLAGS)
@@ -57,8 +55,6 @@ depsdir = $(topdir)/build/deps
 # Make sure these propagate if set manually
 
 export PROFILE
-export MCS
-export MCS_FLAGS
 export CC
 export CFLAGS
 export INSTALL
