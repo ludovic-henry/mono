@@ -2,8 +2,6 @@
 
 BUILD_PROFILE = basic
 
-MCS = $(BUILD_MCS)
-
 # nuttzing!
 
 profile-check:

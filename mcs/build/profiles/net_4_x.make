@@ -1,7 +1,5 @@
 # -*- makefile -*-
 
-MCS = $(BUILD_MCS)
-
 # nuttzing!
 
 profile-check:
