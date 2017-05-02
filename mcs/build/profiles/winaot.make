@@ -1,5 +1,7 @@
 #! -*- makefile -*-
 
+PLATFORMS = winaot
+
 profile-check:
 	@:
 

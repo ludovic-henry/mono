@@ -1,7 +1,11 @@
 # -*- makefile -*-
 
+PLATFORMS = linux macos win32
+
 profile-check:
 	@:
+
+PLATFORMS = macos
 
 DEFAULT_REFERENCES = -r:$(topdir)/class/lib/$(PROFILE)/mscorlib.dll
 PROFILE_MCS_FLAGS = \

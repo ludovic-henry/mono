@@ -1,4 +1,6 @@
 
+PLATFORMS = macos
+
 profile-check:
 	@:
 

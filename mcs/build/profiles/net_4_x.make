@@ -2,6 +2,8 @@
 
 # nuttzing!
 
+PLATFORMS = linux macos win32
+
 profile-check:
 	@:
 

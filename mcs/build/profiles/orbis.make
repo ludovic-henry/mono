@@ -1,5 +1,7 @@
 #! -*- makefile -*-
 
+PLATFORMS = orbis
+
 profile-check:
 	@:
 

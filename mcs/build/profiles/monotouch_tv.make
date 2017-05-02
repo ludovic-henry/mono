@@ -1,5 +1,7 @@
 include $(topdir)/build/profiles/monotouch.make
 
+PLATFORMS = tvos
+
 PROFILE_MCS_FLAGS += \
 	-d:MONOTOUCH_TV
 

@@ -112,6 +112,10 @@ endif
 
 include $(topdir)/build/profiles/$(PROFILE).make
 
+ifndef PLATFORMS
+PLATFORMS = $(BUILD_PLATFORM)
+endif
+
 ifdef BCL_OPTIMIZE
 PROFILE_MCS_FLAGS += -optimize
 endif

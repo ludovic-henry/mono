@@ -1,5 +1,7 @@
 include $(topdir)/build/profiles/monotouch.make
 
+PLATFORMS = watchos
+
 PROFILE_MCS_FLAGS += \
 	-d:FEATURE_NO_BSD_SOCKETS \
 	-d:MONOTOUCH_WATCH
