@@ -108,7 +108,7 @@ TEST_MCS_FLAGS = \
 
 DummyAssembly.dll:
 	$(CSCOMPILE) /target:library /out:$@ Test/DummyAssembly/AnotherSerializable.cs Test/DummyAssembly/Convertable.cs Test/DummyAssembly/Properties/AssemblyInfo.cs \
-	-r:$(topdir)/class/lib/$(PROFILE)/System.dll
+	-r:$(topdir)/class/lib/$(PROFILE)$(if $(PROFILE_PLATFORM),-$(PROFILE_PLATFORM))/System.dll
 
 test-local: DummyAssembly.dll
 
@@ -129,8 +129,8 @@ $(PREBUILT): %.prebuilt: %
 
 dist-default: $(PREBUILT)
 
-simple-test.exe: Test/simple/Program.cs $(topdir)/class/lib/$(PROFILE)/System.Windows.Forms.dll
-	$(CSCOMPILE) -out:$@ Test/simple/Program.cs -r:$(topdir)/class/lib/$(PROFILE)/System.Windows.Forms.dll
+simple-test.exe: Test/simple/Program.cs $(topdir)/class/lib/$(PROFILE)$(if $(PROFILE_PLATFORM),-$(PROFILE_PLATFORM))/System.Windows.Forms.dll
+	$(CSCOMPILE) -out:$@ Test/simple/Program.cs -r:$(topdir)/class/lib/$(PROFILE)$(if $(PROFILE_PLATFORM),-$(PROFILE_PLATFORM))/System.Windows.Forms.dll
 
 test-simple: simple-test.exe
 	$(TEST_RUNTIME) simple-test.exe

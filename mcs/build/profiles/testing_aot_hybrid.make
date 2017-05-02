@@ -8,7 +8,7 @@ MCS = $(BOOTSTRAP_MCS)
 profile-check:
 	@:
 
-DEFAULT_REFERENCES = -r:$(topdir)/class/lib/$(PROFILE)/mscorlib.dll
+DEFAULT_REFERENCES = -r:$(topdir)/class/lib/$(PROFILE)$(if $(PROFILE_PLATFORM),-$(PROFILE_PLATFORM))/mscorlib.dll
 
 PROFILE_MCS_FLAGS = \
 	-d:NET_1_1 \

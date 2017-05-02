@@ -1,4 +1,4 @@
-CLASS=$(mcs_topdir)/class/lib/$(DEFAULT_PROFILE)
+CLASS=$(mcs_topdir)/class/lib/$(DEFAULT_PROFILE)$(if $(DEFAULT_PROFILE_PLATFORM),-$(DEFAULT_PROFILE_PLATFORM))
 
 TOOLS_RUNTIME = MONO_PATH=$(mcs_topdir)/class/lib/build $(top_builddir)/runtime/mono-wrapper
 MCS = $(TOOLS_RUNTIME) $(CSC) -lib:$(CLASS) -noconfig -unsafe -nowarn:0162 -nowarn:0168 -nowarn:0219 -debug:portable

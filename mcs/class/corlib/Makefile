@@ -159,11 +159,11 @@ $(test_lib): $(TEST_RESOURCES) $(satellite_assembly1) $(satellite_assembly2)
 
 $(satellite_assembly1): Test/resources/culture-es-ES.cs Test/resources/Resources.es-ES.resources
 	@mkdir -p es-ES
-	$(CSCOMPILE) -target:library -r:$(topdir)/class/lib/$(PROFILE)/mscorlib.dll Test/resources/culture-es-ES.cs -resource:Test/resources/Resources.es-ES.resources -out:$@
+	$(CSCOMPILE) -target:library -r:$(topdir)/class/lib/$(PROFILE)$(if $(PROFILE_PLATFORM),-$(PROFILE_PLATFORM))/mscorlib.dll Test/resources/culture-es-ES.cs -resource:Test/resources/Resources.es-ES.resources -out:$@
 
 $(satellite_assembly2): Test/resources/culture-nn-NO.cs Test/resources/Resources.nn-NO.resources
 	@mkdir -p nn-NO
-	$(CSCOMPILE) -target:library -r:$(topdir)/class/lib/$(PROFILE)/mscorlib.dll Test/resources/culture-nn-NO.cs -resource:Test/resources/Resources.nn-NO.resources -out:$@
+	$(CSCOMPILE) -target:library -r:$(topdir)/class/lib/$(PROFILE)$(if $(PROFILE_PLATFORM),-$(PROFILE_PLATFORM))/mscorlib.dll Test/resources/culture-nn-NO.cs -resource:Test/resources/Resources.nn-NO.resources -out:$@
 
 vtsdir = Test/System.Runtime.Serialization.Formatters.Binary/VersionTolerantSerialization
 vtslibs = \
@@ -178,18 +178,18 @@ test-vts: $(vtslibs) $(vtsdir)/$(PROFILE)_TestLib/BinarySerializationOverVersion
 
 $(vtsdir)/$(PROFILE)_TestLib/%/Address.dll: $(vtsdir)/VersionTolerantSerializationTestLib/%/Address.cs
 	@mkdir -p $(dir $@)
-	$(CSCOMPILE) -target:library -warn:0 -r:$(topdir)/class/lib/$(PROFILE)/mscorlib.dll -out:$@ $^
+	$(CSCOMPILE) -target:library -warn:0 -r:$(topdir)/class/lib/$(PROFILE)$(if $(PROFILE_PLATFORM),-$(PROFILE_PLATFORM))/mscorlib.dll -out:$@ $^
 
 $(vtsdir)/$(PROFILE)_TestLib/BinarySerializationOverVersions.exe: $(vtsdir)/BinarySerializationOverVersions.cs $(vtsdir)/$(PROFILE)_TestLib/1.0/Address.dll $(test_nunit_dep)
 	$(CSCOMPILE) $(test_nunit_ref) -warn:0 \
 		-r:$(vtsdir)/$(PROFILE)_TestLib/1.0/Address.dll \
-		-r:$(topdir)/class/lib/$(PROFILE)/mscorlib.dll \
-		-r:$(topdir)/class/lib/$(PROFILE)/System.dll \
+		-r:$(topdir)/class/lib/$(PROFILE)$(if $(PROFILE_PLATFORM),-$(PROFILE_PLATFORM))/mscorlib.dll \
+		-r:$(topdir)/class/lib/$(PROFILE)$(if $(PROFILE_PLATFORM),-$(PROFILE_PLATFORM))/System.dll \
 		$(vtsdir)/BinarySerializationOverVersions.cs -out:$@
 	@cp $(vtsdir)/$(PROFILE)_TestLib/1.0/Address.dll $(vtsdir)/$(PROFILE)_TestLib
 
 # Need to define TEST_MONO_PATH to an absolute dir since the test is ran from a subdir
-TEST_MONO_PATH=$(PWD)/../lib/$(PROFILE)
+TEST_MONO_PATH=$(PWD)/../lib/$(PROFILE)$(if $(PROFILE_PLATFORM),-$(PROFILE_PLATFORM))
 
 run-test-vts: test-vts
 	@echo Running vts tests...

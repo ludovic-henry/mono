@@ -1025,6 +1025,19 @@ fi
 DEFAULT_PROFILE=$default_profile
 AC_SUBST(DEFAULT_PROFILE)
 
+default_profile_platform=
+if test x$default_profile = xnet_4_x; then
+  if test x$host_darwin = xyes; then
+    default_profile_platform=darwin
+  elif test x$host_win32 = xyes; then
+    default_profile_platform=win32
+  else
+    default_profile_platform=linux
+  fi
+fi
+DEFAULT_PROFILE_PLATFORM=$default_profile_platform
+AC_SUBST(DEFAULT_PROFILE_PLATFORM)
+
 #
 # End build profile configuration
 #
@@ -4562,6 +4575,13 @@ fi
       echo "BUILD_PLATFORM = linux" >> $mcs_topdir/build/config.make
     fi
 
+    if test x$host_darwin = xyes; then
+      echo "HOST_PLATFORM ?= darwin" >> $mcs_topdir/build/config.make
+    elif test x$host_win32 = xyes; then
+      echo "HOST_PLATFORM ?= win32" >> $mcs_topdir/build/config.make
+    else
+      echo "HOST_PLATFORM ?= linux" >> $mcs_topdir/build/config.make
+    fi
 
     if test "x$PLATFORM_AOT_SUFFIX" != "x"; then
       echo "PLATFORM_AOT_SUFFIX = $PLATFORM_AOT_SUFFIX" >> $mcs_topdir/build/config.make
@@ -4584,6 +4604,7 @@ fi
     fi
     
     echo "DEFAULT_PROFILE = $default_profile" >> $srcdir/$mcsdir/build/config.make
+    echo "DEFAULT_PROFILE_PLATFORM = $default_profile_platform" >> $srcdir/$mcsdir/build/config.make
     
     if test "x$test_bcl_opt" = "xyes"; then    
       echo "BCL_OPTIMIZE = 1" >> $srcdir/$mcsdir/build/config.make

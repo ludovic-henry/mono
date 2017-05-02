@@ -50,9 +50,11 @@ EXTRA_DIST = \
 	TODO			\
 	unmanaged-calls	
 
+include $(mcs_topdir)/build/config-default.make
+-include $(mcs_topdir)/build/pre-config.make
 -include $(mcs_topdir)/build/config.make
 
-CLASS=$(mcs_topdir)/class/lib/$(DEFAULT_PROFILE)
+CLASS=$(mcs_topdir)/class/lib/$(DEFAULT_PROFILE)$(if $(DEFAULT_PROFILE_PLATFORM),-$(DEFAULT_PROFILE_PLATFORM))
 
 dist-hook:
 	$(mkdir_p)  $(distdir)/sources

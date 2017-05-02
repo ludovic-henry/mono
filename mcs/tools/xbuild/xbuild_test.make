@@ -1,5 +1,5 @@
 XBUILD_DATA_DIR=$(topdir)/tools/xbuild/data
-XBUILD_PROFILE_DIR=$(topdir)/class/lib/$(PROFILE)
+XBUILD_PROFILE_DIR=$(topdir)/class/lib/$(PROFILE)$(if $(PROFILE_PLATFORM),-$(PROFILE_PLATFORM))
 
 # makes xbuild look in the class/lib/$PROFILE build directories for targets etc
 export TESTING_MONO=a

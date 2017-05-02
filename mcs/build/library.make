@@ -23,16 +23,16 @@ _FILTER_OUT = $(foreach x,$(2),$(if $(findstring $(1),$(x)),,$(x)))
 LIB_REFS_FULL = $(call _FILTER_OUT,=, $(LIB_REFS))
 LIB_REFS_ALIAS = $(filter-out $(LIB_REFS_FULL),$(LIB_REFS))
 
-LIB_MCS_FLAGS += $(patsubst %,-r:$(topdir)/class/lib/$(PROFILE)/%.dll,$(LIB_REFS_FULL))
-LIB_MCS_FLAGS += $(patsubst %,-r:%.dll, $(subst =,=$(topdir)/class/lib/$(PROFILE)/,$(LIB_REFS_ALIAS)))
+LIB_MCS_FLAGS += $(patsubst %,-r:$(topdir)/class/lib/$(PROFILE)$(if $(PROFILE_PLATFORM),-$(PROFILE_PLATFORM))/%.dll,$(LIB_REFS_FULL))
+LIB_MCS_FLAGS += $(patsubst %,-r:%.dll, $(subst =,=$(topdir)/class/lib/$(PROFILE)$(if $(PROFILE_PLATFORM),-$(PROFILE_PLATFORM))/,$(LIB_REFS_ALIAS)))
 
 sourcefile = $(LIBRARY).sources
 
 # If the directory contains the per profile include file, generate list file.
-PROFILE_sources := $(wildcard $(PROFILE)_$(LIBRARY).sources)
+PROFILE_sources := $(firstword $(if $(PROFILE_PLATFORM),$(wildcard $(PROFILE_PLATFORM)_$(PROFILE)_$(LIBRARY).sources)) $(wildcard $(PROFILE)_$(LIBRARY).sources))
 ifdef PROFILE_sources
-PROFILE_excludes = $(wildcard $(PROFILE)_$(LIBRARY).exclude.sources)
-sourcefile = $(depsdir)/$(PROFILE)_$(LIBRARY).sources
+PROFILE_excludes = $(firstword $(if $(PROFILE_PLATFORM),$(wildcard $(PROFILE_PLATFORM)_$(PROFILE)_$(LIBRARY).exclude.sources)) $(wildcard $(PROFILE)_$(LIBRARY).exclude.sources))
+sourcefile = $(depsdir)/$(PROFILE_PLATFORM)_$(PROFILE)_$(LIBRARY).sources
 library_CLEAN_FILES += $(sourcefile)
 
 # Note, gensources.sh can create a $(sourcefile).makefrag if it sees any '#include's
@@ -42,18 +42,11 @@ $(sourcefile): $(PROFILE_sources) $(PROFILE_excludes) $(topdir)/build/gensources
 	$(SHELL) $(topdir)/build/gensources.sh $@ '$(PROFILE_sources)' '$(PROFILE_excludes)'
 endif
 
-PLATFORM_excludes := $(wildcard $(LIBRARY).$(BUILD_PLATFORM)-excludes)
+response = $(depsdir)/$(PROFILE_PLATFORM)_$(PROFILE)_$(LIBRARY_SUBDIR)_$(LIBRARY).response
+$(response): $(sourcefile)
+	$(PLATFORM_CHANGE_SEPARATOR_CMD) <$(sourcefile) >$@
 
-ifndef PLATFORM_excludes
-ifeq (cat,$(PLATFORM_CHANGE_SEPARATOR_CMD))
-response = $(sourcefile)
-endif
-endif
-
-ifndef response
-response = $(depsdir)/$(PROFILE)_$(LIBRARY_SUBDIR)_$(LIBRARY).response
 library_CLEAN_FILES += $(response)
-endif
 
 ifndef LIBRARY_NAME
 LIBRARY_NAME = $(LIBRARY)
@@ -66,9 +59,9 @@ lib_dir = lib
 endif
 
 ifdef LIBRARY_SUBDIR
-the_libdir_base = $(topdir)/class/$(lib_dir)/$(PROFILE)/$(LIBRARY_SUBDIR)/
+the_libdir_base = $(topdir)/class/$(lib_dir)/$(PROFILE)$(if $(PROFILE_PLATFORM),-$(PROFILE_PLATFORM))/$(LIBRARY_SUBDIR)/
 else
-the_libdir_base = $(topdir)/class/$(lib_dir)/$(PROFILE)/
+the_libdir_base = $(topdir)/class/$(lib_dir)/$(PROFILE)$(if $(PROFILE_PLATFORM),-$(PROFILE_PLATFORM))/
 endif
 
 ifdef RESOURCE_STRINGS
@@ -317,17 +310,17 @@ endif
 
 endif
 
-library_CLEAN_FILES += $(PROFILE)_aot.log
+library_CLEAN_FILES += $(PROFILE_PLATFORM)_$(PROFILE)_$(LIBRARY_NAME)_aot.log
 
 ifdef PLATFORM_AOT_SUFFIX
 $(the_lib)$(PLATFORM_AOT_SUFFIX): $(the_lib)
-	$(Q_AOT) MONO_PATH='$(the_libdir_base)' > $(PROFILE)_$(LIBRARY_NAME)_aot.log 2>&1 $(RUNTIME) $(AOT_BUILD_FLAGS) --debug $(the_lib)
+	$(Q_AOT) MONO_PATH='$(the_libdir_base)' > $(PROFILE_PLATFORM)_$(PROFILE)_$(LIBRARY_NAME)_aot.log 2>&1 $(RUNTIME) $(AOT_BUILD_FLAGS) --debug $(the_lib)
 
 all-local-aot: $(the_lib)$(PLATFORM_AOT_SUFFIX)
 endif
 
 
-makefrag = $(depsdir)/$(PROFILE)_$(LIBRARY_SUBDIR)_$(LIBRARY).makefrag
+makefrag = $(depsdir)/$(PROFILE_PLATFORM)_$(PROFILE)_$(LIBRARY_SUBDIR)_$(LIBRARY).makefrag
 library_CLEAN_FILES += $(makefrag)
 $(makefrag): $(sourcefile)
 #	@echo Creating $@ ...
@@ -336,20 +329,6 @@ $(makefrag): $(sourcefile)
 	   cat $(sourcefile).makefrag >> $@ ; \
 	   echo '$@: $(sourcefile).makefrag' >> $@; \
 	   echo '$(sourcefile).makefrag:' >> $@; fi
-
-ifneq ($(response),$(sourcefile))
-
-ifdef PLATFORM_excludes
-$(response): $(sourcefile) $(PLATFORM_excludes)
-	@echo Filtering $(sourcefile) to $@ ...
-	@sort $(sourcefile) $(PLATFORM_excludes) | uniq -u | $(PLATFORM_CHANGE_SEPARATOR_CMD) >$@
-else
-$(response): $(sourcefile)
-	@echo Converting $(sourcefile) to $@ ...
-	@cat $(sourcefile) | $(PLATFORM_CHANGE_SEPARATOR_CMD) >$@
-endif
-
-endif
 
 -include $(makefrag)
 
@@ -363,22 +342,15 @@ ifndef NO_BUILD
 all-local: $(makefrag) $(test_makefrag) $(btest_makefrag)
 endif
 
-ifneq ($(response),$(sourcefile))
 $(response): $(topdir)/build/library.make $(depsdir)/.stamp
-endif
 $(makefrag) $(test_response) $(test_makefrag) $(btest_response) $(btest_makefrag): $(topdir)/build/library.make $(depsdir)/.stamp
 
 ## Documentation stuff
 
-Q_MDOC_UP=$(if $(V),,@echo "MDOC-UP [$(PROFILE)] $(notdir $(@))";)
-MDOC_UP  =$(Q_MDOC_UP) \
-		MONO_PATH="$(topdir)/class/lib/$(DEFAULT_PROFILE)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH" $(RUNTIME) $(topdir)/class/lib/$(DEFAULT_PROFILE)/mdoc.exe \
-		update --delete -o Documentation/en $(the_lib)
-
 doc-update-local: $(the_libdir)/.doc-stamp
 
 $(the_libdir)/.doc-stamp: $(the_lib)
-	$(MDOC_UP)
+	$(MDOC_UP) $(the_lib)
 	@echo "doc-stamp" > $@
 
 # Need to be here so it comes after the definition of DEP_DIRS/DEP_LIBS

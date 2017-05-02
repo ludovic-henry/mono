@@ -46,7 +46,7 @@ else
 MOBILE_RUNTIME_ARG=
 endif
 
-CLASS=$(mcs_topdir)/class/lib/$(DEFAULT_PROFILE)
+CLASS=$(mcs_topdir)/class/lib/$(DEFAULT_PROFILE)$(if $(DEFAULT_PROFILE_PLATFORM),-$(DEFAULT_PROFILE_PLATFORM))
 
 RUNTIME_EXECUTABLE = $(if $(BOEHM),$(top_builddir)/mono/mini/mono-boehm,$(top_builddir)/runtime/mono-wrapper)
 

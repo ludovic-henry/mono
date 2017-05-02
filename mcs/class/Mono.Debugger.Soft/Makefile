@@ -22,10 +22,10 @@ TEST_HELPERS_SOURCES = \
 test-local: dtest-app.exe dtest-excfilter.exe
 
 dtest-app.exe: Test/dtest-app.cs $(TEST_HELPERS_SOURCES)
-	$(CSCOMPILE) -r:$(topdir)/class/lib/$(PROFILE)/System.Core.dll -r:$(topdir)/class/lib/$(PROFILE)/System.dll -out:$@ -unsafe $(PLATFORM_DEBUG_FLAGS) -optimize- Test/dtest-app.cs $(TEST_HELPERS_SOURCES)
+	$(CSCOMPILE) -r:$(topdir)/class/lib/$(PROFILE)$(if $(PROFILE_PLATFORM),-$(PROFILE_PLATFORM))/System.Core.dll -r:$(topdir)/class/lib/$(PROFILE)$(if $(PROFILE_PLATFORM),-$(PROFILE_PLATFORM))/System.dll -out:$@ -unsafe $(PLATFORM_DEBUG_FLAGS) -optimize- Test/dtest-app.cs $(TEST_HELPERS_SOURCES)
 
 dtest-excfilter.exe: Test/dtest-excfilter.il
-	MONO_PATH=$(topdir)/class/lib/$(PROFILE) $(INTERNAL_ILASM) -out:$@ /exe /debug Test/dtest-excfilter.il
+	MONO_PATH=$(topdir)/class/lib/$(PROFILE)$(if $(PROFILE_PLATFORM),-$(PROFILE_PLATFORM)) $(INTERNAL_ILASM) -out:$@ /exe /debug Test/dtest-excfilter.il
 
 else
 

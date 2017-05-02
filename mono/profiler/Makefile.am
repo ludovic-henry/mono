@@ -103,7 +103,7 @@ PLOG_TESTS_SRC=test-alloc.cs test-busy.cs test-monitor.cs test-excleave.cs \
 	test-heapshot.cs test-traces.cs
 PLOG_TESTS=$(PLOG_TESTS_SRC:.cs=.exe)
 
-CLASS=$(mcs_topdir)/class/lib/$(DEFAULT_PROFILE)
+CLASS=$(mcs_topdir)/class/lib/$(DEFAULT_PROFILE)$(if $(DEFAULT_PROFILE_PLATFORM),-$(DEFAULT_PROFILE_PLATFORM))
 
 TOOLS_RUNTIME = MONO_PATH=$(mcs_topdir)/class/lib/build $(top_builddir)/runtime/mono-wrapper
 MCS = $(TOOLS_RUNTIME) $(CSC) -lib:$(CLASS) -unsafe -nologo -noconfig -nowarn:0162 -nowarn:0168 -nowarn:0219 -debug:portable

@@ -1,4 +1,4 @@
-API_INFO = $(MONO_PATH) $(RUNTIME) $(topdir)/class/lib/$(PROFILE)/mono-api-info.exe
+API_INFO = $(MONO_PATH) $(RUNTIME) $(topdir)/class/lib/$(PROFILE)$(if $(PROFILE_PLATFORM),-$(PROFILE_PLATFORM))/mono-api-info.exe
 API_DIFF = $(MONO_PATH) $(RUNTIME) $(topdir)/tools/corcompare/mono-api-diff.exe
 TRANSFORM = $(MONO_PATH) $(RUNTIME) $(topdir)/tools/corcompare/transform.exe
 
@@ -17,7 +17,7 @@ $(topdir)/build/corcompare/%.html: %.src
 	$(API_DIFF) masterinfos/$(PROFILE)/$(notdir $<) $< > $@ || (rm -rf $@ && exit 1)
 
 .PRECIOUS: %.xml
-%.xml: $(topdir)/class/lib/$(PROFILE)/%.dll
+%.xml: $(topdir)/class/lib/$(PROFILE)$(if $(PROFILE_PLATFORM),-$(PROFILE_PLATFORM))/%.dll
 	$(API_INFO) $< > $@ || (rm -f $@ && exit 1)
 
 CLEAN_FILES += $(topdir)/build/corcompare/$(LIBRARY_NAME:.dll=.html) $(LIBRARY_NAME:.dll=.src) $(LIBRARY_NAME:.dll=.xmlsrc)

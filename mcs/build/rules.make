@@ -22,8 +22,8 @@ VERSION = 0.93
 
 Q=$(if $(V),,@)
 # echo -e "\\t" does not work on some systems, so use 5 spaces
-Q_MCS=$(if $(V),,@echo "$(if $(MCS_MODE),MCS,CSC)     [$(intermediate)$(PROFILE)] $(notdir $(@))";)
-Q_AOT=$(if $(V),,@echo "AOT     [$(intermediate)$(PROFILE)] $(notdir $(@))";)
+Q_MCS=$(if $(V),,@echo "$(if $(MCS_MODE),MCS,CSC)     [$(intermediate)$(PROFILE)$(if $(PROFILE_PLATFORM),-$(PROFILE_PLATFORM))] $(notdir $(@))";)
+Q_AOT=$(if $(V),,@echo "AOT     [$(intermediate)$(PROFILE)$(if $(PROFILE_PLATFORM),-$(PROFILE_PLATFORM))] $(notdir $(@))";)
 
 ifndef BUILD_TOOLS_PROFILE
 BUILD_TOOLS_PROFILE = build
@@ -43,7 +43,7 @@ INSTALL_BIN = $(INSTALL) -c -m 755
 INSTALL_LIB = $(INSTALL_BIN)
 MKINSTALLDIRS = $(SHELL) $(topdir)/mkinstalldirs
 INTERNAL_MBAS = $(RUNTIME) $(RUNTIME_FLAGS) $(topdir)/mbas/mbas.exe
-INTERNAL_ILASM = $(RUNTIME) $(RUNTIME_FLAGS) $(topdir)/class/lib/$(PROFILE)/ilasm.exe
+INTERNAL_ILASM = $(RUNTIME) $(RUNTIME_FLAGS) $(topdir)/class/lib/$(PROFILE)$(if $(PROFILE_PLATFORM),-$(PROFILE_PLATFORM))/ilasm.exe
 INTERNAL_CSC_LOCATION = $(CSC_LOCATION)
 
 # Using CSC_SDK_PATH_DISABLED for sanity check that all references have path specified
@@ -83,6 +83,8 @@ include $(topdir)/build/config-default.make
 # Platform config
 
 include $(topdir)/build/platforms/$(BUILD_PLATFORM).make
+
+PROFILE_PLATFORM = $(if $(PLATFORMS),$(if $(filter $(PLATFORMS),$(HOST_PLATFORM)),$(HOST_PLATFORM),$(error Unknown platform "$(HOST_PLATFORM)" for profile "$(PROFILE)")))
 
 ifdef PLATFORM_CORLIB
 corlib = $(PLATFORM_CORLIB)
@@ -128,7 +130,7 @@ endif
 # recursive make call in order to prevent this recursive call from trying
 # to build aot in each of the subdirs. After this is done, we will aot
 # everything that our building produced by aoting everything in
-# mcs/class/lib/$(PROFILE)/
+# mcs/class/lib/$(PROFILE)$(if $(PROFILE_PLATFORM),-$(PROFILE_PLATFORM))/
 ifndef TOP_LEVEL_DO
 
 ifdef ALWAYS_AOT
@@ -165,9 +167,9 @@ do-all-aot:
 # When we recursively call $(MAKE) aot-all-profile
 # we will have created this directory, and so will
 # be able to evaluate the .dylibs to make
-ifneq ("$(wildcard $(topdir)/class/lib/$(PROFILE))","")
+ifneq ("$(wildcard $(topdir)/class/lib/$(PROFILE)$(if $(PROFILE_PLATFORM),-$(PROFILE_PLATFORM)))","")
 
-AOT_PROFILE_ASSEMBLIES := $(sort $(patsubst .//%,%,$(filter-out %.dll.dll %.exe.dll %bare% %plaincore% %secxml% %Facades% %ilasm%,$(filter %.dll %.exe,$(wildcard $(topdir)/class/lib/$(PROFILE)/*)))))
+AOT_PROFILE_ASSEMBLIES := $(sort $(patsubst .//%,%,$(filter-out %.dll.dll %.exe.dll %bare% %plaincore% %secxml% %Facades% %ilasm%,$(filter %.dll %.exe,$(wildcard $(topdir)/class/lib/$(PROFILE)$(if $(PROFILE_PLATFORM),-$(PROFILE_PLATFORM))/*)))))
 
 # This can run in parallel
 .PHONY: aot-all-profile
@@ -188,7 +190,7 @@ endif
 	$(Q_AOT) MONO_PATH="$(dir $<)" $(RUNTIME) $(RUNTIME_FLAGS) $(AOT_BUILD_FLAGS),temp-path=$<_bitcode_tmp --verbose $< > $@.aot-log
 	@ rm -rf $<_bitcode_tmp
 
-endif #ifneq ("$(wildcard $(topdir)/class/lib/$(PROFILE))","")
+endif #ifneq ("$(wildcard $(topdir)/class/lib/$(PROFILE)$(if $(PROFILE_PLATFORM),-$(PROFILE_PLATFORM)))","")
 
 endif # PLATFORM_AOT_SUFFIX
 
@@ -307,6 +309,9 @@ dist-default:
 
 ## Documentation stuff
 
-Q_MDOC =$(if $(V),,@echo "MDOC    [$(PROFILE)] $(notdir $(@))";)
-MDOC   =$(Q_MDOC) MONO_PATH="$(topdir)/class/lib/$(DEFAULT_PROFILE)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH" $(RUNTIME) $(topdir)/class/lib/$(DEFAULT_PROFILE)/mdoc.exe
+Q_MDOC =$(if $(V),,@echo "MDOC    [$(PROFILE)$(if $(PROFILE_PLATFORM),-$(PROFILE_PLATFORM))] $(notdir $(@))";)
+MDOC   =$(Q_MDOC) MONO_PATH="$(topdir)/class/lib/$(DEFAULT_PROFILE)$(if $(DEFAULT_PROFILE_PLATFORM),-$(DEFAULT_PROFILE_PLATFORM))$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH" $(RUNTIME) $(topdir)/class/lib/$(DEFAULT_PROFILE)$(if $(DEFAULT_PROFILE_PLATFORM),-$(DEFAULT_PROFILE_PLATFORM))/mdoc.exe
+
+Q_MDOC_UP =$(if $(V),,@echo "MDOC-UP [$(PROFILE)$(if $(PROFILE_PLATFORM),-$(PROFILE_PLATFORM))] $(notdir $(@))";)
+MDOC_UP   =$(Q_MDOC_UP) MONO_PATH="$(topdir)/class/lib/$(DEFAULT_PROFILE)$(if $(DEFAULT_PROFILE_PLATFORM),-$(DEFAULT_PROFILE_PLATFORM))$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH" $(RUNTIME) $(topdir)/class/lib/$(DEFAULT_PROFILE)$(if $(DEFAULT_PROFILE_PLATFORM),-$(DEFAULT_PROFILE_PLATFORM))/mdoc.exe update --delete -o Documentation/en
 

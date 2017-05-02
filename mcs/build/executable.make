@@ -19,7 +19,7 @@ executable_CLEAN_FILES += $(response)
 endif
 
 ifndef the_libdir
-the_libdir = $(topdir)/class/lib/$(PROFILE)/
+the_libdir = $(topdir)/class/lib/$(PROFILE)$(if $(PROFILE_PLATFORM),-$(PROFILE_PLATFORM))/
 ifdef PROGRAM_USE_INTERMEDIATE_FILE
 build_libdir = $(the_libdir)tmp/
 else
@@ -42,8 +42,8 @@ executable_CLEAN_FILES += $(build_lib) $(build_lib).so $(build_lib).mdb $(build_
 
 makefrag = $(depsdir)/$(PROFILE)_$(base_prog).makefrag
 
-MCS_REFERENCES = $(patsubst %,-r:$(topdir)/class/lib/$(PROFILE)/%.dll,$(LIB_REFS))
-MCS_REFERENCES += $(patsubst %,-r:$(topdir)/class/lib/$(PROFILE)/%.exe,$(EXE_REFS))
+MCS_REFERENCES = $(patsubst %,-r:$(topdir)/class/lib/$(PROFILE)$(if $(PROFILE_PLATFORM),-$(PROFILE_PLATFORM))/%.dll,$(LIB_REFS))
+MCS_REFERENCES += $(patsubst %,-r:$(topdir)/class/lib/$(PROFILE)$(if $(PROFILE_PLATFORM),-$(PROFILE_PLATFORM))/%.exe,$(EXE_REFS))
 
 ifndef NO_BUILD
 all-local: $(the_lib) $(PROGRAM_config)

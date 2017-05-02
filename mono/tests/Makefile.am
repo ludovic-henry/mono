@@ -49,7 +49,7 @@ JITTEST_PROG_RUN = MONO_CFG_DIR=$(mono_build_root)/runtime/etc $(LIBTOOL) --mode
 
 RUNTIME_ARGS=--config tests-config --optimize=all --debug
 
-CLASS=$(mcs_topdir)/class/lib/$(DEFAULT_PROFILE)
+CLASS=$(mcs_topdir)/class/lib/$(DEFAULT_PROFILE)$(if $(DEFAULT_PROFILE_PLATFORM),-$(DEFAULT_PROFILE_PLATFORM))
 
 with_mono_path = MONO_PATH=$(CLASS)
 
@@ -1713,10 +1713,9 @@ test-aot:
 	@failed=0; \
 	passed=0; \
 	failed_tests="";\
-	profile=$(DEFAULT_PROFILE);	\
 	tmpfile=`mktemp -t mono_aot_outputXXXXXX` || exit 1;	\
 	rm -f test-aot-$${name}.stdout test-aot-$${name}.stderr; \
-	for assembly in $(mcs_topdir)/class/lib/$$profile/*.dll	; do	\
+	for assembly in $(mcs_topdir)/class/lib/$$(DEFAULT_PROFILE)$$(if $(DEFAULT_PROFILE_PLATFORM),-$(DEFAULT_PROFILE_PLATFORM))/*.dll	; do	\
 		asm_name=`basename $$assembly`;	\
 		echo "... $$asm_name";	\
 		for conf in $(AOT_CONFIGURATIONS); do	\
@@ -1724,7 +1723,7 @@ test-aot:
 			params=`echo $$conf | cut -d\| -f 1`;	\
 			test_name="$${asm_name}|$${name}";	\
 			echo "  $$test_name";	\
-			if MONO_PATH=$(mcs_topdir)/class/lib/$$profile $(JITTEST_PROG_RUN) $$params --aot=outfile=$$tmpfile $$assembly >> test-aot-$${name}.stdout 2>> test-aot-$${name}.stderr;	\
+			if MONO_PATH=$(mcs_topdir)/class/lib/$$(DEFAULT_PROFILE)$$(if $(DEFAULT_PROFILE_PLATFORM),-$(DEFAULT_PROFILE_PLATFORM)) $(JITTEST_PROG_RUN) $$params --aot=outfile=$$tmpfile $$assembly >> test-aot-$${name}.stdout 2>> test-aot-$${name}.stderr;	\
 			then \
 				passed=`expr $${passed} + 1`; \
 			else \

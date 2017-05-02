@@ -437,4 +437,4 @@ dist-local: dist-default
 csproj-local:
 
 do-clean:
-	$(RM) -rf $(topdir)/class/lib/$(PROFILE)
+	$(RM) -rf $(topdir)/class/lib/$(PROFILE)$(if $(PROFILE_PLATFORM),-$(PROFILE_PLATFORM))
