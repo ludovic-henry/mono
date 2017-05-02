@@ -87,15 +87,15 @@ LIB_MCS_FLAGS = \
 	$(RESOURCE_COMMAND) \
 	$(IMAGE_RESOURCE_COMMAND)
 
-CLEAN_FILES += $(the_lib).config
+CLEAN_FILES += $(call the_lib,$(BUILD_PLATFORM)).config
 
 TEST_MCS_FLAGS =
 TEST_LIB_REFS = System System.Core System.Xml
 
 include ../../build/library.make
 
-all-local: $(the_lib).config
+all-local: $(call the_lib,$(BUILD_PLATFORM)).config
 
-$(the_lib).config: monodoc.dll.config.in
+$(call the_lib,$(BUILD_PLATFORM)).config: monodoc.dll.config.in
 	sed 's,@monodoc_refdir@,$(mono_libdir)/monodoc,g' monodoc.dll.config.in > $@
 

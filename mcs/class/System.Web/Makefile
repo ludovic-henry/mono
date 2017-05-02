@@ -286,18 +286,22 @@ BUILT_SOURCES = System.Web/UplevelHelper.cs
 
 include ../../build/library.make
 
-$(the_libdir_base)System.Web.dll: $(the_libdir_base)System.Web.Services.dll
+# $(1): platform
+define BuildDependencies
+$(call the_libdir_base,$(1))System.Web.dll: $(call the_libdir_base,$(1))System.Web.Services.dll
 
-$(the_libdir_base)System.Web.Services.dll:
+$(call the_libdir_base,$(1))System.Web.Services.dll:
 	(cd ../System.Web.Services; $(MAKE) $@)
 
 ifneq (plainweb/,$(intermediate))
-$(the_libdir_base)plainweb/System.Web.dll:
-	$(MAKE) intermediate=plainweb/ $(the_libdir_base)plainweb/System.Web.dll
-
+$(call the_libdir_base,$(1))plainweb/System.Web.dll:
+	$(MAKE) intermediate=plainweb/ $(call the_libdir_base,$(1))plainweb/System.Web.dll
 endif
 
-.NOTPARALLEL: $(the_libdir_base)plainweb/System.Web.dll $(the_libdir_base)System.Web.Services.dll
+.NOTPARALLEL: $(call the_libdir_base,$(1))plainweb/System.Web.dll $(call the_libdir_base,$(1))System.Web.Services.dll
+endef
+
+$(foreach platform,$(or $(PLATFORMS),$(BUILD_PLATFORM)),$(eval $(call BuildDependencies,$(platform))))
 
 ifdef DEBUG
 LIB_MCS_FLAGS += -define:DEBUG
@@ -364,7 +368,7 @@ ifdef STANDALONE_VERBOSE
 RUN_STANDALONE += --verbose
 endif
 
-$(build_lib): $(RESX_RES) $(RESOURCE_FILES_2) $(RESOURCE_FILES_1)
+$(foreach platform,$(or $(PLATFORMS),$(BUILD_PLATFORM)),$(call build_lib,$(platform))): $(RESX_RES) $(RESOURCE_FILES_2) $(RESOURCE_FILES_1)
 
 $(RESX_RES): %.resources: %.resx
 	$(RESGEN) `echo $< | $(PLATFORM_CHANGE_SEPARATOR_CMD)`

@@ -1,7 +1,5 @@
 #! -*- makefile -*-
 
-PLATFORMS = android
-
 profile-check:
 	@:
 

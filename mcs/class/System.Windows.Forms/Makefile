@@ -117,7 +117,7 @@ include ../../build/library.make
 TEST_HARNESS_EXCLUDES = -exclude=Interactive,NotWorking,ValueAdd,CAS,InetAccess
 TEST_HARNESS_EXCLUDES_ONDOTNET = -exclude=Interactive,NotDotNet,CAS
 
-$(the_lib): $(RESOURCES)
+$(foreach platform,$(or $(PLATFORMS),$(BUILD_PLATFORM)),$(call the_lib,$(platform))): $(RESOURCES)
 
 $(RESX_RESOURCES): %.resources: %.resx
 	$(RESGEN) $< || cp $@.prebuilt $@

@@ -10,13 +10,18 @@ LIB_MCS_FLAGS =
 TEST_MCS_FLAGS =
 TEST_LIB_REFS = System System.Core
 
-servicemodel = $(the_libdir_base)plainservice/System.ServiceModel.dll
-
 include ../../build/library.make
 
-$(the_libdir_base)$(LIBRARY): $(servicemodel)
+# $(1): platform
+define BuildDependencies
+servicemodel = $(call the_libdir_base,$(1))plainservice/System.ServiceModel.dll
+
+$(call the_libdir_base,$(1))$(LIBRARY): $(servicemodel)
 
 $(servicemodel): 
 	(cd ../System.ServiceModel; $(MAKE) $@)
 
 .NOTPARALLEL: $(servicemodel)
+endef
+
+$(foreach platform,$(or $(PLATFORMS),$(BUILD_PLATFORM)),$(eval $(call BuildDependencies,$(platform))))

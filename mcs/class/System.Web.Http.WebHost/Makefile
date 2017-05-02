@@ -12,5 +12,3 @@ LIB_REFS = System.Core System System.Xml System.Configuration System.Net.Http Sy
 LIB_MCS_FLAGS = -d:ASPNETMVC -keyfile:../winfx.pub -delaysign
 
 include ../../build/library.make
-
-$(the_lib): 

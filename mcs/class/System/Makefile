@@ -30,7 +30,6 @@ LIB_MCS_FLAGS = -d:CONFIGURATION_2_0 $(REFERENCE_SOURCES_FLAGS) -unsafe $(RESOUR
 ifndef NO_MONO_SECURITY
 MONO_SECURITY=Mono.Security
 MONO_SECURITY_REF=MonoSecurity=Mono.Security
-MONO_SECURITY_DLL=$(the_libdir_base)Mono.Security.dll
 EXTERN_ALIAS_FLAGS = -d:MONO_SECURITY_ALIAS
 else
 LIB_MCS_FLAGS += -d:INSIDE_SYSTEM
@@ -125,58 +124,72 @@ EXTRA_DISTFILES = \
 	$(RESOURCE_FILES)				\
 	$(TEST_RESOURCES)
 
+PLATFORM_SPECIFIC = yes
+
 include ../../build/library.make
 
+# $(1): platform
+define BuildDependencies
+
 system_library_deps := \
-	$(secxml_libdir)/System.dll 		\
-	$(the_libdir_base)System.Xml.dll	\
-	$(MONO_SECURITY_DLL)				\
-	$(bare_libdir)/System.dll
+	$(call secxml_libdir,$(1))/System.dll 		\
+	$(call the_libdir_base,$(1))System.Xml.dll	\
+	$(if $(NO_MONO_SECURITY),,$(call the_libdir_base,$(1))Mono.Security.dll)				\
+	$(call bare_libdir,$(1))/System.dll
 
 ifndef MOBILE_PROFILE
-system_library_deps += $(the_libdir_base)System.Configuration.dll	
+system_library_deps += $(call the_libdir_base,$(1))System.Configuration.dll	
 endif
 
 artifacts = $(system_library_deps) 			\
-	$(bare_libdir)/System.Xml.dll			\
-	$(MONO_SECURITY_DLL)				\
-	$(the_libdir_base)System.Configuration.dll
+	$(call bare_libdir,$(1))/System.Xml.dll			\
+	$(if $(NO_MONO_SECURITY),,$(call the_libdir_base,$(1))Mono.Security.dll)				\
+	$(call the_libdir_base,$(1))System.Configuration.dll
 
 .NOTPARALLEL: $(system_library_deps)
 
-$(the_libdir_base)System.dll: $(system_library_deps) ../Mono.Security/Makefile
+$(call the_libdir_base,$(1))System.dll: $(system_library_deps) ../Mono.Security/Makefile
 
 ifeq (bare/,$(intermediate))
 build-bare:
 else
-$(bare_libdir)/System.dll:
-	$(MAKE) intermediate=bare/ $(bare_libdir)/System.dll
+$(call bare_libdir,$(1))/System.dll:
+	$(MAKE) intermediate=bare/ $(call bare_libdir,$(1))/System.dll
 endif
 
 ifneq (secxml/,$(intermediate))
-$(secxml_libdir)/System.dll: $(bare_libdir)/System.dll $(bare_libdir)/System.Xml.dll $(MONO_SECURITY_DLL) $(bare_libdir)/System.dll
-	$(MAKE) intermediate=secxml/ $(secxml_libdir)/System.dll
+$(call secxml_libdir,$(1))/System.dll: $(call bare_libdir,$(1))/System.dll $(call bare_libdir,$(1))/System.Xml.dll $(if $(NO_MONO_SECURITY),,$(call the_libdir_base,$(1))Mono.Security.dll) $(call bare_libdir,$(1))/System.dll
+	$(MAKE) intermediate=secxml/ $(call secxml_libdir,$(1))/System.dll
 else
 build-sec:
 endif
 
-$(the_libdir_base)System.Xml.dll:
+$(call the_libdir_base,$(1))System.Xml.dll:
 	(cd ../System.XML; $(MAKE) $@)
 
-$(bare_libdir)/System.Xml.dll:
+$(call bare_libdir,$(1))/System.Xml.dll:
 	(cd ../System.XML; $(MAKE) $@)
 
-$(the_libdir_base)Mono.Security.dll: ../Mono.Security/Makefile
+$(call the_libdir_base,$(1))Mono.Security.dll: ../Mono.Security/Makefile
 	(cd ../Mono.Security; $(MAKE))
 
-$(the_libdir_base)System.Configuration.dll:
+$(call the_libdir_base,$(1))System.Configuration.dll:
 	(cd ../System.Configuration; $(MAKE))
 
-$(build_lib): $(CYCLIC_DEP_FILES)
+$(call build_lib,$(1)): $(CYCLIC_DEP_FILES)
+
+CLEAN_FILES += \
+	$(call bare_libdir,$(1))/System.dll $(call secxml_libdir,$(1))/System.dll \
+	$(call bare_libdir,$(1))/System.dll.mdb $(call secxml_libdir,$(1))/System.dll.mdb \
+	$(call the_libdir_base,$(1))System.Xml.dll \
+	$(if $(NO_MONO_SECURITY),,$(call the_libdir_base,$(1))Mono.Security.dll)
+endef
+
+$(foreach platform,$(or $(PLATFORMS),$(BUILD_PLATFORM)),$(eval $(call BuildDependencies,$(platform))))
 
 $(test_lib): $(TEST_RESOURCES)
 
-CLEAN_FILES = $(test_lib).config $(bare_libdir)/System.dll $(secxml_libdir)/System.dll $(bare_libdir)/System.dll.mdb $(secxml_libdir)/System.dll.mdb
+CLEAN_FILES += $(test_lib).config
 
 # Helper target to run the perl regex test suite
 regex-check:
@@ -184,7 +197,7 @@ regex-check:
 
 #Debuging target
 fresh: clean
-	rm -rf ../../class/lib/$(PROFILE)/bare ../../class/lib/$(PROFILE)/bare/ $(system_library_deps)
+	rm -rf ../../class/lib/$(PROFILE)/bare ../../class/lib/$(PROFILE)/bare/
 
 ifndef intermediate
 ifneq ($(PROFILE),basic)

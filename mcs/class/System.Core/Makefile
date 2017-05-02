@@ -53,6 +53,8 @@ endif
 
 TEST_MCS_FLAGS = $(LIB_MCS_FLAGS)
 
+PLATFORM_SPECIFIC = yes
+
 include ../../build/library.make
 
 TEST_HARNESS_EXCLUDES += $(extra_test_flags)

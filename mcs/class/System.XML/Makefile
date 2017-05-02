@@ -66,35 +66,39 @@ EXTRA_DISTFILES = \
 
 include ../../build/library.make
 
+# $(1): platform
+define BuildDependencies
 ifeq (bare/,$(intermediate))
 build-bare:
 else
-$(bare_libdir)/System.Xml.dll:
-	$(MAKE) intermediate=bare/ $(bare_libdir)/System.Xml.dll
+$(call bare_libdir,$(1))/System.Xml.dll:
+	$(MAKE) intermediate=bare/ $(call bare_libdir,$(1))/System.Xml.dll
 endif
 
 system_xml_library_deps := 				\
-	$(bare_libdir)/System.dll			\
-	$(bare_libdir)/System.Xml.dll
+	$(call bare_libdir,$(1))/System.dll			\
+	$(call bare_libdir,$(1))/System.Xml.dll
 
 ifndef MOBILE_PROFILE
-system_xml_library_deps += $(the_libdir_base)System.Configuration.dll
+system_xml_library_deps += $(call the_libdir_base,$(1))System.Configuration.dll
 endif
 
 artifacts = $(system_xml_library_deps)	\
-	$(the_libdir_base)System.Configuration.dll
+	$(call the_libdir_base,$(1))System.Configuration.dll
 
 .NOTPARALLEL: $(artifacts)
 
-CLEAN_FILES = $(bare_libdir)/System.Xml.dll $(bare_libdir)/System.Xml.dll.pdb
-$(the_libdir_base)System.Xml.dll: $(system_xml_library_deps) 
-$(bare_libdir)/System.dll:
+CLEAN_FILES = $(call bare_libdir,$(1))/System.Xml.dll $(call bare_libdir,$(1))/System.Xml.dll.pdb
+$(call the_libdir_base,$(1))System.Xml.dll: $(system_xml_library_deps) 
+$(call bare_libdir,$(1))/System.dll:
 	(cd ../System; $(MAKE) $@)
-$(bare_libdir)/System.Xml.dll: $(bare_libdir)/System.dll 
+$(call bare_libdir,$(1))/System.Xml.dll: $(call bare_libdir,$(1))/System.dll 
 
-$(the_libdir_base)System.Configuration.dll:
+$(call the_libdir_base,$(1))System.Configuration.dll:
 	(cd ../System.Configuration; $(MAKE) $@)
+endef
 
+$(foreach platform,$(or $(PLATFORMS),$(BUILD_PLATFORM)),$(eval $(call BuildDependencies,$(platform))))
 
 ifndef intermediate
 ifneq ($(PROFILE),basic)

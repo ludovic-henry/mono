@@ -12,8 +12,8 @@ NO_SIGN_ASSEMBLY=yes
 
 include $(topdir)/build/library.make
 
-SetupDb.exe: $(the_lib)
-	$(CSCOMPILE) /r:$(the_lib) SetupDb.cs
+SetupDb.exe: $(call the_lib,$(BUILD_PLATFORM))
+	$(CSCOMPILE) /r:$(call the_lib,$(BUILD_PLATFORM)) SetupDb.cs
 
 Setup.dll: 
 	$(CSCOMPILE) /r:$(REFERENCES) /target:library /out:Setup.dll @$(SOURCEFILE)

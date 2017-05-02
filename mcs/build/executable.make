@@ -122,7 +122,7 @@ $(the_lib): $(the_libdir)/.stamp
 $(build_lib): $(BUILT_SOURCES) $(EXTRA_SOURCES) $(response) $(build_libdir:=/.stamp)
 	$(PROGRAM_COMPILE) $(MCS_REFERENCES) -target:exe -out:$@ $(BUILT_SOURCES) $(EXTRA_SOURCES) @$(response)
 ifdef PROGRAM_SNK
-	$(Q) $(SN) -R $@ $(PROGRAM_SNK)
+	echo $(Q) $(SN) -R $@ $(PROGRAM_SNK)
 endif
 
 ifdef PROGRAM_USE_INTERMEDIATE_FILE

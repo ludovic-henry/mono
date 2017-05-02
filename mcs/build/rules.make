@@ -112,10 +112,6 @@ endif
 
 include $(topdir)/build/profiles/$(PROFILE).make
 
-ifndef PLATFORMS
-PLATFORMS = $(BUILD_PLATFORM)
-endif
-
 ifdef BCL_OPTIMIZE
 PROFILE_MCS_FLAGS += -optimize
 endif
@@ -325,3 +321,5 @@ dist-default:
 Q_MDOC =$(if $(V),,@echo "MDOC    [$(PROFILE)] $(notdir $(@))";)
 MDOC   =$(Q_MDOC) MONO_PATH="$(topdir)/class/lib/$(DEFAULT_PROFILE)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH" $(RUNTIME) $(topdir)/class/lib/$(DEFAULT_PROFILE)/mdoc.exe
 
+Q_MDOC_UP = $(if $(V),,@echo "MDOC-UP [$(PROFILE)] $(notdir $(@))";)
+MDOC_UP = $(Q_MDOC_UP) MONO_PATH="$(topdir)/class/lib/$(DEFAULT_PROFILE)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH" $(RUNTIME) $(topdir)/class/lib/$(DEFAULT_PROFILE)/mdoc.exe update --delete -o Documentation/en

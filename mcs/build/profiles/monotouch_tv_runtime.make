@@ -1,7 +1,5 @@
 include $(topdir)/build/profiles/monotouch_runtime.make
 
-PLATFORMS = linux macos win32
-
 PROFILE_MCS_FLAGS += \
 	-d:MONOTOUCH_TV
 

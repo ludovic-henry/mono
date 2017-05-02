@@ -15,14 +15,10 @@ LIB_REFS = System System.EnterpriseServices System.Xml System.Data
 LIB_MCS_FLAGS = -nowarn:168,612,618,649 -d:MONO_BROKEN_CONFIGURATION_DLL
 
 ifndef NO_SYSTEM_WEB_DEPENDENCY
-plainweb = $(the_libdir_base)plainweb/System.Web.dll
-system_web_deps = $(plainweb)
 LIB_REFS += plainweb/System.Web
 endif
 
 ifndef NO_SYSTEM_DESIGN_DEPENDENCY
-plaindesign = $(the_libdir_base)plaindesign/System.Design.dll
-system_design_deps = $(plaindesign)
 LIB_REFS += plaindesign/System.Design
 endif
 
@@ -56,12 +52,25 @@ EXTRA_DISTFILES = \
 
 include ../../build/library.make
 
-$(the_libdir_base)$(LIBRARY): $(system_web_deps) $(system_design_deps)
+# $(1): platform
+define BuildDependencies
+ifndef NO_SYSTEM_WEB_DEPENDENCY
+system_web_deps = $(call the_libdir_base,$(1))plainweb/System.Web.dll
+endif
 
-$(plainweb):
+ifndef NO_SYSTEM_DESIGN_DEPENDENCY
+system_design_deps = $(call the_libdir_base,$(1))plaindesign/System.Design.dll
+endif
+
+$(call the_libdir_base,$(1))$(LIBRARY): $(system_web_deps) $(system_design_deps)
+
+$(system_web_deps):
 	(cd ../System.Web; $(MAKE) $@)
 
-$(plaindesign):
+$(system_design_deps):
 	(cd ../System.Design; $(MAKE) $@)
 
-.NOTPARALLEL: $(plainweb) $(plaindesign)
+.NOTPARALLEL: $(system_web_deps) $(system_design_deps)
+endef
+
+$(foreach platform,$(or $(PLATFORMS),$(BUILD_PLATFORM)),$(eval $(call BuildDependencies,$(platform))))

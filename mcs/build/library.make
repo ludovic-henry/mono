@@ -26,35 +26,6 @@ LIB_REFS_ALIAS = $(filter-out $(LIB_REFS_FULL),$(LIB_REFS))
 LIB_MCS_FLAGS += $(patsubst %,-r:$(topdir)/class/lib/$(PROFILE)/%.dll,$(LIB_REFS_FULL))
 LIB_MCS_FLAGS += $(patsubst %,-r:%.dll, $(subst =,=$(topdir)/class/lib/$(PROFILE)/,$(LIB_REFS_ALIAS)))
 
-sourcefile = $(LIBRARY).sources
-
-# If the directory contains the per profile include file, generate list file.
-PROFILE_sources := $(wildcard $(PROFILE)_$(LIBRARY).sources)
-ifdef PROFILE_sources
-PROFILE_excludes = $(wildcard $(PROFILE)_$(LIBRARY).exclude.sources)
-sourcefile = $(depsdir)/$(PROFILE)_$(LIBRARY).sources
-library_CLEAN_FILES += $(sourcefile)
-
-# Note, gensources.sh can create a $(sourcefile).makefrag if it sees any '#include's
-# We don't include it in the dependencies since it isn't always created
-$(sourcefile): $(PROFILE_sources) $(PROFILE_excludes) $(topdir)/build/gensources.sh
-	@echo Creating the per profile list $@ ...
-	$(SHELL) $(topdir)/build/gensources.sh $@ '$(PROFILE_sources)' '$(PROFILE_excludes)'
-endif
-
-PLATFORM_excludes := $(wildcard $(LIBRARY).$(BUILD_PLATFORM)-excludes)
-
-ifndef PLATFORM_excludes
-ifeq (cat,$(PLATFORM_CHANGE_SEPARATOR_CMD))
-response = $(sourcefile)
-endif
-endif
-
-ifndef response
-response = $(depsdir)/$(PROFILE)_$(LIBRARY_SUBDIR)_$(LIBRARY).response
-library_CLEAN_FILES += $(response)
-endif
-
 ifndef LIBRARY_NAME
 LIBRARY_NAME = $(LIBRARY)
 endif
@@ -65,11 +36,8 @@ else
 lib_dir = lib
 endif
 
-ifdef LIBRARY_SUBDIR
-the_libdir_base = $(topdir)/class/$(lib_dir)/$(PROFILE)/$(LIBRARY_SUBDIR)/
-else
-the_libdir_base = $(topdir)/class/$(lib_dir)/$(PROFILE)/
-endif
+# $(1): platform
+the_libdir_base = $(topdir)/class/$(lib_dir)/$(PROFILE)$(if $(1),-$(1))/$(if $(LIBRARY_SUBDIR),$(LIBRARY_SUBDIR)/)
 
 ifdef RESOURCE_STRINGS
 ifneq (basic, $(PROFILE))
@@ -80,26 +48,27 @@ endif
 #
 # The bare directory contains the plain versions of System and System.Xml
 #
-bare_libdir = $(the_libdir_base)bare
+# $(1): platform
+bare_libdir = $(the_libdir_base)bare/
 
 #
 # The secxml directory contains the System version that depends on 
 # System.Xml and Mono.Security
 #
+# $(1): platform
 secxml_libdir = $(the_libdir_base)secxml
 
-the_libdir = $(the_libdir_base)$(intermediate)
+# $(1): platform
+the_libdir = $(call the_libdir_base,$(1))$(intermediate)
 
-ifdef LIBRARY_USE_INTERMEDIATE_FILE
-build_libdir = $(the_libdir)tmp/
-else
-build_libdir = $(the_libdir)
-endif
+# $(1): platform
+build_libdir = $(call the_libdir,$(1))$(if $(LIBRARY_USE_INTERMEDIATE_FILE),tmp/)
 
-the_lib   = $(the_libdir)$(LIBRARY_NAME)
-build_lib = $(build_libdir)$(LIBRARY_NAME)
-library_CLEAN_FILES += $(the_lib)   $(the_lib).so   $(the_lib).mdb   $(the_lib:.dll=.pdb)
-library_CLEAN_FILES += $(build_lib) $(build_lib).so $(build_lib).mdb $(build_lib:.dll=.pdb)
+# $(1): platform
+the_lib = $(call the_libdir,$(1))$(LIBRARY_NAME)
+
+# $(1): platform
+build_lib = $(call build_libdir,$(1))$(LIBRARY_NAME)
 
 ifdef NO_SIGN_ASSEMBLY
 SN = :
@@ -120,7 +89,7 @@ GACROOT = $(DESTDIR)$(mono_libdir)
 endif
 
 ifndef NO_BUILD
-all-local: $(the_lib) $(extra_targets)
+all-local: $(extra_targets)
 endif
 
 ifeq ($(LIBRARY_COMPILE),$(BOOT_COMPILE))
@@ -132,19 +101,22 @@ endif
 csproj-local: csproj-library csproj-test
 
 intermediate_clean=$(subst /,-,$(intermediate))
+
 csproj-library:
-	config_file=`basename $(LIBRARY) .dll`-$(intermediate_clean)$(PROFILE).input; \
-	case "$(thisdir)" in *"Facades"*) config_file=Facades_$$config_file;; *"legacy"*) config_file=legacy_$$config_file;; esac; \
-	echo $(thisdir):$$config_file >> $(topdir)/../msvc/scripts/order; \
-	(echo $(is_boot); \
-	echo $(USE_MCS_FLAGS) $(LIBRARY_FLAGS) $(LIB_MCS_FLAGS); \
-	echo $(LIBRARY_NAME); \
-	echo $(BUILT_SOURCES_cmdline); \
-	echo $(build_lib); \
-	echo $(FRAMEWORK_VERSION); \
-	echo $(PROFILE); \
-	echo $(RESOURCE_DEFS); \
-	echo $(response)) > $(topdir)/../msvc/scripts/inputs/$$config_file
+	$(foreach platform,$(or $(and $(PLATFORM_SPECIFIC),$(PLATFORMS)),$(BUILD_PLATFORM)), \
+		config_file=`basename $(LIBRARY) .dll`-$(intermediate_clean)$(PROFILE)$(if $(and $(PLATFORM_SPECIFIC),$(PLATFORMS)),$(platform)).input; \
+		case "$(thisdir)" in *"Facades"*) \=Facades_$$config_file;; *"legacy"*) config_file=legacy_$$config_file;; esac; \
+		echo $(thisdir):$$config_file >> $(topdir)/../msvc/scripts/order; \
+		(echo $(is_boot); \
+		echo $(USE_MCS_FLAGS) $(LIBRARY_FLAGS) $(LIB_MCS_FLAGS); \
+		echo $(LIBRARY_NAME); \
+		echo $(BUILT_SOURCES_cmdline); \
+		echo $(call build_lib,$(platform)); \
+		echo $(FRAMEWORK_VERSION); \
+		echo $(PROFILE); \
+		$(if $(and $(PLATFORM_SPECIFIC),$(PLATFORMS)),echo $(platform);) \
+		echo $(RESOURCE_DEFS); \
+		echo $(response)) > $(topdir)/../msvc/scripts/inputs/$$config_file)
 
 csproj-test:
 
@@ -158,18 +130,14 @@ install-local uninstall-local:
 
 else
 
-aot_lib = $(the_lib)$(PLATFORM_AOT_SUFFIX)
-aot_libname = $(LIBRARY_NAME)$(PLATFORM_AOT_SUFFIX)
-
 ifdef LIBRARY_INSTALL_DIR
 install-local:
 	$(MKINSTALLDIRS) $(DESTDIR)$(LIBRARY_INSTALL_DIR)
-	$(INSTALL_LIB) $(the_lib) $(DESTDIR)$(LIBRARY_INSTALL_DIR)/$(LIBRARY_NAME)
-	test ! -f $(the_lib).mdb || $(INSTALL_LIB) $(the_lib).mdb $(DESTDIR)$(LIBRARY_INSTALL_DIR)/$(LIBRARY_NAME).mdb
-	test ! -f $(the_lib:.dll=.pdb) || $(INSTALL_LIB) $(the_lib:.dll=.pdb) $(DESTDIR)$(LIBRARY_INSTALL_DIR)/$(LIBRARY_NAME:.dll=.pdb)
-
+	$(INSTALL_LIB) $(call the_lib,$(BUILD_PLATFORM)) $(DESTDIR)$(LIBRARY_INSTALL_DIR)/$(LIBRARY_NAME)
+	test ! -f $(call the_lib,$(BUILD_PLATFORM)).mdb || $(INSTALL_LIB) $(call the_lib,$(BUILD_PLATFORM)).mdb $(DESTDIR)$(LIBRARY_INSTALL_DIR)/$(LIBRARY_NAME).mdb
+	test ! -f $(patsubst %.dll,%.pdb,$(call the_lib,$(BUILD_PLATFORM))) || $(INSTALL_LIB) $(patsubst %.dll,%.pdb,$(call the_lib,$(BUILD_PLATFORM))) $(DESTDIR)$(LIBRARY_INSTALL_DIR)/$(LIBRARY_NAME:.dll=.pdb)
 ifdef PLATFORM_AOT_SUFFIX
-	test ! -f $(aot_lib) || $(INSTALL_LIB) $(aot_lib) $(DESTDIR)$(LIBRARY_INSTALL_DIR)
+	test ! -f $(call the_lib,$(BUILD_PLATFORM))$(PLATFORM_AOT_SUFFIX) || $(INSTALL_LIB) $(call the_lib,$(BUILD_PLATFORM))$(PLATFORM_AOT_SUFFIX) $(DESTDIR)$(LIBRARY_INSTALL_DIR)
 endif
 
 uninstall-local:
@@ -203,7 +171,7 @@ package_flag = /package $(LIBRARY_PACKAGE)
 endif
 
 install-local: $(gacutil)
-	$(GACUTIL) /i $(the_lib) /f $(gacdir_flag) /root $(GACROOT) $(package_flag)
+	$(GACUTIL) /i $(call the_lib,$(BUILD_PLATFORM)) /f $(gacdir_flag) /root $(GACROOT) $(package_flag)
 
 uninstall-local: $(gacutil)
 	-$(GACUTIL) /u $(LIBRARY_NAME:.dll=) $(gacdir_flag) /root $(GACROOT) $(package_flag)
@@ -242,7 +210,7 @@ DISTFILES = $(wildcard *$(LIBRARY)*.sources) $(EXTRA_DISTFILES) $(DIST_LISTED_RE
 
 ASSEMBLY      = $(LIBRARY)
 ASSEMBLY_EXT  = .dll
-the_assembly  = $(the_lib)
+the_assembly  = $(call the_lib,$(BUILD_PLATFORM))
 include $(topdir)/build/tests.make
 
 ifdef HAVE_CS_TESTS
@@ -296,62 +264,92 @@ endif
 
 # The library
 
-$(the_lib): $(the_libdir)/.stamp
+# If the directory contains the per profile include file, generate list file.
+
+# $(1): platform
+define BuildLibrary
+PROFILE_$(1)_sources = $$(firstword $$(if $$(and $$(PLATFORM_SPECIFIC),$$(PLATFORMS)),$$(wildcard $(1)_$$(PROFILE)_$$(LIBRARY).sources)) $$(wildcard $$(PROFILE)_$$(LIBRARY).sources) $$(wildcard $$(LIBRARY).sources))
+PROFILE_$(1)_excludes = $$(firstword $$(if $$(and $$(PLATFORM_SPECIFIC),$$(PLATFORMS)),$$(wildcard $(1)_$$(PROFILE)_$$(LIBRARY).exclude.sources)) $$(wildcard $$(PROFILE)_$$(LIBRARY).exclude.sources))
+
+$(1)_sourcefile = $$(depsdir)/$(1)_$$(PROFILE)_$$(LIBRARY).sources
+$$($(1)_sourcefile): $$(PROFILE_$(1)_sources) $$(PROFILE_$(1)_excludes) $$(topdir)/build/gensources.sh
+	@echo Creating the per profile and platform list $$@ ...
+	$$(SHELL) $$(topdir)/build/gensources.sh $$@ '$$(PROFILE_$(1)_sources)' '$$(PROFILE_$(1)_excludes)'
+
+library_CLEAN_FILES += $(1)_sourcefile
+
+PLATFORM_$(1)_excludes = $$(wildcard $$(LIBRARY).$(1)-excludes)
+
+$(1)_response = $$(depsdir)/$(1)_$$(PROFILE)_$$(LIBRARY_SUBDIR)_$$(LIBRARY).response
+ifdef $$(PLATFORM_$(1)_excludes)
+$$($(1)_response): $$($(1)_sourcefile) $$(PLATFORM_$(1)_excludes)
+	@echo Filtering $$($(1)_sourcefile) to $$@ ...
+	@sort $$($(1)_sourcefile) $$(PLATFORM_$(1)_excludes) | uniq -u | $$(PLATFORM_CHANGE_SEPARATOR_CMD) >$$@
+else
+$$($(1)_response): $$($(1)_sourcefile)
+	@echo Converting $$($(1)_sourcefile) to $$@ ...
+	@cat $$($(1)_sourcefile) | $$(PLATFORM_CHANGE_SEPARATOR_CMD) >$$@
+endif
+
+library_CLEAN_FILES += $(1)_response
+
+$$($(1)_response): $$(topdir)/build/platform-library.make $$(depsdir)/.stamp
+
+ifndef NO_BUILD
+all-local: $($(1)_makefrag)
+endif
+
+$(1)_makefrag = $$(depsdir)/$(1)_$$(PROFILE)_$$(LIBRARY_SUBDIR)_$$(LIBRARY).makefrag
+$($(1)_makefrag): $$($(1)_sourcefile)
+#	@echo Creating $$@ ...
+	@sed 's,^,$$(call build_lib,$(1)): ,' $$< >$$@
+	@if test ! -f $$($(1)_sourcefile).makefrag; then :; else \
+	   cat $$($(1)_sourcefile).makefrag >> $$@ ; \
+	   echo '$$@: $$($(1)_sourcefile).makefrag' >> $$@; \
+	   echo '$$($(1)_sourcefile).makefrag:' >> $$@; fi
+
+library_CLEAN_FILES += $($(1)_makefrag)
+
+-include $($(1)_makefrag)
+
+$$(call the_lib,$(1)): $$(call the_libdir,$(1))/.stamp
 
 ifndef NO_BUILD
 
-$(build_lib): $(response) $(sn) $(BUILT_SOURCES) $(build_libdir:=/.stamp) $(GEN_RESOURCE_DEPS)
-	$(LIBRARY_COMPILE) $(LIBRARY_FLAGS) $(LIB_MCS_FLAGS) $(GEN_RESOURCE_FLAGS) -target:library -out:$@ $(BUILT_SOURCES_cmdline) @$(response)
+$$(call build_lib,$(1)): $$($(1)_response) $$(sn) $$(BUILT_SOURCES) $$(patsubst %,%/.stamp,$$(call build_libdir$(1))) $$(GEN_RESOURCE_DEPS)
+	$$(LIBRARY_COMPILE) $$(LIBRARY_FLAGS) $$(LIB_MCS_FLAGS) $$(GEN_RESOURCE_FLAGS) -target:library -out:$$@ $$(BUILT_SOURCES_cmdline) @$$($(1)_response)
 ifdef RESOURCE_STRINGS_FILES
-	$(Q) $(STRING_REPLACER) $(RESOURCE_STRINGS_FILES) $@
+	$$(Q) $$(STRING_REPLACER) $$(RESOURCE_STRINGS_FILES) $$@
 endif
-	$(Q) $(SN) -R $@ $(LIBRARY_SNK)
+	$$(Q) $$(SN) -R $$@ $$(LIBRARY_SNK)
 
 ifdef LIBRARY_USE_INTERMEDIATE_FILE
-$(the_lib): $(build_lib)
-	$(Q) cp $(build_lib) $@
-	$(Q) $(SN) -v $@
-	$(Q) test ! -f $(build_lib).mdb || mv $(build_lib).mdb $@.mdb
-	$(Q) test ! -f $(build_lib:.dll=.pdb) || mv $(build_lib:.dll=.pdb) $(the_lib:.dll=.pdb)
+$$(call the_lib,$(1)): $$(call build_lib,$(1))
+	$$(Q) cp $$(call build_lib,$(1)) $$@
+	echo $$(Q) $$(SN) -v $$@
+	$$(Q) test ! -f $$<.mdb || mv $$<.mdb $$@.mdb
+	$$(Q) test ! -f $$(patsubst %.dll,%.pdb,$$<) || mv $$(patsubst %.dll,%.pdb,$$<) $$(patsubst %.dll,%.pdb,$$@)
 endif
 
-endif
+all-local: $$(call the_lib,$(1))
 
-library_CLEAN_FILES += $(PROFILE)_aot.log
+endif # NO_BUILD
 
 ifdef PLATFORM_AOT_SUFFIX
-$(the_lib)$(PLATFORM_AOT_SUFFIX): $(the_lib)
-	$(Q_AOT) MONO_PATH='$(the_libdir_base)' > $(PROFILE)_$(LIBRARY_NAME)_aot.log 2>&1 $(RUNTIME) $(AOT_BUILD_FLAGS) --debug $(the_lib)
+$$(call the_lib,$(1))$$(PLATFORM_AOT_SUFFIX): $$(call the_lib,$(1))
+	$$(Q_AOT) MONO_PATH='$$(call the_libdir_base,$(1))' > $(1)_$$(PROFILE)_$$(LIBRARY_NAME)_aot.log 2>&1 $$(RUNTIME) $$(AOT_BUILD_FLAGS) --debug $$<
 
-all-local-aot: $(the_lib)$(PLATFORM_AOT_SUFFIX)
+all-local-aot: $$(call the_lib,$(1))$$(PLATFORM_AOT_SUFFIX)
+
+library_CLEAN_FILES += $(1)_$$(PROFILE)_$$(LIBRARY_NAME)_aot.log
+
+library_CLEAN_FILES += $$(call the_lib,$(1)) $$(call the_lib,$(1))$$(PLATFORM_AOT_SUFFIX) $$(call the_lib,$(1)).mdb $$(patsubst %.dll,%.pdb,$$(call the_lib,$(1)))
+library_CLEAN_FILES += $$(call build_lib,$(1)) $$(call build_lib,$(1))$$(PLATFORM_AOT_SUFFIX) $$(call build_lib,$(1)).mdb $$(patsubst %.dll,%.pdb,$$(call build_lib,$(1)))
 endif
 
+endef # BuildLibrary
 
-makefrag = $(depsdir)/$(PROFILE)_$(LIBRARY_SUBDIR)_$(LIBRARY).makefrag
-library_CLEAN_FILES += $(makefrag)
-$(makefrag): $(sourcefile)
-#	@echo Creating $@ ...
-	@sed 's,^,$(build_lib): ,' $< >$@
-	@if test ! -f $(sourcefile).makefrag; then :; else \
-	   cat $(sourcefile).makefrag >> $@ ; \
-	   echo '$@: $(sourcefile).makefrag' >> $@; \
-	   echo '$(sourcefile).makefrag:' >> $@; fi
-
-ifneq ($(response),$(sourcefile))
-
-ifdef PLATFORM_excludes
-$(response): $(sourcefile) $(PLATFORM_excludes)
-	@echo Filtering $(sourcefile) to $@ ...
-	@sort $(sourcefile) $(PLATFORM_excludes) | uniq -u | $(PLATFORM_CHANGE_SEPARATOR_CMD) >$@
-else
-$(response): $(sourcefile)
-	@echo Converting $(sourcefile) to $@ ...
-	@cat $(sourcefile) | $(PLATFORM_CHANGE_SEPARATOR_CMD) >$@
-endif
-
-endif
-
--include $(makefrag)
+$(foreach platform,$(or $(and $(PLATFORM_SPECIFIC),$(PLATFORMS)),$(BUILD_PLATFORM)),$(eval $(call BuildLibrary,$(platform))))
 
 # for now, don't give any /lib flags or set MONO_PATH, since we
 # give a full path to the assembly.
@@ -360,26 +358,25 @@ endif
 include $(topdir)/build/corcompare.make
 
 ifndef NO_BUILD
-all-local: $(makefrag) $(test_makefrag) $(btest_makefrag)
+all-local: $(test_makefrag) $(btest_makefrag)
 endif
 
-ifneq ($(response),$(sourcefile))
-$(response): $(topdir)/build/library.make $(depsdir)/.stamp
-endif
 $(makefrag) $(test_response) $(test_makefrag) $(btest_response) $(btest_makefrag): $(topdir)/build/library.make $(depsdir)/.stamp
 
 ## Documentation stuff
 
-Q_MDOC_UP=$(if $(V),,@echo "MDOC-UP [$(PROFILE)] $(notdir $(@))";)
-MDOC_UP  =$(Q_MDOC_UP) \
-		MONO_PATH="$(topdir)/class/lib/$(DEFAULT_PROFILE)$(PLATFORM_PATH_SEPARATOR)$$MONO_PATH" $(RUNTIME) $(topdir)/class/lib/$(DEFAULT_PROFILE)/mdoc.exe \
-		update --delete -o Documentation/en $(the_lib)
+# $(1): platform
+define UpdateDocumentation
 
-doc-update-local: $(the_libdir)/.doc-stamp
-
-$(the_libdir)/.doc-stamp: $(the_lib)
-	$(MDOC_UP)
+$(call the_libdir,$(1))/.doc-stamp: $(call the_lib,$(1))
+	$(MDOC_UP) $(call the_lib,$(1))
 	@echo "doc-stamp" > $@
+
+doc-update-local: $(call the_libdir,$(1))/.doc-stamp
+
+endef # UpdateDocumentation
+
+$(foreach platform,$(or $(and $(PLATFORM_SPECIFIC),$(PLATFORMS)),$(BUILD_PLATFORM)),$(eval $(call UpdateDocumentation,$(platform))))
 
 # Need to be here so it comes after the definition of DEP_DIRS/DEP_LIBS
 gen-deps:

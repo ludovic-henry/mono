@@ -12,8 +12,8 @@ NO_SIGN_ASSEMBLY=yes
 
 include $(topdir)/build/library.make
 
-Runtests.exe: $(the_lib)
-	$(CSCOMPILE) /r:$(the_lib) Runtests.cs
+Runtests.exe: $(call the_lib,$(BUILD_PLATFORM))
+	$(CSCOMPILE) /r:$(call the_lib,$(BUILD_PLATFORM)) Runtests.cs
 
 DbAdapter.dll: 
 	$(CSCOMPILE) /r:$(REFERENCES) /target:library /out:DbAdapter.dll @$(SOURCEFILE)

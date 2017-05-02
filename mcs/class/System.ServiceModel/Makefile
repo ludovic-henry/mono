@@ -30,9 +30,6 @@ endif
 ifeq (4, $(FRAMEWORK_VERSION_MAJOR))
 
 ifndef NO_SYSTEM_SERVICEMODEL_ACTIVATION_DEPENDENCY
-activation = $(the_libdir_base)System.ServiceModel.Activation.dll
-servicemodel_deps = $(activation)
-
 ifneq (plainservice/,$(intermediate))
 LIB_REFS += System.ServiceModel.Activation
 LIB_MCS_FLAGS += -define:HAS_ACTIVATION
@@ -74,19 +71,30 @@ endif
 
 include ../../build/library.make
 
-$(the_libdir_base)System.ServiceModel.dll: $(servicemodel_deps)
+# $(1): platform
+define BuildDependencies
+ifeq (4, $(FRAMEWORK_VERSION_MAJOR))
+ifndef NO_SYSTEM_SERVICEMODEL_ACTIVATION_DEPENDENCY
+servicemodel_deps = $(call the_libdir_base,$(1))System.ServiceModel.Activation.dll
+endif
+endif
 
-$(activation):
+$(call the_libdir_base,$(1))System.ServiceModel.dll: $(servicemodel_deps)
+
+$(servicemodel_deps):
 	(cd ../System.ServiceModel.Activation; $(MAKE) $@)
 
 ifneq (plainservice/,$(intermediate))
-$(the_libdir_base)plainservice/System.ServiceModel.dll:
-	$(MAKE) intermediate=plainservice/ $(the_libdir_base)plainservice/System.ServiceModel.dll
+$(call the_libdir_base,$(1))plainservice/System.ServiceModel.dll:
+	$(MAKE) intermediate=plainservice/ $(call the_libdir_base,$(1))plainservice/System.ServiceModel.dll
 endif
 
 .NOTPARALLEL: $(servicemodel_deps)
 
-CLEAN_FILES = $(the_libdir_base)plainservice/System.ServiceModel.dll
+CLEAN_FILES += $(call the_libdir_base,$(1))plainservice/System.ServiceModel.dll
+endef
+
+$(foreach platform,$(or $(PLATFORMS),$(BUILD_PLATFORM)),$(eval $(call BuildDependencies,$(platform))))
 
 ifndef intermediate
 csproj-local:

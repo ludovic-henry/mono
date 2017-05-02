@@ -145,6 +145,8 @@ TEST_RESX_RESOURCES_SATELITE = \
 
 CLEAN_FILES += $(TEST_RESX_RESOURCES)
 
+PLATFORM_SPECIFIC = yes
+
 include $(topdir)/build/library.make
 
 $(TEST_RESX_RESOURCES) $(TEST_RESX_RESOURCES_SATELITE): %.resources: %.resx

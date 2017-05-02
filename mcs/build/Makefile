@@ -15,7 +15,6 @@ common/Consts.cs: common/Consts.cs.in $(wildcard config.make)
 	test -n '$(MONO_CORLIB_VERSION)'
 	sed -e 's,@''MONO_VERSION@,$(MONO_VERSION),' -e 's,@''MONO_CORLIB_VERSION@,$(MONO_CORLIB_VERSION),' $< > $@
 
-PLATFORMS = macos linux win32
 PROFILES = \
 	basic \
 	build \
