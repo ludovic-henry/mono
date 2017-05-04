@@ -49,7 +49,11 @@ namespace System {
 				McsCSharpCompiler = Path.Combine (GacPath, "4.5", "mcs.exe");
 				if (!File.Exists (McsCSharpCompiler)) {
 					// Starting from mono\mcs\class
-					McsCSharpCompiler = Path.Combine (Path.GetDirectoryName (GacPath), "lib", "net_4_x", "mcs.exe");
+					foreach (string path in Directory.GetFiles (Path.Combine (Path.GetDirectoryName (GacPath), "lib"), "net_4_x-*")) {
+						McsCSharpCompiler = Path.Combine (path, "mcs.exe");
+						if (File.Exists (McsCSharpCompiler))
+							break;
+					}
 				}
 
 				//if (!File.Exists (CSharpCompiler))

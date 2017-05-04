@@ -811,6 +811,25 @@ if test $csc_compiler = default; then
 fi
 AC_MSG_RESULT($csc_compiler)
 
+
+if test x$host_darwin = xyes; then
+  build_platform=darwin
+elif test x$host_win32 = xyes; then
+  build_platform=win32
+else
+  build_platform=linux
+fi
+
+if test x$host_darwin = xyes; then
+  host_platform=darwin
+elif test x$host_win32 = xyes; then
+  host_platform=win32
+else
+  host_platform=linux
+fi
+HOST_PLATFORM=$host_platform
+AC_SUBST(HOST_PLATFORM)
+
 #
 # Set the build profiles and options before things which use them
 #
@@ -1027,16 +1046,12 @@ AC_SUBST(DEFAULT_PROFILE)
 
 default_profile_platform=
 if test x$default_profile = xnet_4_x; then
-  if test x$host_darwin = xyes; then
-    default_profile_platform=darwin
-  elif test x$host_win32 = xyes; then
-    default_profile_platform=win32
-  else
-    default_profile_platform=linux
-  fi
+  default_profile_platform=$host_platform
 fi
 DEFAULT_PROFILE_PLATFORM=$default_profile_platform
 AC_SUBST(DEFAULT_PROFILE_PLATFORM)
+
+
 
 #
 # End build profile configuration
@@ -4455,6 +4470,7 @@ mono/tests/Makefile
 mono/tests/tests-config
 mono/tests/gc-descriptors/Makefile
 mono/tests/testing_gac/Makefile
+mono/tests/verifier/Makefile
 mono/unit-tests/Makefile
 mono/benchmark/Makefile
 mono/mini/Makefile
@@ -4567,21 +4583,8 @@ fi
     echo "MONO_VERSION = $myver" >> $mcs_topdir/build/config.make
     echo "MONO_CORLIB_VERSION = $MONO_CORLIB_VERSION" >> $mcs_topdir/build/config.make
 
-    if test x$host_darwin = xyes; then
-      echo "BUILD_PLATFORM = darwin" >> $mcs_topdir/build/config.make
-    elif test x$host_win32 = xyes; then
-      echo "BUILD_PLATFORM = win32" >> $mcs_topdir/build/config.make
-    else
-      echo "BUILD_PLATFORM = linux" >> $mcs_topdir/build/config.make
-    fi
-
-    if test x$host_darwin = xyes; then
-      echo "HOST_PLATFORM ?= darwin" >> $mcs_topdir/build/config.make
-    elif test x$host_win32 = xyes; then
-      echo "HOST_PLATFORM ?= win32" >> $mcs_topdir/build/config.make
-    else
-      echo "HOST_PLATFORM ?= linux" >> $mcs_topdir/build/config.make
-    fi
+    echo "BUILD_PLATFORM = $build_platform" >> $mcs_topdir/build/config.make
+    echo "HOST_PLATFORM ?= $host_platform" >> $mcs_topdir/build/config.make
 
     if test "x$PLATFORM_AOT_SUFFIX" != "x"; then
       echo "PLATFORM_AOT_SUFFIX = $PLATFORM_AOT_SUFFIX" >> $mcs_topdir/build/config.make

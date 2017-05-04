@@ -254,7 +254,9 @@ namespace Mono.CSharp
 			sdk_directory.Add ("4.6", new string[] { "4.6-api", "v4.0.30319" });
 			sdk_directory.Add ("4.6.1", new string[] { "4.6.1-api", "v4.0.30319" });
 			sdk_directory.Add ("4.6.2", new string [] { "4.6.2-api", "v4.0.30319" });
-			sdk_directory.Add ("4.x", new string [] { "4.5", "net_4_x", "v4.0.30319" });
+			sdk_directory.Add ("4.x", new string [] { "4.5", "net_4_x-darwin", "v4.0.30319" });
+			sdk_directory.Add ("4.x", new string [] { "4.5", "net_4_x-linux", "v4.0.30319" });
+			sdk_directory.Add ("4.x", new string [] { "4.5", "net_4_x-win32", "v4.0.30319" });
 		}
 
 		public StaticLoader (StaticImporter importer, CompilerContext compiler)

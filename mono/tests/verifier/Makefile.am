@@ -3,7 +3,7 @@
 	ilasm -out:$@ $<
 
 BatchCompiler.exe: BatchCompiler.cs
-	mcs -r:../../../mcs/class/lib/net_4_x/ilasm.exe BatchCompiler.cs
+	mcs -r:../../../mcs/class/lib/$(DEFAULT_PROFILE)$(if $(DEFAULT_PROFILE_PLATFORM),-$(DEFAULT_PROFILE_PLATFORM))/ilasm.exe BatchCompiler.cs
 
 test_lib.dll: test_lib.cs
 	mcs test_lib.cs -target:library
@@ -16,7 +16,6 @@ compile-stamp: generate-stamp BatchCompiler.exe test_lib.dll
 			mcs /unsafe $$i; \
 		fi \
 	done 
-	#MONO_PATH=../../../mcs/class/lib/net_2_0/ mono BatchCompiler.exe
 	for i in *.il; do ilasm $$i; done
 	touch compile-stamp
 

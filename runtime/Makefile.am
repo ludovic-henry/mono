@@ -145,16 +145,34 @@ mcs-compileall: mono-wrapper etc/mono/config
 	  if [ "binary_reference_assemblies" = "$$profile" ]; then \
           continue; \
 	  elif [ "xbuild_12" = "$$profile" ]; then \
-		  MONO_PATH="$$mcs_topdir/class/lib/$$profile$(PLATFORM_PATH_SEPARATOR)$$mcs_topdir/class/lib/net_4_x$(PLATFORM_PATH_SEPARATOR)$$save_MONO_PATH"; \
+		  MONO_PATH="$$mcs_topdir/class/lib/$$profile-$(HOST_PLATFORM)$(PLATFORM_PATH_SEPARATOR)$$mcs_topdir/class/lib/net_4_x-$(HOST_PLATFORM)$(PLATFORM_PATH_SEPARATOR)$$save_MONO_PATH"; \
 	  elif [ "xbuild_14" = "$$profile" ]; then \
-		  MONO_PATH="$$mcs_topdir/class/lib/$$profile$(PLATFORM_PATH_SEPARATOR)$$mcs_topdir/class/lib/net_4_x$(PLATFORM_PATH_SEPARATOR)$$save_MONO_PATH"; \
+		  MONO_PATH="$$mcs_topdir/class/lib/$$profile-$(HOST_PLATFORM)$(PLATFORM_PATH_SEPARATOR)$$mcs_topdir/class/lib/net_4_x-$(HOST_PLATFORM)$(PLATFORM_PATH_SEPARATOR)$$save_MONO_PATH"; \
+	  elif [ "net_4_x" = "$$profile" ]; then \
+		  MONO_PATH="$$mcs_topdir/class/lib/net_4_x-$(HOST_PLATFORM)$(PLATFORM_PATH_SEPARATOR)$$save_MONO_PATH"; \
 	  else \
 		  MONO_PATH="$$mcs_topdir/class/lib/$$profile$(PLATFORM_PATH_SEPARATOR)$$save_MONO_PATH"; \
 	  fi; \
-	  export verifiable_files=`ls "$(mcs_topdir)/class/lib/$$profile/" | grep -E '\.(dll|exe)$$' $(foreach asm,$(VERIFY_TESTS_FILTER), | grep -v $(asm))` ; \
+	  if [ "xbuild_12" = "$$profile" ]; then \
+		  export verifiable_files=`ls "$(mcs_topdir)/class/lib/xbuild_12-$(HOST_PLATFORM)/" | grep -E '\.(dll|exe)$$' $(foreach asm,$(VERIFY_TESTS_FILTER), | grep -v $(asm))` ; \
+	  elif [ "xbuild_14" = "$$profile" ]; then \
+		  export verifiable_files=`ls "$(mcs_topdir)/class/lib/xbuild_14-$(HOST_PLATFORM)/" | grep -E '\.(dll|exe)$$' $(foreach asm,$(VERIFY_TESTS_FILTER), | grep -v $(asm))` ; \
+	  elif [ "net_4_x" = "$$profile" ]; then \
+		  export verifiable_files=`ls "$(mcs_topdir)/class/lib/net_4_x-$(HOST_PLATFORM)/" | grep -E '\.(dll|exe)$$' $(foreach asm,$(VERIFY_TESTS_FILTER), | grep -v $(asm))` ; \
+	  else \
+		  export verifiable_files=`ls "$(mcs_topdir)/class/lib/$$profile/" | grep -E '\.(dll|exe)$$' $(foreach asm,$(VERIFY_TESTS_FILTER), | grep -v $(asm))` ; \
+	  fi; \
 	  export MONO_PATH; \
 	  for stub in $$verifiable_files; do \
-	  i=$(mcs_topdir)/class/lib/$$profile/$$stub ; \
+	  if [ "xbuild_12" = "$$profile" ]; then \
+		  i=$(mcs_topdir)/class/lib/xbuild_12-$(HOST_PLATFORM)/$$stub ; \
+	  elif [ "xbuild_14" = "$$profile" ]; then \
+		  i=$(mcs_topdir)/class/lib/xbuild_14-$(HOST_PLATFORM)/$$stub ; \
+	  elif [ "net_4_x" = "$$profile" ]; then \
+		  i=$(mcs_topdir)/class/lib/net_4_x-$(HOST_PLATFORM)/$$stub ; \
+	  else \
+		  i=$(mcs_topdir)/class/lib/$$profile/$$stub ; \
+	  fi; \
 	  echo $$i ; \
 		if [ ! -f $$i ] ; then \
 			continue ; \
