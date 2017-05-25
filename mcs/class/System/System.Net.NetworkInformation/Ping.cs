@@ -265,16 +265,21 @@ namespace System.Net.NetworkInformation {
 				bytes = new byte [100];
 				do {
 					EndPoint endpoint = client;
-					SocketError error = 0;
-					int rc = s.ReceiveFrom (bytes, 0, 100, SocketFlags.None,
-							ref endpoint, out error);
+					int rc;
 
-					if (error != SocketError.Success) {
-						if (error == SocketError.TimedOut) {
+					try
+					{
+						rc = s.ReceiveFrom (bytes, 0, 100, SocketFlags.None, ref endpoint);
+					}
+					catch (SocketException se)
+					{
+						if (se.SocketErrorCode == SocketError.TimedOut)
+						{
 							return new PingReply (null, new byte [0], options, 0, IPStatus.TimedOut);
 						}
-						throw new NotSupportedException (String.Format ("Unexpected socket error during ping request: {0}", error));
+						throw new NotSupportedException ($"Unexpected socket error during ping request: {se.SocketErrorCode}");
 					}
+
 					long rtt = (long) (DateTime.Now - sentTime).TotalMilliseconds;
 					int headerLength = (bytes [0] & 0xF) << 2;
 					int bodyLength = rc - headerLength;

@@ -1620,6 +1620,13 @@ namespace System.Threading.Tasks
             return new DisposableSubscription(this, continuationTask);
         }
 #endif
+
+#if MONO
+        internal bool IsCompletedSuccessfully
+        {
+            get { return (m_stateFlags & TASK_STATE_COMPLETED_MASK) == TASK_STATE_RAN_TO_COMPLETION; }
+        }
+#endif
     }
 
 #if SUPPORT_IOBSERVABLE

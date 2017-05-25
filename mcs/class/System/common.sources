@@ -91,15 +91,6 @@ System.Net.Security/NegotiateStream.cs
 System.Net.Security/RemoteCertificateValidationCallback.cs
 System.Net.Security/SslPolicyErrors.cs
 
-System.Net.Sockets/SafeSocketHandle.cs
-System.Net.Sockets/Socket.cs
-System.Net.Sockets/SocketAsyncEventArgs.cs
-System.Net.Sockets/SocketAsyncResult.cs
-System.Net.Sockets/SocketOperation.cs
-System.Net.Sockets/SocketReceiveFromResult.cs
-System.Net.Sockets/SocketReceiveMessageFromResult.cs
-System.Net.Sockets/SocketTaskExtensions.cs
-
 System.Runtime.InteropServices.ComTypes/ADVF.cs
 System.Runtime.InteropServices.ComTypes/DATADIR.cs
 System.Runtime.InteropServices.ComTypes/DVASPECT.cs
@@ -254,7 +245,6 @@ ReferenceSources/RequestCacheProtocol.cs
 ReferenceSources/ServerCertValidationCallback.cs
 ReferenceSources/SettingsSectionInternal.cs
 ReferenceSources/SecureStringHelper.cs
-ReferenceSources/Socket.cs
 ReferenceSources/SR.cs
 ReferenceSources/SRCategoryAttribute.cs
 ReferenceSources/Win32Exception.cs
@@ -624,7 +614,6 @@ ReferenceSources/Win32Exception.cs
 ../referencesource/System/net/System/Net/_IStreams.cs
 ../referencesource/System/net/System/Net/_NetRes.cs
 ../referencesource/System/net/System/Net/_LoggingObject.cs
-../referencesource/System/net/System/Net/_PooledStream.cs
 ../referencesource/System/net/System/Net/_ProxyChain.cs
 ../referencesource/System/net/System/Net/_ScatterGatherBuffers.cs
 ../referencesource/System/net/System/Net/_Semaphore.cs
@@ -639,7 +628,6 @@ ReferenceSources/Win32Exception.cs
 ../referencesource/System/net/System/Net/cookiecollection.cs
 ../referencesource/System/net/System/Net/cookiecontainer.cs
 ../referencesource/System/net/System/Net/cookieexception.cs
-../referencesource/System/net/System/Net/connectionpool.cs
 ../referencesource/System/net/System/Net/DnsEndPoint.cs
 ../referencesource/System/net/System/Net/EndPoint.cs
 ../referencesource/System/net/System/Net/FtpStatusCode.cs
@@ -667,7 +655,6 @@ ReferenceSources/Win32Exception.cs
 ../referencesource/System/net/System/Net/NetworkCredential.cs
 ../referencesource/System/net/System/Net/ProtocolViolationException.cs
 ../referencesource/System/net/System/Net/TransportContext.cs
-../referencesource/System/net/System/Net/TransportType.cs
 ../referencesource/System/net/System/Net/UnicodeDecodingConformance.cs
 ../referencesource/System/net/System/Net/UnicodeEncodingConformance.cs
 ../referencesource/System/net/System/Net/ServicePointManager.cs
@@ -694,29 +681,6 @@ ReferenceSources/Win32Exception.cs
 
 ../referencesource/System/net/System/Net/SecureProtocols/AuthenticatedStream.cs
 ../referencesource/System/net/System/Net/SecureProtocols/NegotiateEnumTypes.cs
-
-../referencesource/System/net/System/Net/Sockets/_MultipleConnectAsync.cs
-../referencesource/System/net/System/Net/Sockets/AddressFamily.cs
-../referencesource/System/net/System/Net/Sockets/IOControlCode.cs
-../referencesource/System/net/System/Net/Sockets/IPPacketInformation.cs
-../referencesource/System/net/System/Net/Sockets/IPProtectionLevel.cs
-../referencesource/System/net/System/Net/Sockets/LingerOption.cs
-../referencesource/System/net/System/Net/Sockets/MulticastOption.cs
-../referencesource/System/net/System/Net/Sockets/NetworkStream.cs
-../referencesource/System/net/System/Net/Sockets/ProtocolFamily.cs
-../referencesource/System/net/System/Net/Sockets/ProtocolType.cs
-../referencesource/System/net/System/Net/Sockets/SelectMode.cs
-../referencesource/System/net/System/Net/Sockets/Socket.cs
-../referencesource/System/net/System/Net/Sockets/SocketErrors.cs
-../referencesource/System/net/System/Net/Sockets/SocketFlags.cs
-../referencesource/System/net/System/Net/Sockets/SocketInformation.cs
-../referencesource/System/net/System/Net/Sockets/SocketInformationOptions.cs
-../referencesource/System/net/System/Net/Sockets/SocketOptionLevel.cs
-../referencesource/System/net/System/Net/Sockets/SocketOptionName.cs
-../referencesource/System/net/System/Net/Sockets/SocketShutdown.cs
-../referencesource/System/net/System/Net/Sockets/SocketType.cs
-../referencesource/System/net/System/Net/Sockets/TransmitFileFlags.cs
-../referencesource/System/net/System/Net/Sockets/UdpReceiveResult.cs
 
 ../referencesource/System/net/System/Net/mail/Base64Stream.cs
 ../referencesource/System/net/System/Net/mail/Base64WriteStateInfo.cs

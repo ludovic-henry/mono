@@ -97,7 +97,11 @@ namespace System.Net
             IAsyncResult result = null;
             
             if(netStream != null){
+#if MONO
+                result = this.netStream.BeginRead (buffer, offset, count, callback, state);
+#else
                 result = this.netStream.UnsafeBeginRead (buffer, offset, count, callback, state);
+#endif
             }
             else{
                 result = this.stream.BeginRead (buffer, offset, count, callback, state);
@@ -113,7 +117,11 @@ namespace System.Net
             IAsyncResult result = null;
 
             if(netStream != null){
+#if MONO
+                result = this.netStream.BeginWrite(buffer, offset, count, callback, state);
+#else
                 result = this.netStream.UnsafeBeginWrite(buffer, offset, count, callback, state);
+#endif
             }
             else{
                 result = this.stream.BeginWrite (buffer, offset, count, callback, state);

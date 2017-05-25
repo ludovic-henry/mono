@@ -247,6 +247,7 @@ Mono.Net.Dns/ResolverAsyncOperation.cs
 Mono.Net.Dns/SimpleResolver.cs
 Mono.Net.Dns/ResolverError.cs
 Mono.Net.Dns/SimpleResolverEventArgs.cs
+
 ReferenceSources/BinaryCompatibility.cs
 ReferenceSources/ConfigurationManagerInternalFactory.cs
 ReferenceSources/SR2.cs
@@ -269,6 +270,9 @@ ReferenceSources/SR2.cs
 ../referencesource/System/net/System/Net/NetworkInformation/pingexception.cs
 ../referencesource/System/net/System/Net/NetworkInformation/PingOptions.cs
 ../referencesource/System/net/System/Net/NetworkInformation/PingReply.cs
+
+../referencesource/System/net/System/Net/Sockets/AddressFamily.cs
+../referencesource/System/net/System/Net/Sockets/SocketErrors.cs
 
 ../../../external/corefx/src/Common/src/System/CSharpHelpers.cs
 ../../../external/corefx/src/Common/src/System/NotImplemented.cs

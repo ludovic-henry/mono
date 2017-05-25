@@ -2757,26 +2757,6 @@ m_Handle, buffer, offset + sent, size - sent, socketFlags, out nativeError, is_b
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]
 		internal static extern bool SupportsPortReuse (ProtocolType proto);
 
-		internal static int FamilyHint {
-			get {
-				// Returns one of
-				//	MONO_HINT_UNSPECIFIED		= 0,
-				//	MONO_HINT_IPV4				= 1,
-				//	MONO_HINT_IPV6				= 2,
-
-				int hint = 0;
-				if (OSSupportsIPv4) {
-					hint = 1;
-				}
-
-				if (OSSupportsIPv6) {
-					hint = hint == 0 ? 2 : 0;
-				}
-
-				return hint;
-			}
-		}
-
 		static bool IsProtocolSupported (NetworkInterfaceComponent networkInterface)
 		{
 #if MOBILE

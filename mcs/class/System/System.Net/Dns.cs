@@ -372,7 +372,7 @@ namespace System.Net {
 
 			string h_name;
 			string[] h_aliases, h_addrlist;
-			bool ret = GetHostByAddr_internal(address, out h_name, out h_aliases, out h_addrlist, Socket.FamilyHint);
+			bool ret = GetHostByAddr_internal(address, out h_name, out h_aliases, out h_addrlist, GetSocketFamilyHint ());
 			if (!ret)
 				Error_11001 (address);
 			return (hostent_to_IPHostEntry (address, h_name, h_aliases, h_addrlist));
@@ -434,7 +434,7 @@ namespace System.Net {
 			string h_name;
 			string[] h_aliases, h_addrlist;
 
-			bool ret = GetHostByName_internal(hostName, out h_name, out h_aliases, out h_addrlist, Socket.FamilyHint);
+			bool ret = GetHostByName_internal(hostName, out h_name, out h_aliases, out h_addrlist, GetSocketFamilyHint ());
 			if (ret == false)
 				Error_11001 (hostName);
 
@@ -489,6 +489,44 @@ namespace System.Net {
 		public static Task<IPHostEntry> GetHostEntryAsync (string hostNameOrAddress)
 		{
 			return Task<IPHostEntry>.Factory.FromAsync (BeginGetHostEntry, EndGetHostEntry, hostNameOrAddress, null);
+		}
+
+		private static int _familyHint = -1;
+		private static readonly object _familyHintLock = new object();
+
+		private static int GetSocketFamilyHint ()
+		{
+			// Returns one of
+			//	MONO_HINT_UNSPECIFIED		= 0,
+			//	MONO_HINT_IPV4				= 1,
+			//	MONO_HINT_IPV6				= 2,
+
+			if (_familyHint == -1)
+			{
+				lock (_familyHintLock)
+				{
+					if (_familyHint == -1)
+					{
+						if (Socket.OSSupportsIPv4 && Socket.OSSupportsIPv6)
+						{
+							_familyHint = 0;
+						}
+						else if (Socket.OSSupportsIPv4)
+						{
+							_familyHint = 1;
+						}
+						else if (Socket.OSSupportsIPv6)
+						{
+							_familyHint = 2;
+						}
+						else
+						{
+							_familyHint = 0;
+						}
+					}
+				}
+			}
+			return _familyHint;
 		}
 	}
 }

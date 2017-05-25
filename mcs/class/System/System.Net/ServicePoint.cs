@@ -506,10 +506,12 @@ namespace System.Net
 			}
 		}
 
+#if MOBILE
 		internal Socket GetConnection(PooledStream PooledStream, object owner, bool async, out IPAddress address, ref Socket abortSocket, ref Socket abortSocket6)
 		{
 			throw new NotImplementedException ();
 		}
+#endif
 	}
 }
 
