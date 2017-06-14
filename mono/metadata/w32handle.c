@@ -50,7 +50,6 @@ static MonoW32HandleOps *handle_ops [MONO_W32HANDLE_COUNT];
 #define SLOT_OFFSET(x)	(x % HANDLE_PER_SLOT)
 
 static MonoW32HandleBase *private_handles [SLOT_MAX];
-static guint32 private_handles_count = 0;
 static guint32 private_handles_slots_count = 0;
 
 guint32 mono_w32handle_fd_reserve;
@@ -262,15 +261,10 @@ mono_w32handle_init (void)
 	/* This is needed by the code in mono_w32handle_new_internal */
 	mono_w32handle_fd_reserve = (eg_getdtablesize () + (HANDLE_PER_SLOT - 1)) & ~(HANDLE_PER_SLOT - 1);
 
-	do {
-		/*
-		 * The entries in private_handles reserved for fds are allocated lazily to
-		 * save memory.
-		 */
-
-		private_handles_count += HANDLE_PER_SLOT;
+	/* The entries in private_handles reserved for fds are allocated lazily to save memory. */
+	while (private_handles_slots_count * HANDLE_PER_SLOT < mono_w32handle_fd_reserve) {
 		private_handles_slots_count ++;
-	} while(mono_w32handle_fd_reserve > private_handles_count);
+	}
 
 	mono_os_mutex_init (&scan_mutex);
 
@@ -307,13 +301,14 @@ static void mono_w32handle_init_handle (MonoW32HandleBase *handle,
  * success and 0 on failure.  This is only called from
  * mono_w32handle_new, and scan_mutex must be held.
  */
-static guint32 mono_w32handle_new_internal (MonoW32HandleType type,
-					  gpointer handle_specific)
+static gsize
+mono_w32handle_new_internal (MonoW32HandleType type, gpointer handle_specific)
 {
-	guint32 i, k, count;
-	static guint32 last = 0;
+	static gsize last = 0;
+	gsize count;
+	guint32 i, k;
 	gboolean retry = FALSE;
-	
+
 	/* A linear scan should be fast enough.  Start from the last
 	 * allocation, assuming that handles are allocated more often
 	 * than they're freed. Leave the space reserved for file
@@ -328,55 +323,45 @@ static guint32 mono_w32handle_new_internal (MonoW32HandleType type,
 
 again:
 	count = last;
-	for(i = SLOT_INDEX (count); i < private_handles_slots_count; i++) {
-		if (private_handles [i]) {
-			for (k = SLOT_OFFSET (count); k < HANDLE_PER_SLOT; k++) {
-				MonoW32HandleBase *handle = &private_handles [i][k];
+	for (i = SLOT_INDEX (count); i < SLOT_MAX; i++) {
+		if (!private_handles [i]) {
+			private_handles [i] = g_new0 (MonoW32HandleBase, HANDLE_PER_SLOT);
+			private_handles_slots_count ++;
+		}
 
-				if(handle->type == MONO_W32HANDLE_UNUSED) {
-					last = count + 1;
+		for (k = SLOT_OFFSET (count); k < HANDLE_PER_SLOT; k++) {
+			MonoW32HandleBase *handle = &private_handles [i][k];
 
-					mono_w32handle_init_handle (handle, type, handle_specific);
-					return (count);
-				}
-				count++;
+			if (handle->type == MONO_W32HANDLE_UNUSED) {
+				last = count + 1;
+
+				mono_w32handle_init_handle (handle, type, handle_specific);
+				return (count);
 			}
+			count++;
 		}
 	}
 
-	if(retry && last > mono_w32handle_fd_reserve) {
+	if (retry && last > mono_w32handle_fd_reserve) {
 		/* Try again from the beginning */
 		last = mono_w32handle_fd_reserve;
 		goto again;
 	}
 
-	/* Will need to expand the array.  The caller will sort it out */
-
-	return(0);
+	return 0;
 }
 
 gpointer
 mono_w32handle_new (MonoW32HandleType type, gpointer handle_specific)
 {
-	guint32 handle_idx = 0;
+	gsize handle_idx = 0;
 	gpointer handle;
 
 	g_assert(!type_is_fd(type));
 
 	mono_os_mutex_lock (&scan_mutex);
 
-	while ((handle_idx = mono_w32handle_new_internal (type, handle_specific)) == 0) {
-		/* Try and expand the array, and have another go */
-		int idx = SLOT_INDEX (private_handles_count);
-		if (idx >= SLOT_MAX) {
-			break;
-		}
-
-		private_handles [idx] = g_new0 (MonoW32HandleBase, HANDLE_PER_SLOT);
-
-		private_handles_count += HANDLE_PER_SLOT;
-		private_handles_slots_count ++;
-	}
+	handle_idx = mono_w32handle_new_internal (type, handle_specific);
 
 	mono_os_mutex_unlock (&scan_mutex);
 
