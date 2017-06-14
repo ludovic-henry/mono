@@ -105,9 +105,6 @@ void
 mono_w32handle_init (void);
 
 void
-mono_w32handle_cleanup (void);
-
-void
 mono_w32handle_register_ops (MonoW32HandleType type, MonoW32HandleOps *ops);
 
 gpointer
