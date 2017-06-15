@@ -2845,7 +2845,6 @@ mono_network_init (void)
 void
 mono_network_cleanup (void)
 {
-	mono_w32socket_cleanup ();
 	mono_networking_shutdown ();
 }
 
