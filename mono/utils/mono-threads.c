@@ -876,6 +876,7 @@ mono_thread_info_begin_suspend (MonoThreadInfo *info)
 	switch (mono_threads_transition_request_async_suspension (info)) {
 	case AsyncSuspendAlreadySuspended:
 	case AsyncSuspendBlocking:
+	case AsyncSuspendExternal:
 		return TRUE;
 	case AsyncSuspendWait:
 		mono_threads_add_to_pending_operation_set (info);
@@ -962,6 +963,7 @@ suspend_sync (MonoNativeThreadId tid, gboolean interrupt_kernel)
 		}
 		break;
 	case AsyncSuspendBlocking:
+	case AsyncSuspendExternal:
 		if (interrupt_kernel)
 			mono_threads_suspend_abort_syscall (info);
 

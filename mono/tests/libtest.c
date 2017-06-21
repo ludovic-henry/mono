@@ -5455,6 +5455,7 @@ call_managed (gpointer arg)
 {
 	SimpleDelegate del = (SimpleDelegate)arg;
 
+	call_managed_res = del (41);
 	call_managed_res = del (42);
 }
 

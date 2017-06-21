@@ -371,25 +371,6 @@ mono_threads_enter_gc_unsafe_region_unbalanced_with_info (MonoThreadInfo *info, 
 	return info;
 }
 
-gpointer
-mono_threads_enter_gc_unsafe_region_cookie (void)
-{
-	MonoThreadInfo *info;
-
-	g_assert (mono_threads_is_blocking_transition_enabled ());
-
-	info = mono_thread_info_current_unchecked ();
-
-	check_info (info, "enter (cookie)", "unsafe");
-
-#ifdef ENABLE_CHECKED_BUILD_GC
-	if (mono_check_mode_enabled (MONO_CHECK_MODE_GC))
-		coop_tls_push (info);
-#endif
-
-	return info;
-}
-
 void
 mono_threads_exit_gc_unsafe_region (gpointer cookie, gpointer *stackdata)
 {
