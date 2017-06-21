@@ -5100,6 +5100,7 @@ mono_threads_attach_coop (MonoDomain *domain, gpointer *dummy)
 	MonoDomain *orig;
 	MonoThreadInfo *info;
 	gboolean external;
+	gpointer cookie;
 
 	orig = mono_domain_get ();
 
@@ -5109,13 +5110,10 @@ mono_threads_attach_coop (MonoDomain *domain, gpointer *dummy)
 		g_assert (domain);
 	}
 
-	/* On coop, when we detached, we moved the thread from  RUNNING->BLOCKING.
-	 * If we try to reattach we do a BLOCKING->RUNNING transition.  If the thread
-	 * is fresh, mono_thread_attach() will do a STARTING->RUNNING transition so
-	 * we're only responsible for making the cookie. */
-	external = !(info = mono_thread_info_current_unchecked ()) || !mono_thread_info_is_live (info);
+	external = !(info = mono_thread_info_current_unchecked ()) || mono_thread_info_is_external (info);
 
 	if (!mono_thread_internal_current ()) {
+		/* STARTING -> RUNNING */
 		mono_thread_attach (domain);
 
 		// #678164
@@ -5125,16 +5123,29 @@ mono_threads_attach_coop (MonoDomain *domain, gpointer *dummy)
 	if (orig != domain)
 		mono_domain_set (domain, TRUE);
 
-	if (external) {
-		/* mono_thread_attach put the thread in RUNNING mode from STARTING, but we need to
-		 * return the right cookie. */
-		*dummy = mono_threads_enter_gc_unsafe_region_cookie ();
-	} else {
-		/* thread state (BLOCKING|RUNNING) -> RUNNING */
+	g_assert (!(((gsize) orig) & 0x1));
+	cookie = (gpointer) (((gsize) orig) | (external ? 1 : 0));
+
+	if (!info || !external) {
+		/* BLOCKING|RUNNING -> RUNNING */
 		*dummy = mono_threads_enter_gc_unsafe_region (dummy);
+	} else {
+		switch (mono_threads_transition_done_external (info)) {
+		case DoneExternalOk:
+			info->thread_saved_state [SELF_SUSPEND_STATE_INDEX].valid = FALSE;
+			break;
+		case DoneExternalWait:
+			mono_thread_info_wait_for_resume (info);
+			break;
+		default:
+			g_error ("Unknown thread state");
+		}
+
+		if (!mono_thread_info_is_live (info))
+			g_error ("%s: thread %p is not live, state = %s", __func__, info, mono_thread_state_name (mono_thread_info_current_state (info)));
 	}
 
-	return orig;
+	return cookie;
 }
 
 /*
@@ -5147,15 +5158,35 @@ void
 mono_threads_detach_coop (gpointer cookie, gpointer *dummy)
 {
 	MonoDomain *domain, *orig;
-
-	orig = (MonoDomain*) cookie;
+	gboolean external;
 
 	domain = mono_domain_get ();
 	g_assert (domain);
 
-	/* it won't do anything if cookie is NULL
-	 * thread state RUNNING -> (RUNNING|BLOCKING) */
-	mono_threads_exit_gc_unsafe_region (*dummy, dummy);
+	external = (((gsize) cookie) & 0x1);
+
+	if (!external) {
+		/* it won't do anything if cookie is NULL
+		 * thread state RUNNING -> (RUNNING|BLOCKING) */
+		mono_threads_exit_gc_unsafe_region (*dummy, dummy);
+	} else {
+		MonoThreadInfo *info;
+
+		info = mono_thread_info_current ();
+
+retry:
+		mono_threads_get_runtime_callbacks ()->thread_state_init (&info->thread_saved_state [SELF_SUSPEND_STATE_INDEX]);
+
+		switch (mono_threads_transition_do_external (info)) {
+		case DoExternalContinue:
+			break;
+		case DoExternalPollAndRetry:
+			mono_threads_state_poll ();
+			goto retry;
+		}
+	}
+
+	orig = (MonoDomain*) (((gsize) cookie) & ~0x1);
 
 	if (orig != domain) {
 		if (!orig)

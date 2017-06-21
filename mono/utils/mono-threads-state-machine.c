@@ -49,6 +49,8 @@ state_name (int state)
 		"SELF_SUSPEND_REQUESTED",
 		"STATE_BLOCKING",
 		"STATE_BLOCKING_AND_SUSPENDED",
+		"STATE_EXTERNAL",
+		"STATE_EXTERNAL_AND_SUSPENDED",
 	};
 	return state_names [get_thread_state (state)];
 }
@@ -75,9 +77,12 @@ check_thread_state (MonoThreadInfo* info)
 	case STATE_ASYNC_SUSPEND_REQUESTED:
 	case STATE_SELF_SUSPEND_REQUESTED:
 	case STATE_BLOCKING_AND_SUSPENDED:
+	case STATE_EXTERNAL_AND_SUSPENDED:
 		g_assert (suspend_count > 0);
 		break;
-	case STATE_BLOCKING: //this is a special state that can have zero or positive suspend count.
+	case STATE_BLOCKING:
+	case STATE_EXTERNAL:
+		/* these are special states that can have zero or positive suspend count. */
 		break;
 	default:
 		g_error ("Invalid state %d", cur_state);
@@ -136,7 +141,8 @@ retry_state_change:
 	UNWRAP_THREAD_STATE (raw_state, cur_state, suspend_count, info);
 	switch (cur_state) {
 	case STATE_RUNNING:
-	case STATE_BLOCKING: /* An OS thread on coop goes STARTING->BLOCKING->RUNNING->BLOCKING->DETACHED */
+	case STATE_BLOCKING: /* An OS thread on coop goes STARTING->RUNNING->BLOCKING->DETACHED */
+	case STATE_EXTERNAL: /* An OS thread on coop goes STARTING->RUNNING->EXTERNAL->DETACHED */
 		if (!(suspend_count == 0))
 			mono_fatal_with_history ("suspend_count = %d, but should be == 0", suspend_count);
 		if (InterlockedCompareExchange (&info->thread_state, STATE_DETACHED, raw_state) != raw_state)
@@ -164,6 +170,7 @@ Returns one of the following values:
 - AsyncSuspendAlreadySuspended: Thread already suspended, nothing to do.
 - AsyncSuspendWait: Self suspend in progress, asked it to notify us. Caller must add target to the notification set.
 - AsyncSuspendBlocking: Thread in blocking state
+- AsyncSuspendExternal: Thread in external state
 */
 MonoRequestAsyncSuspendResult
 mono_threads_transition_request_async_suspension (MonoThreadInfo *info)
@@ -186,6 +193,7 @@ retry_state_change:
 	case STATE_ASYNC_SUSPENDED:
 	case STATE_SELF_SUSPENDED: //Async suspend can suspend the same thread multiple times as it starts from the outside
 	case STATE_BLOCKING_AND_SUSPENDED:
+	case STATE_EXTERNAL_AND_SUSPENDED:
 		if (!(suspend_count > 0 && suspend_count < THREAD_SUSPEND_COUNT_MAX))
 			mono_fatal_with_history ("suspend_count = %d, but should be > 0 and < THREAD_SUSPEND_COUNT_MAX", suspend_count);
 		if (InterlockedCompareExchange (&info->thread_state, build_thread_state (cur_state, suspend_count + 1), raw_state) != raw_state)
@@ -202,12 +210,16 @@ retry_state_change:
 		return AsyncSuspendWait; //This is the first async suspend request, change the thread and let it notify us [1]
 
 	case STATE_BLOCKING:
+	case STATE_EXTERNAL:
 		if (!(suspend_count < THREAD_SUSPEND_COUNT_MAX))
 			mono_fatal_with_history ("suspend_count = %d, but should be < THREAD_SUSPEND_COUNT_MAX", suspend_count);
 		if (InterlockedCompareExchange (&info->thread_state, build_thread_state (cur_state, suspend_count + 1), raw_state) != raw_state)
 			goto retry_state_change;
 		trace_state_change ("ASYNC_SUSPEND_REQUESTED", info, raw_state, cur_state, 1);
-		return AsyncSuspendBlocking; //A thread in the blocking state has its state saved so we can treat it as suspended.
+		if (cur_state == STATE_BLOCKING)
+			return AsyncSuspendBlocking; //A thread in the blocking state has its state saved so we can treat it as suspended.
+		else
+			return AsyncSuspendExternal; //A thread in the external state has its state saved so we can treat it as suspended.
 
 /*
 
@@ -265,7 +277,9 @@ retry_state_change:
 STATE_ASYNC_SUSPENDED: Code should not be running while suspended.
 STATE_SELF_SUSPENDED: Code should not be running while suspended.
 STATE_BLOCKING:
-STATE_BLOCKING_AND_SUSPENDED: Pool is a local state transition. No VM activities are allowed while in blocking mode.
+STATE_BLOCKING_AND_SUSPENDED: Poll is a local state transition. No VM activities are allowed while in blocking mode.
+STATE_EXTERNAL:
+STATE_EXTERNAL_AND_SUSPENDED: Poll is a local state transition. No VM activities are allowed while in external mode.
 */
 	default:
 		mono_fatal_with_history ("Cannot transition thread %p from %s with STATE_POLL", mono_thread_info_get_tid (info), state_name (cur_state));
@@ -309,7 +323,8 @@ retry_state_change:
 		trace_state_change ("RESUME", info, raw_state, cur_state, 0);
 		return ResumeError; //Resume failed because thread was not blocked
 
-	case STATE_BLOCKING: //Blocking, might have a suspend count, we decrease if it's > 0
+	case STATE_BLOCKING:
+	case STATE_EXTERNAL: // might have a suspend count, we decrease if it's > 0
 		if (suspend_count == 0) {
 			trace_state_change ("RESUME", info, raw_state, cur_state, 0);
 			return ResumeError;
@@ -322,6 +337,7 @@ retry_state_change:
 		break;
 	case STATE_ASYNC_SUSPENDED:
 	case STATE_SELF_SUSPENDED:
+	case STATE_EXTERNAL_AND_SUSPENDED:
 	case STATE_BLOCKING_AND_SUSPENDED: //Decrease the suspend_count and maybe resume
 		if (!(suspend_count > 0))
 			mono_fatal_with_history ("suspend_count = %d, but should be > 0", suspend_count);
@@ -391,6 +407,7 @@ retry_state_change:
 
 	case STATE_SELF_SUSPENDED: //async suspend raced with self suspend and lost
 	case STATE_BLOCKING_AND_SUSPENDED: //async suspend raced with blocking and lost
+	case STATE_EXTERNAL_AND_SUSPENDED: //async suspend raced with external and lost
 		trace_state_change ("FINISH_ASYNC_SUSPEND", info, raw_state, cur_state, 0);
 		return FALSE; //let self suspend wait
 
@@ -405,6 +422,7 @@ STATE_RUNNING: A thread cannot escape suspension once requested.
 STATE_ASYNC_SUSPENDED: There can be only one suspend initiator at a given time, meaning this state should have been visible on the first stage of suspend.
 STATE_SELF_SUSPEND_REQUESTED: When self suspend and async suspend happen together, they converge to async suspend so this state should not be visible.
 STATE_BLOCKING: Async suspend only begins if a transition to async suspend requested happened. Blocking would have put us into blocking with positive suspend count if it raced with async finish.
+STATE_EXTERNAL: Async suspend only begins if a transition to async suspend requested happened. External would have put us into external with positive suspend count if it raced with async finish.
 */
 	default:
 		mono_fatal_with_history ("Cannot transition thread %p from %s with FINISH_ASYNC_SUSPEND", mono_thread_info_get_tid (info), state_name (cur_state));
@@ -451,6 +469,8 @@ STATE_SELF_SUSPENDED: Code should not be running while suspended.
 STATE_SELF_SUSPEND_REQUESTED: A blocking operation must not be done while trying to self suspend
 STATE_BLOCKING:
 STATE_BLOCKING_AND_SUSPENDED: Blocking is not nestabled
+STATE_EXTERNAL:
+STATE_EXTERNAL_AND_SUSPENDED: Cannot transfer from External to Blocking without going through Running first
 */
 	default:
 		mono_fatal_with_history ("Cannot transition thread %p from %s with DO_BLOCKING", mono_thread_info_get_tid (info), state_name (cur_state));
@@ -462,7 +482,6 @@ This is the exit transition from the blocking state. If this thread is logically
 until its resumed before continuing.
 
 It returns one of:
--Aborted: The blocking operation was aborted and not properly restored. Aborts can happen due to lazy loading and some n2m transitions;
 -Ok: Done with blocking, just move on;
 -Wait: This thread was async suspended, wait for resume
 
@@ -500,6 +519,97 @@ STATE_BLOCKING_AND_SUSPENDED: This an exit state of done blocking
 */
 	default:
 		mono_fatal_with_history ("Cannot transition thread %p from %s with DONE_BLOCKING", mono_thread_info_get_tid (info), state_name (cur_state));
+	}
+}
+
+/*
+This transitions the thread into a cooperative state where it's assumed to be suspended but can continue.
+
+Native runtime code might want to put itself into a state where the thread is considered suspended but can keep running.
+That state only works as long as the only managed state touched is blitable and was pinned before the transition.
+
+It returns the action the caller must perform:
+
+- Continue: Entered blocking state sucessfully;
+- PollAndRetry: Async suspend raced and won, try to suspend and then retry;
+
+*/
+MonoDoExternalResult
+mono_threads_transition_do_external (MonoThreadInfo* info)
+{
+	int raw_state, cur_state, suspend_count;
+
+retry_state_change:
+	UNWRAP_THREAD_STATE (raw_state, cur_state, suspend_count, info);
+	switch (cur_state) {
+
+	case STATE_RUNNING: //transition to external
+		if (!(suspend_count == 0))
+			mono_fatal_with_history ("suspend_count = %d, but should be == 0", suspend_count);
+		if (InterlockedCompareExchange (&info->thread_state, build_thread_state (STATE_EXTERNAL, suspend_count), raw_state) != raw_state)
+			goto retry_state_change;
+		trace_state_change ("DO_EXTERNAL", info, raw_state, STATE_EXTERNAL, 0);
+		return DoExternalContinue;
+
+	case STATE_ASYNC_SUSPEND_REQUESTED:
+		if (!(suspend_count > 0))
+			mono_fatal_with_history ("suspend_count = %d, but should be > 0", suspend_count);
+		trace_state_change ("DO_EXTERNAL", info, raw_state, cur_state, 0);
+		return DoExternalPollAndRetry;
+/*
+STATE_ASYNC_SUSPENDED
+STATE_ASYNC_SUSPEND_REQUESTED
+STATE_SELF_SUSPENDED: Code should not be running while suspended.
+STATE_SELF_SUSPEND_REQUESTED: A blocking operation must not be done while trying to self suspend
+STATE_BLOCKING:
+STATE_BLOCKING_AND_SUSPENDED: Blocking is not nestabled
+*/
+	default:
+		mono_fatal_with_history ("Cannot transition thread %p from %s with DO_EXTERNAL", mono_thread_info_get_tid (info), state_name (cur_state));
+	}
+}
+
+/*
+This is the exit transition from the external state. If this thread is logically async suspended it will have to wait
+until its resumed before continuing.
+
+It returns one of:
+-Ok: Done with blocking, just move on;
+-Wait: This thread was async suspended, wait for resume
+
+*/
+MonoDoneExternalResult
+mono_threads_transition_done_external (MonoThreadInfo* info)
+{
+	int raw_state, cur_state, suspend_count;
+
+retry_state_change:
+	UNWRAP_THREAD_STATE (raw_state, cur_state, suspend_count, info);
+	switch (cur_state) {
+	case STATE_EXTERNAL:
+		if (suspend_count == 0) {
+			if (InterlockedCompareExchange (&info->thread_state, build_thread_state (STATE_RUNNING, suspend_count), raw_state) != raw_state)
+				goto retry_state_change;
+			trace_state_change ("DONE_EXTERNAL", info, raw_state, STATE_RUNNING, 0);
+			return DoneExternalOk;
+		} else {
+			if (!(suspend_count >= 0))
+				mono_fatal_with_history ("suspend_count = %d, but should be >= 0", suspend_count);
+			if (InterlockedCompareExchange (&info->thread_state, build_thread_state (STATE_EXTERNAL_AND_SUSPENDED, suspend_count), raw_state) != raw_state)
+				goto retry_state_change;
+			trace_state_change ("DONE_EXTERNAL", info, raw_state, STATE_EXTERNAL_AND_SUSPENDED, 0);
+			return DoneExternalWait;
+		}
+
+/*
+STATE_RUNNING: //Blocking was aborted and not properly restored
+STATE_ASYNC_SUSPENDED
+STATE_SELF_SUSPENDED: Code should not be running while suspended.
+STATE_SELF_SUSPEND_REQUESTED: A blocking operation must not be done while trying to self suspend
+STATE_BLOCKING_AND_SUSPENDED: This an exit state of done blocking
+*/
+	default:
+		mono_fatal_with_history ("Cannot transition thread %p from %s with DONE_EXTERNAL", mono_thread_info_get_tid (info), state_name (cur_state));
 	}
 }
 
@@ -609,6 +719,17 @@ mono_thread_info_is_live (MonoThreadInfo *info)
 		return FALSE;
 	}
 	return TRUE;
+}
+
+gboolean
+mono_thread_info_is_external (MonoThreadInfo *info)
+{
+	switch (get_thread_state (info->thread_state)) {
+	case STATE_EXTERNAL:
+	case STATE_EXTERNAL_AND_SUSPENDED:
+		return TRUE;
+	}
+	return FALSE;
 }
 
 int

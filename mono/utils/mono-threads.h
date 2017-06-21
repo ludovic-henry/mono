@@ -122,18 +122,18 @@ and reduce the number of casts drastically.
 #endif /* defined (_POSIX_VERSION) */
 
 enum {
-	STATE_STARTING				= 0x00,
-	STATE_RUNNING				= 0x01,
-	STATE_DETACHED				= 0x02,
-
-	STATE_ASYNC_SUSPENDED			= 0x03,
-	STATE_SELF_SUSPENDED			= 0x04,
-	STATE_ASYNC_SUSPEND_REQUESTED	= 0x05,
-	STATE_SELF_SUSPEND_REQUESTED 	= 0x06,
-	STATE_BLOCKING					= 0x07,
-	STATE_BLOCKING_AND_SUSPENDED	= 0x8,
-
-	STATE_MAX						= 0x08,
+	STATE_STARTING,
+	STATE_RUNNING,
+	STATE_DETACHED,
+	STATE_ASYNC_SUSPENDED,
+	STATE_SELF_SUSPENDED,
+	STATE_ASYNC_SUSPEND_REQUESTED,
+	STATE_SELF_SUSPEND_REQUESTED,
+	STATE_BLOCKING,
+	STATE_BLOCKING_AND_SUSPENDED,
+	STATE_EXTERNAL,
+	STATE_EXTERNAL_AND_SUSPENDED,
+	STATE_MAX = STATE_EXTERNAL_AND_SUSPENDED,
 
 	THREAD_STATE_MASK			= 0x00FF,
 	THREAD_SUSPEND_COUNT_MASK	= 0xFF00,
@@ -425,9 +425,6 @@ mono_thread_info_is_interrupt_state (THREAD_INFO_TYPE *info);
 void
 mono_thread_info_describe_interrupt_token (THREAD_INFO_TYPE *info, GString *text);
 
-gboolean
-mono_thread_info_is_live (THREAD_INFO_TYPE *info);
-
 int
 mono_threads_get_max_stack_size (void);
 
@@ -566,11 +563,12 @@ typedef enum {
 	AsyncSuspendWait,
 	AsyncSuspendInitSuspend,
 	AsyncSuspendBlocking,
+	AsyncSuspendExternal,
 } MonoRequestAsyncSuspendResult;
 
 typedef enum {
 	DoBlockingContinue, //in blocking mode, continue
-	DoBlockingPollAndRetry, //async suspend raced blocking and won, pool and retry
+	DoBlockingPollAndRetry, //async suspend raced blocking and won, poll and retry
 } MonoDoBlockingResult;
 
 typedef enum {
@@ -578,6 +576,15 @@ typedef enum {
 	DoneBlockingWait, //thread should end suspended
 } MonoDoneBlockingResult;
 
+typedef enum {
+	DoExternalContinue, //in external mode, continue
+	DoExternalPollAndRetry, //async suspend raced external and won, poll and retry
+} MonoDoExternalResult;
+
+typedef enum {
+	DoneExternalOk, //exited external fine
+	DoneExternalWait, //thread should end suspended
+} MonoDoneExternalResult;
 
 typedef enum {
 	AbortBlockingIgnore, //Ignore
@@ -596,17 +603,17 @@ gboolean mono_threads_transition_finish_async_suspend (THREAD_INFO_TYPE* info);
 MonoDoBlockingResult mono_threads_transition_do_blocking (THREAD_INFO_TYPE* info);
 MonoDoneBlockingResult mono_threads_transition_done_blocking (THREAD_INFO_TYPE* info);
 MonoAbortBlockingResult mono_threads_transition_abort_blocking (THREAD_INFO_TYPE* info);
+MonoDoExternalResult mono_threads_transition_do_external (THREAD_INFO_TYPE* info);
+MonoDoneExternalResult mono_threads_transition_done_external (THREAD_INFO_TYPE* info);
 
 MonoThreadUnwindState* mono_thread_info_get_suspend_state (THREAD_INFO_TYPE *info);
-
-gpointer
-mono_threads_enter_gc_unsafe_region_cookie (void);
 
 
 void mono_thread_info_wait_for_resume (THREAD_INFO_TYPE *info);
 /* Advanced suspend API, used for suspending multiple threads as once. */
 gboolean mono_thread_info_is_running (THREAD_INFO_TYPE *info);
 gboolean mono_thread_info_is_live (THREAD_INFO_TYPE *info);
+gboolean mono_thread_info_is_external (THREAD_INFO_TYPE *info);
 int mono_thread_info_suspend_count (THREAD_INFO_TYPE *info);
 int mono_thread_info_current_state (THREAD_INFO_TYPE *info);
 const char* mono_thread_state_name (int state);
