@@ -5112,12 +5112,7 @@ mono_threads_attach_coop (MonoDomain *domain, gpointer *dummy)
 		g_assert (domain);
 	}
 
-	/* On coop, when we detached, we moved the thread from  RUNNING->BLOCKING.
-	 * If we try to reattach we do a BLOCKING->RUNNING transition.  If the thread
-	 * is fresh, mono_thread_attach() will do a STARTING->RUNNING transition so
-	 * we're only responsible for making the cookie. */
-	if (mono_threads_is_blocking_transition_enabled ())
-		external = !(info = mono_thread_info_current_unchecked ()) || mono_thread_info_is_external (info);
+	external = !(info = mono_thread_info_current_unchecked ()) || mono_thread_info_is_external (info);
 
 	if (!mono_thread_internal_current ()) {
 		/* STARTING -> RUNNING */
@@ -5126,9 +5121,6 @@ mono_threads_attach_coop (MonoDomain *domain, gpointer *dummy)
 		// #678164
 		mono_thread_set_state (mono_thread_internal_current (), ThreadState_Background);
 	}
-
-	if (orig != domain)
-		mono_domain_set (domain, TRUE);
 
 	g_assert (!(((gsize) orig) & 0x1));
 	cookie = (gpointer) (((gsize) orig) | (external ? 1 : 0));
@@ -5154,6 +5146,9 @@ mono_threads_attach_coop (MonoDomain *domain, gpointer *dummy)
 			g_error ("%s: thread %p is not live, state = %s", __func__, info, mono_thread_state_name (mono_thread_info_current_state (info)));
 	}
 
+	if (orig != domain)
+		mono_domain_set (domain, TRUE);
+
 	return cookie;
 }
 
@@ -5173,6 +5168,15 @@ mono_threads_detach_coop (gpointer cookie, gpointer *dummy)
 
 	domain = mono_domain_get ();
 	g_assert (domain);
+
+	orig = (MonoDomain*) (((gsize) cookie) & ~0x1);
+
+	if (orig != domain) {
+		if (!orig)
+			mono_domain_unset ();
+		else
+			mono_domain_set (orig, TRUE);
+	}
 
 	external = (((gsize) cookie) & 0x1);
 
@@ -5198,15 +5202,6 @@ retry:
 			mono_threads_state_poll ();
 			goto retry;
 		}
-	}
-
-	orig = (MonoDomain*) (((gsize) cookie) & ~0x1);
-
-	if (orig != domain) {
-		if (!orig)
-			mono_domain_unset ();
-		else
-			mono_domain_set (orig, TRUE);
 	}
 }
 
