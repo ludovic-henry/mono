@@ -736,7 +736,7 @@ processes_cleanup (void)
 		if (process->signalled && process->handle) {
 			/* This process has exited and we need to remove the artifical ref
 			 * on the handle */
-			mono_w32handle_unref (process->handle);
+			mono_w32handle_close (process->handle);
 			process->handle = NULL;
 		}
 	}
@@ -965,8 +965,7 @@ get_process_foreach_callback (gpointer handle, gpointer handle_specific, gpointe
 	if (mono_w32handle_issignalled (handle))
 		return FALSE;
 
-	mono_w32handle_ref (handle);
-	foreach_data->handle = handle;
+	foreach_data->handle = mono_w32handle_duplicate (handle);
 	return TRUE;
 }
 
@@ -2019,7 +2018,7 @@ process_create (const gunichar2 *appname, const gunichar2 *cmdline,
 
 		/* Keep the process handle artificially alive until the process
 		 * exits so that the information in the handle isn't lost. */
-		mono_w32handle_ref (handle);
+		mono_w32handle_close (handle);
 		process->handle = handle;
 
 		mono_os_mutex_lock (&processes_mutex);
