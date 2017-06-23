@@ -212,8 +212,6 @@ mono_w32handle_lock_handle (gpointer handle)
 	if (!mono_w32handle_lookup_data (handle, &handle_data))
 		g_error ("%s: failed to lookup handle %p", __func__, handle);
 
-	mono_w32handle_ref (handle);
-
 	mono_os_mutex_lock (&handle_data->signal_mutex);
 
 	mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_W32HANDLE, "%s: lock handle %p", __func__, handle);
@@ -230,11 +228,7 @@ mono_w32handle_trylock_handle (gpointer handle)
 	if (!mono_w32handle_lookup_data (handle, &handle_data))
 		g_error ("%s: failed to lookup handle %p", __func__, handle);
 
-	mono_w32handle_ref (handle);
-
 	locked = mono_os_mutex_trylock (&handle_data->signal_mutex) == 0;
-	if (!locked)
-		mono_w32handle_unref (handle);
 
 	mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_W32HANDLE, "%s: trylock handle %p, locked: %s", __func__, handle, locked ? "true" : "false");
 
@@ -252,8 +246,6 @@ mono_w32handle_unlock_handle (gpointer handle)
 	mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_W32HANDLE, "%s: unlock handle %p", __func__, handle);
 
 	mono_os_mutex_unlock (&handle_data->signal_mutex);
-
-	mono_w32handle_unref (handle);
 }
 
 void
@@ -1244,7 +1236,6 @@ done:
 MonoW32HandleWaitRet
 mono_w32handle_wait_multiple (gpointer *handles, gsize nhandles, gboolean waitall, guint32 timeout, gboolean alertable)
 {
-	MonoW32HandleWaitRet ret;
 	gboolean alerted, poll;
 	gint i;
 	gint64 start;
@@ -1300,13 +1291,6 @@ mono_w32handle_wait_multiple (gpointer *handles, gsize nhandles, gboolean waital
 	if (timeout != MONO_INFINITE_WAIT)
 		start = mono_msec_ticks ();
 
-	for (i = 0; i < nhandles; ++i) {
-		/* Add a reference, as we need to ensure the handle wont
-		 * disappear from under us while we're waiting in the loop
-		 * (not lock, as we don't want exclusive access here) */
-		mono_w32handle_ref (handles [i]);
-	}
-
 	for (;;) {
 		gsize count, lowest;
 		gboolean signalled;
@@ -1338,14 +1322,12 @@ mono_w32handle_wait_multiple (gpointer *handles, gsize nhandles, gboolean waital
 		mono_w32handle_unlock_handles (handles, nhandles);
 
 		if (signalled) {
-			ret = MONO_W32HANDLE_WAIT_RET_SUCCESS_0 + lowest;
 			for (i = lowest; i < nhandles; i++) {
 				if (abandoned [i]) {
-					ret = MONO_W32HANDLE_WAIT_RET_ABANDONED_0 + lowest;
-					break;
+					return MONO_W32HANDLE_WAIT_RET_ABANDONED_0 + lowest;
 				}
 			}
-			goto done;
+			return MONO_W32HANDLE_WAIT_RET_SUCCESS_0 + lowest;
 		}
 
 		for (i = 0; i < nhandles; i++) {
@@ -1388,11 +1370,8 @@ mono_w32handle_wait_multiple (gpointer *handles, gsize nhandles, gboolean waital
 
 				elapsed = mono_msec_ticks () - start;
 				if (elapsed > timeout) {
-					ret = MONO_W32HANDLE_WAIT_RET_TIMEOUT;
-
 					mono_w32handle_unlock_signal_mutex ();
-
-					goto done;
+					return MONO_W32HANDLE_WAIT_RET_TIMEOUT;
 				}
 
 				waited = mono_w32handle_timedwait_signal (timeout - elapsed, poll, alertable ? &alerted : NULL);
@@ -1402,23 +1381,13 @@ mono_w32handle_wait_multiple (gpointer *handles, gsize nhandles, gboolean waital
 		mono_w32handle_unlock_signal_mutex ();
 
 		if (alerted) {
-			ret = MONO_W32HANDLE_WAIT_RET_ALERTED;
-			goto done;
+			return MONO_W32HANDLE_WAIT_RET_ALERTED;
 		}
 
 		if (waited != 0) {
-			ret = MONO_W32HANDLE_WAIT_RET_TIMEOUT;
-			goto done;
+			return MONO_W32HANDLE_WAIT_RET_TIMEOUT;
 		}
 	}
-
-done:
-	for (i = 0; i < nhandles; i++) {
-		/* Unref everything we reffed above */
-		mono_w32handle_unref (handles [i]);
-	}
-
-	return ret;
 }
 
 MonoW32HandleWaitRet
