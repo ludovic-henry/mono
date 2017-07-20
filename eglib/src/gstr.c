@@ -938,7 +938,7 @@ g_stpcpy (gchar *dest, const char *src)
 	g_return_val_if_fail (dest != NULL, dest);
 	g_return_val_if_fail (src != NULL, dest);
 
-#if HAVE_STPCPY
+#ifdef HAVE_STPCPY
 	return stpcpy (dest, src);
 #else
 	while (*src)

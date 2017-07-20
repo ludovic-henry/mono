@@ -15,11 +15,14 @@ SUBDIRS = po $(libgc_dir) eglib mono $(ikvm_native_dir) support data runtime scr
 # Keep in sync with SUBDIRS
 DIST_SUBDIRS = m4 po $(libgc_dir) eglib mono ikvm-native support data runtime scripts man samples tools msvc docs acceptance-tests llvm
 
-all: update_submodules
+all: update_submodules cmake
 
 SUBMODULE_ERROR='Could not recursively update all git submodules. You may experience compilation problems if some submodules are out of date'
 update_submodules:
 	@$(srcdir)/scripts/update_submodules.sh
+
+cmake:
+	cd cmake-build && $(if $(V),VERBOSE=1,) $(MAKE)
 
 .PHONY: update_submodules
 

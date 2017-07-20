@@ -1,5 +1,6 @@
-#ifndef __EGLIB_CONFIG_H
-#define __EGLIB_CONFIG_H
+
+#ifndef __EGLIB_SRC_EGLIB_CONFIG_H__
+#define __EGLIB_SRC_EGLIB_CONFIG_H__
 
 /*
  * System-dependent settings
@@ -14,29 +15,47 @@
 #define G_DIR_SEPARATOR_S        "@PATHSEP@"
 #define G_BREAKPOINT()           @BREAKPOINT@
 #define G_OS_@OS@
-#define GPOINTER_TO_INT(ptr)   @GPOINTER_TO_INT@
-#define GPOINTER_TO_UINT(ptr)  @GPOINTER_TO_UINT@
-#define GINT_TO_POINTER(v)     @GINT_TO_POINTER@
-#define GUINT_TO_POINTER(v)    @GUINT_TO_POINTER@
 
 #if @HAVE_ALLOCA_H@ == 1
 #define G_HAVE_ALLOCA_H
 #endif
 
-typedef unsigned @GSIZE@ gsize;
-typedef signed   @GSIZE@ gssize;
-
-#define G_GSIZE_FORMAT   @GSIZE_FORMAT@
-
-#if @G_HAVE_ISO_VARARGS@ == 1
-#define G_HAVE_ISO_VARARGS
-#endif
-
-#if defined (HOST_WATCHOS)
+#if defined(HOST_WATCHOS)
 #undef G_BREAKPOINT
 #define G_BREAKPOINT()
 #endif
 
 typedef @PIDTYPE@ GPid;
 
+#if @SIZEOF_VOID_P@ == @SIZEOF_INT@
+#define GPOINTER_TO_INT(ptr) ((gint) (ptr))
+#define GPOINTER_TO_UINT(ptr) ((guint) (ptr))
+#define GINT_TO_POINTER(v) ((gpointer) (v))
+#define GUINT_TO_POINTER(v) ((gpointer) (v))
+#define GSIZE int
+#define G_GSIZE_FORMAT "u"
+
+#elif @SIZEOF_VOID_P@ == @SIZEOF_LONG@
+#define GPOINTER_TO_INT(ptr) ((gint)(long) (ptr))
+#define GPOINTER_TO_UINT(ptr) ((guint)(long) (ptr))
+#define GINT_TO_POINTER(v) ((gpointer)(glong) (v))
+#define GUINT_TO_POINTER(v) ((gpointer)(gulong) (v))
+#define GSIZE long
+#define G_GSIZE_FORMAT "lu"
+
+#elif @SIZEOF_VOID_P@ == @SIZEOF_LONG_LONG@
+#define GPOINTER_TO_INT(ptr) ((gint)(long long) (ptr))
+#define GPOINTER_TO_UINT(ptr) ((guint)(unsigned long long) (ptr))
+#define GINT_TO_POINTER(v) ((gpointer)(long long) (v))
+#define GUINT_TO_POINTER(v) ((gpointer)(unsigned long long) (v))
+#define GSIZE long long
+#define G_GSIZE_FORMAT "I64u"
+
+#else
+#error "unsupported pointer size"
 #endif
+
+typedef unsigned GSIZE gsize;
+typedef signed   GSIZE gssize;
+
+#endif /* __EGLIB_SRC_EGLIB_CONFIG_H__ */

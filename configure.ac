@@ -58,6 +58,8 @@ case $host_os in
 *cygwin* ) LN_S='cp -p';;
 esac
 
+CMAKE_ARGS=
+
 #
 # libgc defaults
 #
@@ -67,7 +69,6 @@ libgc_configure_args=
 # libgc should inherit the original CFLAGS/CPPFLAGS passed to configure, i.e. -O0
 CPPFLAGS_FOR_LIBGC=$CPPFLAGS
 CFLAGS_FOR_LIBGC=$CFLAGS
-CPPFLAGS_FOR_EGLIB=$CPPFLAGS
 CFLAGS_FOR_EGLIB=$CFLAGS
 CPPFLAGS_FOR_BTLS=$CPPFLAGS
 CFLAGS_FOR_BTLS=$CFLAGS
@@ -323,7 +324,6 @@ case "$host" in
 				CCASFLAGS="$CCASFLAGS $BROKEN_DARWIN_FLAGS"
 				CPPFLAGS_FOR_LIBGC="$CPPFLAGS_FOR_LIBGC $BROKEN_DARWIN_CPPFLAGS"
 				CFLAGS_FOR_LIBGC="$CFLAGS_FOR_LIBGC $BROKEN_DARWIN_FLAGS"
-				CPPFLAGS_FOR_EGLIB="$CPPFLAGS_FOR_EGLIB $BROKEN_DARWIN_CPPFLAGS"
 				CFLAGS_FOR_EGLIB="$CFLAGS_FOR_EGLIB $BROKEN_DARWIN_FLAGS"
 				with_sgen_default_concurrent=yes
 				;;
@@ -379,6 +379,9 @@ AM_CONDITIONAL(PLATFORM_LINUX, echo x$target_os | grep -q linux)
 AM_CONDITIONAL(PLATFORM_DARWIN, test x$host_darwin = xyes)
 AM_CONDITIONAL(PLATFORM_SIGPOSIX, test x$use_sigposix = xyes)
 AM_CONDITIONAL(PLATFORM_ANDROID, test x$platform_android = xyes)
+
+AC_SUBST(host_win32)
+AC_SUBST(host_darwin)
 
 if test -z "$PLATFORM_DARWIN_TRUE"; then :
 PLATFORM_AOT_SUFFIX=.dylib
@@ -439,6 +442,8 @@ AC_SUBST(BUILD_EXEEXT)
 
 AM_CONDITIONAL(CROSS_COMPILING, [test x$cross_compiling = xyes])
 AM_CONDITIONAL(USE_BATCH_FILES, [test x$host_win32 = xyes -a x$cross_compiling = xyes])
+
+AC_SUBST(cross_compiling)
 
 # Set STDC_HEADERS
 AC_HEADER_STDC
@@ -698,8 +703,7 @@ fi
 AC_SUBST([WERROR_CFLAGS])
 AC_SUBST([SHARED_CFLAGS])
 
-ac_configure_args="$ac_configure_args \"CPPFLAGS_FOR_EGLIB=$EGLIB_CPPFLAGS\" \"CFLAGS_FOR_EGLIB=$CFLAGS_FOR_EGLIB\""
-AC_CONFIG_SUBDIRS(eglib)
+AC_SUBST(CFLAGS_FOR_EGLIB)
 
 GLIB_CFLAGS='-I$(top_srcdir)/eglib/src -I$(top_builddir)/eglib/src'
 GLIB_LIBS='-L$(top_builddir)/eglib/src -leglib -lm'
@@ -3524,6 +3528,8 @@ fi
 
 AM_CONDITIONAL(TARGET_OSX, test x$target_osx = xyes)
 
+AC_SUBST(target_osx)
+
 if test "x$sizeof_register" = "x4"; then
    AC_DEFINE(SIZEOF_REGISTER,4,[size of machine integer registers])
 elif test "x$sizeof_register" = "x8"; then
@@ -4103,6 +4109,14 @@ fi
 
 AM_CONDITIONAL(BTLS_ANDROID, test x$btls_android = xyes)
 
+case "$target" in
+   *-*-haiku*)
+		target_haiku=yes
+		;;
+esac
+
+AC_SUBST(target_haiku)
+
 if test x$DISABLE_MCS_DOCS = xyes; then
    docs_dir=""
 else
@@ -4347,6 +4361,8 @@ Makefile
 mono-uninstalled.pc
 acceptance-tests/Makefile
 llvm/Makefile
+eglib/Makefile
+eglib/src/Makefile
 scripts/mono-find-provides
 scripts/mono-find-requires
 mono/Makefile
@@ -4420,6 +4436,12 @@ po/Makefile
 
 # Update all submodules recursively to ensure everything is checked out
 $srcdir/scripts/update_submodules.sh
+
+# Run cmake
+mkdir -p cmake-build
+pushd cmake-build
+cmake ../$srcdir $CMAKE_ARGS
+popd
 
 if test x$host_win32 = xyes; then
    # Get rid of 'cyg' prefixes in library names

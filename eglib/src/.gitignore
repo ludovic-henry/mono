@@ -5,6 +5,7 @@
 /*.lo
 /*.la
 /*.o
+/libeglib.a
 /semantic.cache
 /.project
 /.cproject
