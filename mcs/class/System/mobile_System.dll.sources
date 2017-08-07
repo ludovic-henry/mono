@@ -1,3 +1,8 @@
 #include common.sources
 #include common_networking.sources
+
 System.IO/FileSystemWatcher_mobile.cs
+
+../referencesource/System/compmod/microsoft/win32/safehandles/SafeProcessHandle.cs
+
+../referencesource/System/services/monitoring/system/diagnosticts/processwaithandle.cs

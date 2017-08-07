@@ -1,0 +1,6 @@
+#include net_4_x_System.dll.sources
+
+../../../external/corefx/src/System.Diagnostics.Process/src/Microsoft/Win32/SafeHandles/SafeProcessHandle.cs
+../../../external/corefx/src/System.Diagnostics.Process/src/Microsoft/Win32/SafeHandles/SafeProcessHandle.Windows.cs
+
+../../../external/corefx/src/System.Diagnostics.Process/src/System/Diagnostics/ProcessWaitHandle.Windows.cs

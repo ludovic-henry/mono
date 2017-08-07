@@ -1,0 +1,13 @@
+#include net_4_x_System.dll.sources
+
+../../../external/corefx/src/Common/src/Interop/Unix/Interop.Errors.cs
+../../../external/corefx/src/Common/src/Interop/Unix/Interop.Libraries.cs
+
+../../../external/corefx/src/Common/src/Interop/Unix/System.Native/Interop.Kill.cs
+../../../external/corefx/src/Common/src/Interop/Unix/System.Native/Interop.WaitPid.cs
+
+../../../external/corefx/src/System.Diagnostics.Process/src/Microsoft/Win32/SafeHandles/SafeProcessHandle.cs
+../../../external/corefx/src/System.Diagnostics.Process/src/Microsoft/Win32/SafeHandles/SafeProcessHandle.Unix.cs
+
+../../../external/corefx/src/System.Diagnostics.Process/src/System/Diagnostics/ProcessWaitHandle.Unix.cs
+../../../external/corefx/src/System.Diagnostics.Process/src/System/Diagnostics/ProcessWaitState.Unix.cs

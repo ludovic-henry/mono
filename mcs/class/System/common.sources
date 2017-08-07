@@ -841,7 +841,6 @@ ReferenceSources/Win32Exception.cs
 ../referencesource/System/services/monitoring/system/diagnosticts/Process.cs
 ../referencesource/System/services/monitoring/system/diagnosticts/ProcessModuleCollection.cs
 ../referencesource/System/services/monitoring/system/diagnosticts/ProcessStartInfo.cs
-../referencesource/System/services/monitoring/system/diagnosticts/processwaithandle.cs
 ../referencesource/System/services/monitoring/system/diagnosticts/ProcessThreadCollection.cs
 
 ../referencesource/System/services/timers/system/timers/ElapsedEventHandler.cs
@@ -854,8 +853,6 @@ ReferenceSources/Win32Exception.cs
 ../referencesource/System/misc/WeakHashtable.cs
 
 ../referencesource/System/compmod/system/codedom/compiler/GeneratedCodeAttribute.cs
-
-../referencesource/System/compmod/microsoft/win32/safehandles/SafeProcessHandle.cs
 
 corefx/SR.cs
 
