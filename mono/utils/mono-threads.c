@@ -982,15 +982,27 @@ suspend_sync (MonoNativeThreadId tid, gboolean interrupt_kernel)
 	return info;
 }
 
-static MonoThreadInfo*
-suspend_sync_nolock (MonoNativeThreadId id, gboolean interrupt_kernel)
+void
+mono_thread_info_safe_suspend_and_run (MonoNativeThreadId id, gboolean interrupt_kernel, MonoSuspendThreadCallback callback, gpointer user_data)
 {
+	int result;
 	MonoThreadInfo *info = NULL;
+	MonoThreadHazardPointers *hp = mono_hazard_pointer_get ();
 	int sleep_duration = 0;
+
+	THREADS_SUSPEND_DEBUG ("SUSPENDING tid %p\n", (void*)id);
+	/*FIXME: unify this with self-suspend*/
+	g_assert (id != mono_native_thread_id_get ());
+
+	/* This can block during stw */
+	mono_thread_info_suspend_lock ();
+	mono_threads_begin_global_suspend ();
+
 	for (;;) {
-		if (!(info = suspend_sync (id, interrupt_kernel))) {
+		info = suspend_sync (id, interrupt_kernel)
+		if (!info) {
 			mono_hazard_pointer_clear (mono_hazard_pointer_get (), 1);
-			return NULL;
+			goto done;
 		}
 
 		/*WARNING: We now are in interrupt context until we resume the thread. */
@@ -999,7 +1011,7 @@ suspend_sync_nolock (MonoNativeThreadId id, gboolean interrupt_kernel)
 
 		if (!mono_thread_info_core_resume (info)) {
 			mono_hazard_pointer_clear (mono_hazard_pointer_get (), 1);
-			return NULL;
+			goto done;
 		}
 		THREADS_SUSPEND_DEBUG ("RESTARTED thread tid %p\n", (void*)id);
 
@@ -1013,27 +1025,6 @@ suspend_sync_nolock (MonoNativeThreadId id, gboolean interrupt_kernel)
 
 		sleep_duration += 10;
 	}
-	return info;
-}
-
-void
-mono_thread_info_safe_suspend_and_run (MonoNativeThreadId id, gboolean interrupt_kernel, MonoSuspendThreadCallback callback, gpointer user_data)
-{
-	int result;
-	MonoThreadInfo *info = NULL;
-	MonoThreadHazardPointers *hp = mono_hazard_pointer_get ();
-
-	THREADS_SUSPEND_DEBUG ("SUSPENDING tid %p\n", (void*)id);
-	/*FIXME: unify this with self-suspend*/
-	g_assert (id != mono_native_thread_id_get ());
-
-	/* This can block during stw */
-	mono_thread_info_suspend_lock ();
-	mono_threads_begin_global_suspend ();
-
-	info = suspend_sync_nolock (id, interrupt_kernel);
-	if (!info)
-		goto done;
 
 	switch (result = callback (info, user_data)) {
 	case MonoResumeThread:
@@ -1418,7 +1409,7 @@ mono_threads_signal_thread_handle (MonoThreadHandle* thread_handle)
 	mono_os_event_set (&thread_handle->event);
 }
 
-#define INTERRUPT_STATE ((MonoThreadInfoInterruptToken*) (size_t) -1)
+#define INTERRUPT_STATE ((MonoThreadInfoInterruptToken*) GINT_TO_POINTER(-1))
 
 struct _MonoThreadInfoInterruptToken {
 	void (*callback) (gpointer data);
@@ -1456,15 +1447,15 @@ mono_thread_info_install_interrupt (void (*callback) (gpointer data), gpointer d
 	token->callback = callback;
 	token->data = data;
 
-	previous_token = (MonoThreadInfoInterruptToken *)InterlockedCompareExchangePointer ((gpointer*) &info->interrupt_token, token, NULL);
-
-	if (previous_token) {
-		if (previous_token != INTERRUPT_STATE)
-			g_error ("mono_thread_info_install_interrupt: previous_token should be INTERRUPT_STATE (%p), but it was %p", INTERRUPT_STATE, previous_token);
-
+	switch (previous_token = (MonoThreadInfoInterruptToken *)InterlockedCompareExchangePointer ((gpointer*) &info->interrupt_token, token, NULL)) {
+	case NULL:
+		break;
+	case INTERRUPT_STATE:
+		g_error ("%s: previous_token should be INTERRUPT_STATE, but it was %p", __func__, previous_token);
+	default:
 		g_free (token);
-
 		*interrupted = TRUE;
+		break;
 	}
 
 	THREADS_INTERRUPT_DEBUG ("interrupt install    tid %p token %p previous_token %p interrupted %s\n",
@@ -1483,16 +1474,17 @@ mono_thread_info_uninstall_interrupt (gboolean *interrupted)
 	info = mono_thread_info_current ();
 	g_assert (info);
 
-	previous_token = (MonoThreadInfoInterruptToken *)InterlockedExchangePointer ((gpointer*) &info->interrupt_token, NULL);
-
-	/* only the installer can uninstall the token */
-	g_assert (previous_token);
-
-	if (previous_token == INTERRUPT_STATE) {
+	switch (previous_token = (MonoThreadInfoInterruptToken *)InterlockedExchangePointer ((gpointer*) &info->interrupt_token, NULL)) {
+	case NULL:
+		/* only the installer can uninstall the token */
+		g_error ("%s: previous_token should be non-NULL", __func__);
+	case INTERRUPT_STATE:
 		/* if it is interrupted, then it is going to be freed in finish interrupt */
 		*interrupted = TRUE;
-	} else {
+		break;
+	default:
 		g_free (previous_token);
+		break;
 	}
 
 	THREADS_INTERRUPT_DEBUG ("interrupt uninstall  tid %p previous_token %p interrupted %s\n",
