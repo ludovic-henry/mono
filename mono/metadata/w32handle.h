@@ -13,6 +13,7 @@
 #endif
 
 #include "mono/utils/mono-coop-mutex.h"
+#include "mono/utils/refcount.h"
 
 #ifndef INVALID_HANDLE_VALUE
 #define INVALID_HANDLE_VALUE (gpointer)-1
@@ -36,8 +37,8 @@ typedef enum {
 } MonoW32Type;
 
 typedef struct {
+	MonoRefCount ref;
 	MonoW32Type type;
-	gint32 ref;
 	gint32 duplicate;
 	gboolean signalled;
 	gboolean in_use;

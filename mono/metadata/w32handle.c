@@ -172,6 +172,30 @@ mono_w32handle_cleanup (void)
 	mono_coop_mutex_destroy (&handles_mutex);
 }
 
+static void
+mono_w32handle_ops_destroy (MonoW32Handle *handle_data);
+
+static void
+w32handle_destroy (gpointer data)
+{
+	MonoW32Handle *handle_data;
+
+	handle_data = (MonoW32Handle*) data;
+	g_assert (handle_data);
+
+	g_assert (!handle_data->in_use);
+
+	mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_W32HANDLE, "%s: destroy %s handle %p", __func__, mono_w32handle_ops_typename (handle_data->type), handle_data);
+
+	mono_w32handle_ops_destroy (handle_data);
+
+	mono_coop_mutex_destroy (&handle_data->signal_mutex);
+	mono_coop_cond_destroy (&handle_data->signal_cond);
+
+	g_free (handle_data->specific);
+	g_free (handle_data);
+}
+
 static gsize
 mono_w32handle_ops_typesize (MonoW32Type type);
 
@@ -182,8 +206,8 @@ mono_w32handle_new (MonoW32Type type, gpointer handle_specific)
 	MonoW32Handle *handle_data;
 
 	handle_data = g_new0 (MonoW32Handle, 1);
+	mono_refcount_init (handle_data, w32handle_destroy);
 	handle_data->type = type;
-	handle_data->ref = 1;
 	handle_data->signalled = FALSE;
 	mono_coop_cond_init (&handle_data->signal_cond);
 	mono_coop_mutex_init (&handle_data->signal_mutex);
@@ -287,50 +311,6 @@ mono_w32handle_foreach (gboolean (*on_each)(MonoW32Handle *handle_data, gpointer
 	mono_coop_mutex_unlock (&handles_mutex);
 }
 
-static gboolean
-mono_w32handle_ref_core (MonoW32Handle *handle_data)
-{
-	gint32 old, new;
-
-	do {
-		old = handle_data->ref;
-		if (old == 0)
-			return FALSE;
-
-		new = old + 1;
-	} while (InterlockedCompareExchange (&handle_data->ref, new, old) != old);
-
-	mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_W32HANDLE, "%s: ref %s handle %p, ref: %d -> %d",
-		__func__, mono_w32handle_ops_typename (handle_data->type), handle_data, old, new);
-
-	return TRUE;
-}
-
-static gboolean
-mono_w32handle_unref_core (MonoW32Handle *handle_data)
-{
-	MonoW32Type type;
-	gint32 old, new;
-
-	type = handle_data->type;
-
-	do {
-		old = handle_data->ref;
-		if (!(old >= 1))
-			g_error ("%s: handle %p has ref %d, it should be >= 1", __func__, handle_data, old);
-
-		new = old - 1;
-	} while (InterlockedCompareExchange (&handle_data->ref, new, old) != old);
-
-	/* handle_data might contain invalid data from now on, if
-	 * another thread is unref'ing this handle at the same time */
-
-	mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_W32HANDLE, "%s: unref %s handle %p, ref: %d -> %d destroy: %s",
-		__func__, mono_w32handle_ops_typename (type), handle_data, old, new, new == 0 ? "true" : "false");
-
-	return new == 0;
-}
-
 gboolean
 mono_w32handle_lookup_and_ref (gpointer handle, MonoW32Handle **handle_data)
 {
@@ -343,42 +323,18 @@ mono_w32handle_lookup_and_ref (gpointer handle, MonoW32Handle **handle_data)
 		return FALSE;
 	}
 
-	if (!mono_w32handle_ref_core (*handle_data))
-		g_error ("%s: failed to ref handle %p", __func__, *handle_data);
+	mono_refcount_inc (*handle_data);
 
 	mono_coop_mutex_unlock (&handles_mutex);
 
 	return TRUE;
 }
 
-static void
-mono_w32handle_ops_destroy (MonoW32Handle *handle_data);
-
-static void
-w32handle_destroy (MonoW32Handle *handle_data)
-{
-	g_assert (!handle_data->in_use);
-
-	mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_W32HANDLE, "%s: destroy %s handle %p", __func__, mono_w32handle_ops_typename (handle_data->type), handle_data);
-
-	mono_w32handle_ops_destroy (handle_data);
-
-	mono_coop_mutex_destroy (&handle_data->signal_mutex);
-	mono_coop_cond_destroy (&handle_data->signal_cond);
-
-	g_free (handle_data->specific);
-	g_free (handle_data);
-}
-
 /* The handle must not be locked on entry to this function */
 void
 mono_w32handle_unref (MonoW32Handle *handle_data)
 {
-	gboolean destroy;
-
-	destroy = mono_w32handle_unref_core (handle_data);
-	if (destroy)
-		w32handle_destroy (handle_data);
+	mono_refcount_dec (handle_data);
 }
 
 void
