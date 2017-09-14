@@ -25,7 +25,6 @@
 #endif
 
 typedef enum {
-	MONO_W32TYPE_UNUSED = 0,
 	MONO_W32TYPE_SEM,
 	MONO_W32TYPE_MUTEX,
 	MONO_W32TYPE_EVENT,
@@ -38,7 +37,8 @@ typedef enum {
 
 typedef struct {
 	MonoW32Type type;
-	guint ref;
+	gint32 ref;
+	gint32 duplicate;
 	gboolean signalled;
 	gboolean in_use;
 	MonoCoopMutex signal_mutex;
@@ -56,7 +56,7 @@ typedef enum {
 
 typedef struct 
 {
-	void (*close)(gpointer handle, gpointer data);
+	void (*destroy)(MonoW32Handle *handle_data);
 
 	/* mono_w32handle_signal_and_wait */
 	void (*signal)(MonoW32Handle *handle_data);

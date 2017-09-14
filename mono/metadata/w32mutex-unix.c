@@ -214,7 +214,7 @@ void
 mono_w32mutex_init (void)
 {
 	static MonoW32HandleOps mutex_ops = {
-		NULL,			/* close */
+		NULL,			/* destroy */
 		mutex_handle_signal,	/* signal */
 		mutex_handle_own,	/* own */
 		mutex_handle_is_owned,	/* is_owned */
@@ -226,7 +226,7 @@ mono_w32mutex_init (void)
 	};
 
 	static MonoW32HandleOps namedmutex_ops = {
-		NULL,			/* close */
+		NULL,			/* destroy */
 		mutex_handle_signal,	/* signal */
 		mutex_handle_own,	/* own */
 		mutex_handle_is_owned,	/* is_owned */

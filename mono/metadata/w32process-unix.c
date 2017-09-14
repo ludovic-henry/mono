@@ -751,13 +751,13 @@ processes_cleanup (void)
 }
 
 static void
-process_close (gpointer handle, gpointer data)
+process_destroy (MonoW32Handle *handle_data)
 {
 	MonoW32HandleProcess *process_handle;
 
 	mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_IO_LAYER, "%s", __func__);
 
-	process_handle = (MonoW32HandleProcess *) data;
+	process_handle = (MonoW32HandleProcess *) handle_data->specific;
 	g_free (process_handle->pname);
 	process_handle->pname = NULL;
 	if (process_handle->process)
@@ -766,11 +766,11 @@ process_close (gpointer handle, gpointer data)
 }
 
 static MonoW32HandleOps process_ops = {
-	process_close,		/* close_shared */
+	process_destroy,	/* destroy */
 	NULL,				/* signal */
 	NULL,				/* own */
 	NULL,				/* is_owned */
-	process_wait,			/* special_wait */
+	process_wait,		/* special_wait */
 	NULL,				/* prewait */
 	process_details,	/* details */
 	process_typename,	/* typename */

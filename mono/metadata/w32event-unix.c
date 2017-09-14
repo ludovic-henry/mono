@@ -113,7 +113,7 @@ void
 mono_w32event_init (void)
 {
 	static MonoW32HandleOps event_ops = {
-		NULL,			/* close */
+		NULL,			/* destroy */
 		event_handle_signal,		/* signal */
 		event_handle_own,		/* own */
 		NULL,			/* is_owned */
@@ -125,7 +125,7 @@ mono_w32event_init (void)
 	};
 
 	static MonoW32HandleOps namedevent_ops = {
-		NULL,			/* close */
+		NULL,			/* destroy */
 		event_handle_signal,	/* signal */
 		event_handle_own,		/* own */
 		NULL,			/* is_owned */

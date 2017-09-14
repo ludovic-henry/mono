@@ -104,7 +104,7 @@ void
 mono_w32semaphore_init (void)
 {
 	static MonoW32HandleOps sem_ops = {
-		NULL,			/* close */
+		NULL,			/* destroy */
 		sem_handle_signal,		/* signal */
 		sem_handle_own,		/* own */
 		NULL,			/* is_owned */
@@ -116,7 +116,7 @@ mono_w32semaphore_init (void)
 	};
 
 	static MonoW32HandleOps namedsem_ops = {
-		NULL,			/* close */
+		NULL,			/* destroy */
 		sem_handle_signal,	/* signal */
 		sem_handle_own,		/* own */
 		NULL,			/* is_owned */
