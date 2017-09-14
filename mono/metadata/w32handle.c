@@ -27,8 +27,7 @@
 static MonoW32HandleCapability handle_caps [MONO_W32TYPE_COUNT];
 static MonoW32HandleOps *handle_ops [MONO_W32TYPE_COUNT];
 
-static GHashTable *handles_table;
-static MonoCoopMutex handles_mutex;
+static MonoRefHandleTable *handles_table;
 
 /*
  * This is an internal handle which is used for handling waiting for multiple handles.
@@ -132,209 +131,6 @@ void
 mono_w32handle_unlock (MonoW32Handle *handle_data)
 {
 	mono_coop_mutex_unlock (&handle_data->signal_mutex);
-}
-
-static void
-handles_remove (gpointer data)
-{
-	MonoW32Handle *handle_data;
-
-	handle_data = (MonoW32Handle*) data;
-	g_assert (handle_data);
-
-	mono_w32handle_unref (handle_data);
-}
-
-void
-mono_w32handle_init (void)
-{
-	static gboolean initialized = FALSE;
-
-	if (initialized)
-		return;
-
-	g_assert ((sizeof (handle_ops) / sizeof (handle_ops[0]))
-		  == MONO_W32TYPE_COUNT);
-
-	handles_table = g_hash_table_new_full (NULL, NULL, NULL, handles_remove);
-	mono_coop_mutex_init (&handles_mutex);
-
-	mono_coop_cond_init (&global_signal_cond);
-	mono_coop_mutex_init (&global_signal_mutex);
-
-	initialized = TRUE;
-}
-
-void
-mono_w32handle_cleanup (void)
-{
-	g_hash_table_destroy (handles_table);
-	mono_coop_mutex_destroy (&handles_mutex);
-}
-
-static void
-mono_w32handle_ops_destroy (MonoW32Handle *handle_data);
-
-static void
-w32handle_destroy (gpointer data)
-{
-	MonoW32Handle *handle_data;
-
-	handle_data = (MonoW32Handle*) data;
-	g_assert (handle_data);
-
-	g_assert (!handle_data->in_use);
-
-	mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_W32HANDLE, "%s: destroy %s handle %p", __func__, mono_w32handle_ops_typename (handle_data->type), handle_data);
-
-	mono_w32handle_ops_destroy (handle_data);
-
-	mono_coop_mutex_destroy (&handle_data->signal_mutex);
-	mono_coop_cond_destroy (&handle_data->signal_cond);
-
-	g_free (handle_data->specific);
-	g_free (handle_data);
-}
-
-static gsize
-mono_w32handle_ops_typesize (MonoW32Type type);
-
-
-gpointer
-mono_w32handle_new (MonoW32Type type, gpointer handle_specific)
-{
-	MonoW32Handle *handle_data;
-
-	handle_data = g_new0 (MonoW32Handle, 1);
-	mono_refcount_init (handle_data, w32handle_destroy);
-	handle_data->type = type;
-	handle_data->signalled = FALSE;
-	mono_coop_cond_init (&handle_data->signal_cond);
-	mono_coop_mutex_init (&handle_data->signal_mutex);
-	if (handle_specific)
-		handle_data->specific = g_memdup (handle_specific, mono_w32handle_ops_typesize (type));
-
-	mono_coop_mutex_lock (&handles_mutex);
-
-	if (g_hash_table_lookup_extended (handles_table, (gpointer) handle_data, NULL, NULL))
-		g_error("%s: duplicate %s handle %p", __func__, mono_w32handle_get_typename (type), (gpointer) handle_data);
-
-	g_hash_table_insert (handles_table, (gpointer) handle_data, handle_data);
-
-	mono_coop_mutex_unlock (&handles_mutex);
-
-	mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_W32HANDLE, "%s: create %s handle %p", __func__, mono_w32handle_ops_typename (type), handle_data);
-
-	return (gpointer) handle_data;
-}
-
-gpointer
-mono_w32handle_duplicate (MonoW32Handle *handle_data)
-{
-	gint32 old, new;
-
-	do {
-		old = handle_data->duplicate;
-		g_assert (old >= 0);
-		g_assert (old < G_MAXINT32);
-
-		new = old + 1;
-	} while (InterlockedCompareExchange (&handle_data->duplicate, new, old) != old);
-
-	mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_W32HANDLE, "%s: duplicate %s handle %p, duplicate: %d -> %d",
-		__func__, mono_w32handle_ops_typename (handle_data->type), handle_data, old, new);
-
-	return (gpointer) handle_data;
-}
-
-gboolean
-mono_w32handle_close (gpointer handle)
-{
-	MonoW32Handle *handle_data;
-	gint32 old, new;
-	gboolean remove;
-
-	if (!mono_w32handle_lookup_and_ref (handle, &handle_data))
-		return FALSE;
-
-	remove = FALSE;
-
-	do {
-		old = handle_data->duplicate;
-		g_assert (old >= 0);
-		g_assert (old <= G_MAXINT32);
-
-		if (old == 0) {
-			remove = TRUE;
-			break;
-		}
-
-		new = old - 1;
-	} while (InterlockedCompareExchange (&handle_data->duplicate, new, old) != old);
-
-	mono_w32handle_unref (handle);
-
-	if (remove) {
-		gboolean removed;
-
-		mono_coop_mutex_lock (&handles_mutex);
-
-		if (!g_hash_table_lookup_extended (handles_table, handle, NULL, (gpointer*) &handle_data)) {
-			mono_coop_mutex_unlock (&handles_mutex);
-			return FALSE;
-		}
-
-		removed = g_hash_table_remove (handles_table, (gpointer) handle_data);
-		g_assert (removed);
-
-		mono_coop_mutex_unlock (&handles_mutex);
-	}
-
-	return TRUE;
-}
-
-void
-mono_w32handle_foreach (gboolean (*on_each)(MonoW32Handle *handle_data, gpointer user_data), gpointer user_data)
-{
-	MonoW32Handle *handle_data;
-	GHashTableIter iter;
-
-	g_hash_table_iter_init (&iter, handles_table);
-
-	mono_coop_mutex_lock (&handles_mutex);
-
-	while (g_hash_table_iter_next (&iter, NULL, (gpointer*) &handle_data)) {
-		if (on_each (handle_data, user_data))
-			break;
-	}
-
-	mono_coop_mutex_unlock (&handles_mutex);
-}
-
-gboolean
-mono_w32handle_lookup_and_ref (gpointer handle, MonoW32Handle **handle_data)
-{
-	g_assert (handle_data);
-
-	mono_coop_mutex_lock (&handles_mutex);
-
-	if (!g_hash_table_lookup_extended (handles_table, handle, NULL, (gpointer*) handle_data)) {
-		mono_coop_mutex_unlock (&handles_mutex);
-		return FALSE;
-	}
-
-	mono_refcount_inc (*handle_data);
-
-	mono_coop_mutex_unlock (&handles_mutex);
-
-	return TRUE;
-}
-
-/* The handle must not be locked on entry to this function */
-void
-mono_w32handle_unref (MonoW32Handle *handle_data)
-{
-	mono_refcount_dec (handle_data);
 }
 
 void
@@ -611,22 +407,6 @@ mono_w32handle_timedwait_signal_handle (MonoW32Handle *handle_data, guint32 time
 	}
 
 	return res;
-}
-
-static gboolean
-dump_callback (MonoW32Handle *handle_data, gpointer user_data)
-{
-	g_print ("%p [%7s] signalled: %5s ref: %3d ",
-		handle_data, mono_w32handle_ops_typename (handle_data->type), handle_data->signalled ? "true" : "false", handle_data->ref);
-	mono_w32handle_ops_details (handle_data);
-	g_print ("\n");
-
-	return FALSE;
-}
-
-void mono_w32handle_dump (void)
-{
-	mono_w32handle_foreach (dump_callback, NULL);
 }
 
 static gboolean
@@ -1034,4 +814,163 @@ done:
 	mono_w32handle_unref (signal_handle_data);
 
 	return ret;
+}
+
+static void
+w32handle_close (MonoRefHandle *refhandle)
+{
+}
+
+static void
+w32handle_destroy (MonoRefHandle *refhandle)
+{
+	MonoW32Handle *handle_data;
+
+	handle_data = (MonoW32Handle*) refhandle;
+	g_assert (handle_data);
+
+	g_assert (!handle_data->in_use);
+
+	mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_W32HANDLE, "%s: destroy %s handle %p", __func__, mono_w32handle_ops_typename (handle_data->type), handle_data);
+
+	mono_w32handle_ops_destroy (handle_data);
+
+	mono_coop_mutex_destroy (&handle_data->signal_mutex);
+	mono_coop_cond_destroy (&handle_data->signal_cond);
+
+	g_free (handle_data->specific);
+	g_free (handle_data);
+}
+
+gpointer
+mono_w32handle_new (MonoW32Type type, gpointer handle_specific)
+{
+	MonoW32Handle *handle_data;
+
+	handle_data = g_new0 (MonoW32Handle, 1);
+	mono_refhandle_init ((MonoRefHandle*) handle_data, w32handle_destroy);
+	handle_data->type = type;
+	handle_data->signalled = FALSE;
+	mono_coop_cond_init (&handle_data->signal_cond);
+	mono_coop_mutex_init (&handle_data->signal_mutex);
+	if (handle_specific)
+		handle_data->specific = g_memdup (handle_specific, mono_w32handle_ops_typesize (type));
+
+	mono_reftable_insert (handles_table, (gpointer) handle_data, (MonoRefHandle*) handle_data);
+
+	mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_W32HANDLE, "%s: create %s handle %p", __func__, mono_w32handle_ops_typename (type), handle_data);
+
+	return (gpointer) handle_data;
+}
+
+gpointer
+mono_w32handle_duplicate (MonoW32Handle *handle_data)
+{
+	gint32 old, new;
+
+	do {
+		old = handle_data->duplicate;
+		g_assert (old >= 0);
+		g_assert (old < G_MAXINT32);
+
+		new = old + 1;
+	} while (InterlockedCompareExchange (&handle_data->duplicate, new, old) != old);
+
+	mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_W32HANDLE, "%s: duplicate %s handle %p, duplicate: %d -> %d",
+		__func__, mono_w32handle_ops_typename (handle_data->type), handle_data, old, new);
+
+	return (gpointer) handle_data;
+}
+
+gboolean
+mono_w32handle_close (gpointer handle)
+{
+	MonoW32Handle *handle_data;
+	gint32 old, new;
+	gboolean remove;
+
+	if (!mono_w32handle_lookup_and_ref (handle, &handle_data))
+		return FALSE;
+
+	remove = FALSE;
+
+	do {
+		old = handle_data->duplicate;
+		g_assert (old >= 0);
+		g_assert (old <= G_MAXINT32);
+
+		if (old == 0) {
+			remove = TRUE;
+			break;
+		}
+
+		new = old - 1;
+	} while (InterlockedCompareExchange (&handle_data->duplicate, new, old) != old);
+
+	mono_w32handle_unref (handle);
+
+	if (remove)
+		return mono_reftable_remove (handles_table, handle);
+
+	return TRUE;
+}
+
+void
+mono_w32handle_foreach (gboolean (*on_each)(MonoW32Handle *handle_data, gpointer user_data), gpointer user_data)
+{
+	mono_reftable_foreach (handles_table, (gboolean (*) (MonoRefHandle *refhandle, gpointer user_data)) on_each, user_data);
+}
+
+gboolean
+mono_w32handle_lookup_and_ref (gpointer handle, MonoW32Handle **handle_data)
+{
+	return mono_reftable_lookup_and_ref (handles_table, handle, (MonoRefHandle**) handle_data);
+}
+
+/* The handle must not be locked on entry to this function */
+void
+mono_w32handle_unref (MonoW32Handle *handle_data)
+{
+	mono_refhandle_unref ((MonoRefHandle*) handle_data);
+}
+
+static gboolean
+dump_callback (MonoW32Handle *handle_data, gpointer user_data)
+{
+	g_print ("%p [%7s] signalled: %5s duplicate: %3d ",
+		handle_data, mono_w32handle_ops_typename (handle_data->type), handle_data->signalled ? "true" : "false", handle_data->duplicate);
+	mono_w32handle_ops_details (handle_data);
+	g_print ("\n");
+
+	return FALSE;
+}
+
+void mono_w32handle_dump (void)
+{
+	mono_w32handle_foreach (dump_callback, NULL);
+}
+
+void
+mono_w32handle_init (void)
+{
+	static gboolean initialized = FALSE;
+
+	if (initialized)
+		return;
+
+	handles_table = mono_reftable_new (w32handle_close);
+
+	mono_coop_cond_init (&global_signal_cond);
+	mono_coop_mutex_init (&global_signal_mutex);
+
+	initialized = TRUE;
+}
+
+void
+mono_w32handle_cleanup (void)
+{
+	mono_reftable_destroy (handles_table);
+
+	// mono_coop_cond_destroy (&global_signal_cond);
+	// mono_coop_mutex_destroy (&global_signal_mutex);
 }

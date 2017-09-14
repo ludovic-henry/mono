@@ -40,6 +40,7 @@
 #include "w32file-unix-glob.h"
 #include "w32error.h"
 #include "fdhandle.h"
+#include "refhandle.h"
 #include "utils/mono-io-portability.h"
 #include "utils/mono-logger-internals.h"
 #include "utils/mono-os-mutex.h"
@@ -72,7 +73,7 @@ typedef struct {
 } FileHandle;
 
 typedef struct {
-	MonoRefCount ref;
+	MonoRefHandle refhandle;
 	MonoCoopMutex mutex;
 	gchar **namelist;
 	gchar *dir_part;
@@ -88,8 +89,7 @@ typedef struct {
 static GHashTable *file_share_table;
 static MonoCoopMutex file_share_mutex;
 
-static GHashTable *finds;
-static MonoCoopMutex finds_mutex;
+static MonoRefHandleTable *findhandles_table;
 
 static void
 time_t_to_filetime (time_t timeval, FILETIME *filetime)
@@ -2997,11 +2997,16 @@ mono_w32file_filetime_to_systemtime(const FILETIME *file_time, SYSTEMTIME *syste
 }
 
 static void
-findhandle_destroy (gpointer data)
+findhandle_close (MonoRefHandle *refhandle)
+{
+}
+
+static void
+findhandle_destroy (MonoRefHandle *refhandle)
 {
 	FindHandle *findhandle;
 
-	findhandle = (FindHandle*) data;
+	findhandle = (FindHandle*) refhandle;
 	g_assert (findhandle);
 
 	mono_coop_mutex_destroy (&findhandle->mutex);
@@ -3020,69 +3025,11 @@ findhandle_create (void)
 	FindHandle* findhandle;
 
 	findhandle = g_new0 (FindHandle, 1);
-	mono_refcount_init (findhandle, findhandle_destroy);
+	mono_refhandle_init ((MonoRefHandle*) findhandle, findhandle_destroy);
 
 	mono_coop_mutex_init (&findhandle->mutex);
 
 	return findhandle;
-}
-
-static void
-findhandle_insert (FindHandle *findhandle)
-{
-	mono_coop_mutex_lock (&finds_mutex);
-
-	if (g_hash_table_lookup_extended (finds, (gpointer) findhandle, NULL, NULL))
-		g_error("%s: duplicate Find handle %p", __func__, (gpointer) findhandle);
-
-	g_hash_table_insert (finds, (gpointer) findhandle, findhandle);
-
-	mono_coop_mutex_unlock (&finds_mutex);
-}
-
-static gboolean
-findhandle_lookup_and_ref (gpointer handle, FindHandle **findhandle)
-{
-	mono_coop_mutex_lock (&finds_mutex);
-
-	if (!g_hash_table_lookup_extended (finds, handle, NULL, (gpointer*) findhandle)) {
-		mono_coop_mutex_unlock (&finds_mutex);
-		return FALSE;
-	}
-
-	mono_refcount_inc (*findhandle);
-
-	mono_coop_mutex_unlock (&finds_mutex);
-
-	return TRUE;
-}
-
-static void
-findhandle_unref (FindHandle *findhandle)
-{
-	mono_refcount_dec (findhandle);
-}
-
-static gboolean
-findhandle_close (gpointer handle)
-{
-	FindHandle *findhandle;
-	gboolean removed;
-
-	mono_coop_mutex_lock (&finds_mutex);
-
-	if (!g_hash_table_lookup_extended (finds, handle, NULL, (gpointer*) &findhandle)) {
-		mono_coop_mutex_unlock (&finds_mutex);
-
-		return FALSE;
-	}
-
-	removed = g_hash_table_remove (finds, (gpointer) findhandle);
-	g_assert (removed);
-
-	mono_coop_mutex_unlock (&finds_mutex);
-
-	return TRUE;
 }
 
 gpointer
@@ -3184,7 +3131,7 @@ mono_w32file_find_first (const gunichar2 *pattern, WIN32_FIND_DATA *find_data)
 	findhandle->num = result;
 	findhandle->count = 0;
 
-	findhandle_insert (findhandle);
+	mono_reftable_insert (findhandles_table, (gpointer) findhandle, (MonoRefHandle*) findhandle);
 
 	if (!mono_w32file_find_next ((gpointer) findhandle, find_data)) {
 		mono_w32file_find_close ((gpointer) findhandle);
@@ -3208,7 +3155,7 @@ mono_w32file_find_next (gpointer handle, WIN32_FIND_DATA *find_data)
 	glong bytes;
 	gboolean ret = FALSE;
 
-	if (!findhandle_lookup_and_ref (handle, &findhandle)) {
+	if (!mono_reftable_lookup_and_ref (findhandles_table, handle, (MonoRefHandle**) &findhandle)) {
 		mono_w32error_set_last (ERROR_INVALID_HANDLE);
 		return FALSE;
 	}
@@ -3315,7 +3262,7 @@ retry:
 cleanup:
 	mono_coop_mutex_unlock (&findhandle->mutex);
 
-	findhandle_unref (findhandle);
+	mono_refhandle_unref ((MonoRefHandle*) findhandle);
 	
 	return(ret);
 }
@@ -3323,7 +3270,7 @@ cleanup:
 gboolean
 mono_w32file_find_close (gpointer handle)
 {
-	if (!findhandle_close (handle)) {
+	if (!mono_reftable_remove (findhandles_table, handle)) {
 		mono_w32error_set_last (ERROR_INVALID_HANDLE);
 		return FALSE;
 	}
@@ -4716,8 +4663,7 @@ mono_w32file_init (void)
 
 	mono_coop_mutex_init (&file_share_mutex);
 
-	finds = g_hash_table_new (g_direct_hash, g_direct_equal);
-	mono_coop_mutex_init (&finds_mutex);
+	findhandles_table = mono_reftable_new (findhandle_close);
 
 	if (g_hasenv ("MONO_STRICT_IO_EMULATION"))
 		lock_while_writing = TRUE;
@@ -4731,8 +4677,7 @@ mono_w32file_cleanup (void)
 	if (file_share_table)
 		g_hash_table_destroy (file_share_table);
 
-	g_hash_table_destroy (finds);
-	mono_coop_mutex_destroy (&finds_mutex);
+	mono_reftable_destroy (findhandles_table);
 }
 
 gboolean

@@ -5,7 +5,7 @@
 #include <config.h>
 #include <glib.h>
 
-#include "utils/refcount.h"
+#include "refhandle.h"
 
 typedef enum {
 	MONO_FDTYPE_FILE,
@@ -16,7 +16,7 @@ typedef enum {
 } MonoFDType;
 
 typedef struct {
-	MonoRefCount ref;
+	MonoRefHandle refhandle;
 	MonoFDType type;
 	gint fd;
 } MonoFDHandle;

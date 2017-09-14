@@ -1,40 +1,40 @@
 
 #include "fdhandle.h"
-#include "utils/mono-lazy-init.h"
-#include "utils/mono-coop-mutex.h"
 
-static GHashTable *fds;
-static MonoCoopMutex fds_mutex;
+#include "utils/mono-lazy-init.h"
+
+static MonoRefHandleTable *fdhandles_table;
 static MonoFDHandleCallback fds_callback[MONO_FDTYPE_COUNT];
 static mono_lazy_init_t fds_init = MONO_LAZY_INIT_STATUS_NOT_INITIALIZED;
 
-static const gchar *types_str[] = {
-	"File",
-	"Console",
-	"Pipe",
-	"Socket",
-	NULL
-};
-
 static void
-fds_remove (gpointer data)
+fdhandle_close (MonoRefHandle *refhandle)
 {
 	MonoFDHandle* fdhandle;
 
-	fdhandle = (MonoFDHandle*) data;
+	fdhandle = (MonoFDHandle*) refhandle;
 	g_assert (fdhandle);
 
 	g_assert (fds_callback [fdhandle->type].close);
 	fds_callback [fdhandle->type].close (fdhandle);
+}
 
-	mono_refcount_dec (fdhandle);
+static void
+fdhandle_destroy (MonoRefHandle *refhandle)
+{
+	MonoFDHandle* fdhandle;
+
+	fdhandle = (MonoFDHandle*) refhandle;
+	g_assert (fdhandle);
+
+	g_assert (fds_callback [fdhandle->type].destroy);
+	fds_callback [fdhandle->type].destroy (fdhandle);
 }
 
 static void
 initialize (void)
 {
-	fds = g_hash_table_new_full (g_direct_hash, g_direct_equal, NULL, fds_remove);
-	mono_coop_mutex_init (&fds_mutex);
+	fdhandles_table = mono_reftable_new (fdhandle_close);
 }
 
 void
@@ -44,22 +44,10 @@ mono_fdhandle_register (MonoFDType type, MonoFDHandleCallback *callback)
 	memcpy (&fds_callback [type], callback, sizeof (MonoFDHandleCallback));
 }
 
-static void
-fdhandle_destroy (gpointer data)
-{
-	MonoFDHandle* fdhandle;
-
-	fdhandle = (MonoFDHandle*) data;
-	g_assert (fdhandle);
-
-	g_assert (fds_callback [fdhandle->type].destroy);
-	fds_callback [fdhandle->type].destroy (fdhandle);
-}
-
 void
 mono_fdhandle_init (MonoFDHandle *fdhandle, MonoFDType type, gint fd)
 {
-	mono_refcount_init (fdhandle, fdhandle_destroy);
+	mono_refhandle_init ((MonoRefHandle*) fdhandle, fdhandle_destroy);
 	fdhandle->type = type;
 	fdhandle->fd = fd;
 }
@@ -67,76 +55,29 @@ mono_fdhandle_init (MonoFDHandle *fdhandle, MonoFDType type, gint fd)
 void
 mono_fdhandle_insert (MonoFDHandle *fdhandle)
 {
-	mono_coop_mutex_lock (&fds_mutex);
-
-	if (g_hash_table_lookup_extended (fds, GINT_TO_POINTER(fdhandle->fd), NULL, NULL))
-		g_error("%s: duplicate %s fd %d", __func__, types_str [fdhandle->type], fdhandle->fd);
-
-	g_hash_table_insert (fds, GINT_TO_POINTER(fdhandle->fd), fdhandle);
-
-	mono_coop_mutex_unlock (&fds_mutex);
+	mono_reftable_insert (fdhandles_table, GINT_TO_POINTER(fdhandle->fd), (MonoRefHandle*) fdhandle);
 }
 
 gboolean
 mono_fdhandle_try_insert (MonoFDHandle *fdhandle)
 {
-	mono_coop_mutex_lock (&fds_mutex);
-
-	if (g_hash_table_lookup_extended (fds, GINT_TO_POINTER(fdhandle->fd), NULL, NULL)) {
-		/* we raced between 2 invocations of mono_fdhandle_try_insert */
-		mono_coop_mutex_unlock (&fds_mutex);
-
-		return FALSE;
-	}
-
-	g_hash_table_insert (fds, GINT_TO_POINTER(fdhandle->fd), fdhandle);
-
-	mono_coop_mutex_unlock (&fds_mutex);
-
-	return TRUE;
+	return mono_reftable_try_insert (fdhandles_table, GINT_TO_POINTER(fdhandle->fd), (MonoRefHandle*) fdhandle);
 }
 
 gboolean
 mono_fdhandle_lookup_and_ref (gint fd, MonoFDHandle **fdhandle)
 {
-	mono_coop_mutex_lock (&fds_mutex);
-
-	if (!g_hash_table_lookup_extended (fds, GINT_TO_POINTER(fd), NULL, (gpointer*) fdhandle)) {
-		mono_coop_mutex_unlock (&fds_mutex);
-		return FALSE;
-	}
-
-	mono_refcount_inc (*fdhandle);
-
-	mono_coop_mutex_unlock (&fds_mutex);
-
-	return TRUE;
+	return mono_reftable_lookup_and_ref (fdhandles_table, GINT_TO_POINTER(fd), (MonoRefHandle**) fdhandle);
 }
 
 void
 mono_fdhandle_unref (MonoFDHandle *fdhandle)
 {
-	mono_refcount_dec (fdhandle);
+	mono_refhandle_unref ((MonoRefHandle*) fdhandle);
 }
 
 gboolean
 mono_fdhandle_close (gint fd)
 {
-	MonoFDHandle *fdhandle;
-	gboolean removed;
-
-	mono_coop_mutex_lock (&fds_mutex);
-
-	if (!g_hash_table_lookup_extended (fds, GINT_TO_POINTER(fd), NULL, (gpointer*) &fdhandle)) {
-		mono_coop_mutex_unlock (&fds_mutex);
-
-		return FALSE;
-	}
-
-	removed = g_hash_table_remove (fds, GINT_TO_POINTER(fdhandle->fd));
-	g_assert (removed);
-
-	mono_coop_mutex_unlock (&fds_mutex);
-
-	return TRUE;
+	return mono_reftable_remove (fdhandles_table, GINT_TO_POINTER (fd));
 }
