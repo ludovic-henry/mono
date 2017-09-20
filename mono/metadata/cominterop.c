@@ -378,21 +378,18 @@ cominterop_get_method_interface (MonoMethod* method)
 		}
 	}
 
-	if (!ic) 
-		g_assert (ic);
-	g_assert (MONO_CLASS_IS_INTERFACE (ic));
-
 	return ic;
 }
 
 /**
  * cominterop_get_com_slot_for_method:
  * @method: a method
+ * @error: pointer to a bool indicating whether the lookup was successful or not; all failures will be considered fatal if it's set to null.
  *
  * Returns: the method's slot in the COM interface vtable
  */
 static int
-cominterop_get_com_slot_for_method (MonoMethod* method)
+cominterop_get_com_slot_for_method (MonoMethod* method, gboolean* error)
 {
 	guint32 slot = method->slot;
  	MonoClass *ic = method->klass;
@@ -402,6 +399,14 @@ cominterop_get_com_slot_for_method (MonoMethod* method)
 		int offset = 0;
 		int i = 0;
 		ic = cominterop_get_method_interface (method);
+		if (!ic || !MONO_CLASS_IS_INTERFACE (ic)) {
+			if (error) {
+				*error = TRUE;
+				return -1;
+			}
+			else
+				g_assert (0);
+		}
 		offset = mono_class_interface_offset (method->klass, ic);
 		g_assert(offset >= 0);
 		int mcount = mono_class_get_method_count (ic);
@@ -414,8 +419,8 @@ cominterop_get_com_slot_for_method (MonoMethod* method)
 		}
 	}
 
-	g_assert (ic);
-	g_assert (MONO_CLASS_IS_INTERFACE (ic));
+	if (error)
+		*error = FALSE;
 
 	return slot + cominterop_get_com_slot_begin (ic);
 }
@@ -643,11 +648,24 @@ void
 mono_mb_emit_cominterop_get_function_pointer (MonoMethodBuilder *mb, MonoMethod *method)
 {
 #ifndef DISABLE_JIT
+	int slot;
+	gboolean error;
 	// get function pointer from 1st arg, the COM interface pointer
 	mono_mb_emit_ldarg (mb, 0);
-	mono_mb_emit_icon (mb, cominterop_get_com_slot_for_method (method));
-	mono_mb_emit_icall (mb, cominterop_get_function_pointer);
-	/* Leaves the function pointer on top of the stack */
+	slot = cominterop_get_com_slot_for_method (method, &error);
+	if (!error) {
+		mono_mb_emit_icon (mb, slot);
+		mono_mb_emit_icall (mb, cominterop_get_function_pointer);
+		/* Leaves the function pointer on top of the stack */
+	}
+	else {
+		/*
+		 * This code should never be executed and all invalid COM objects should be sieved out during their creation.
+		 * However, it will be emitted as a safeguard for cases when a method tries to interact with an invalid COM object from an unreachable basic block.
+		 */
+		char *msg = g_strdup_printf ("Unable to locate the interface on which method %s is defined.", mono_method_get_full_name (method));
+		mono_mb_emit_exception (mb, "SystemException", msg);
+	}
 #endif
 }
 
@@ -1706,7 +1724,10 @@ guint32
 ves_icall_System_Runtime_InteropServices_Marshal_GetComSlotForMethodInfoInternal (MonoReflectionMethod *m)
 {
 #ifndef DISABLE_COM
-	return cominterop_get_com_slot_for_method (m->method);
+	gboolean error;
+	int slot = cominterop_get_com_slot_for_method (m->method, &error);
+	g_assert (!error);
+	return slot;
 #else
 	g_assert_not_reached ();
 #endif
