@@ -593,7 +593,8 @@ TESTS_IL_SRC=			\
 	gsharing-valuetype-layout.il	\
 	invalid_generic_instantiation.il \
 	bug-45841-fpstack-exceptions.il \
-	instance_tailrec.il
+	instance_tailrec.il \
+	bug-8477.il
 
 TESTS_GSHARED_SRC = \
 	generics-sharing.2.cs	\
