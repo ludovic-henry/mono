@@ -412,7 +412,7 @@ struct _MonoInternalThread {
 	MonoThreadManageCallback manage_callback;
 	gpointer unused4;
 	gsize    flags;
-	gpointer thread_pinning_ref;
+	gpointer thread_pinning_handle;
 	gsize __abort_protected_block_count;
 	gint32 priority;
 	GPtrArray *owned_mutexes;

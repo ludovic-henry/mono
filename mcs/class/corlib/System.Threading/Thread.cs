@@ -83,7 +83,7 @@ namespace System.Threading {
 		private IntPtr manage_callback;
 		private IntPtr unused4;
 		private IntPtr flags;
-		private IntPtr thread_pinning_ref;
+		private IntPtr thread_pinning_handle;
 		private IntPtr abort_protected_block_count;
 		private int priority = (int) ThreadPriority.Normal;
 		private IntPtr owned_mutex;

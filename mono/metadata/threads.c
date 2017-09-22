@@ -559,8 +559,7 @@ create_internal_thread_object (void)
 	thread->apartment_state = ThreadApartmentState_Unknown;
 	thread->managed_id = get_next_managed_thread_id ();
 	if (mono_gc_is_moving ()) {
-		thread->thread_pinning_ref = thread;
-		MONO_GC_REGISTER_ROOT_PINNING (thread->thread_pinning_ref, MONO_ROOT_SOURCE_THREADING, NULL, "Thread Pinning Reference");
+		thread->thread_pinning_handle = GUINT_TO_POINTER (mono_gchandle_new ((MonoObject*) thread, TRUE));
 	}
 
 	thread->priority = MONO_THREAD_PRIORITY_NORMAL;
@@ -889,8 +888,8 @@ mono_thread_detach_internal (MonoInternalThread *thread)
 	mono_memory_barrier ();
 
 	if (mono_gc_is_moving ()) {
-		MONO_GC_UNREGISTER_ROOT (thread->thread_pinning_ref);
-		thread->thread_pinning_ref = NULL;
+		mono_gchandle_free (GPOINTER_TO_UINT (thread->thread_pinning_handle));
+		thread->thread_pinning_handle = NULL;
 	}
 
 	/* There is no more any guarantee that `thread` is alive */
