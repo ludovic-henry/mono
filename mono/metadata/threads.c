@@ -896,7 +896,6 @@ mono_thread_detach_internal (MonoInternalThread *thread)
 	mono_memory_barrier ();
 
 	SET_CURRENT_OBJECT (NULL);
-	mono_domain_unset ();
 
 	if (!mono_thread_info_try_get_internal_thread_gchandle (info, &gchandle))
 		g_error ("%s: failed to get gchandle, info = %p", __func__, info);
