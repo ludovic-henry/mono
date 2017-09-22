@@ -1294,7 +1294,6 @@ mono_thread_attach (MonoDomain *domain)
 	MonoInternalThread *internal;
 	MonoThread *thread;
 	MonoThreadInfo *info;
-	MonoNativeThreadId tid;
 
 	if (mono_thread_internal_current_is_attached ()) {
 		if (domain != mono_domain_get ())
@@ -1306,8 +1305,6 @@ mono_thread_attach (MonoDomain *domain)
 	info = mono_thread_info_attach ();
 	g_assert (info);
 
-	tid=mono_native_thread_id_get ();
-
 	internal = create_internal_thread_object ();
 
 	thread = create_thread_object (domain, internal);
@@ -1318,12 +1315,12 @@ mono_thread_attach (MonoDomain *domain)
 			mono_thread_info_sleep (10000, NULL);
 	}
 
-	THREAD_DEBUG (g_message ("%s: Attached thread ID %"G_GSIZE_FORMAT" (handle %p)", __func__, tid, internal->handle));
+	THREAD_DEBUG (g_message ("%s: Attached thread ID %"G_GSIZE_FORMAT" (handle %p)", __func__, thread_get_tid (internal), internal->handle));
 
 	if (mono_thread_attach_cb)
-		mono_thread_attach_cb (MONO_NATIVE_THREAD_ID_TO_UINT (tid), info->stack_end);
+		mono_thread_attach_cb ((intptr_t) thread_get_tid (internal), info->stack_end);
 
-	fire_attach_profiler_events (tid);
+	fire_attach_profiler_events (thread_get_tid (internal));
 
 	return thread;
 }
