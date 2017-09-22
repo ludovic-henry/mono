@@ -57,7 +57,7 @@ namespace System.Threading {
 		private int name_len; 
 		private ThreadState state;
 		private object abort_exc;
-		private int abort_state_handle;
+		private IntPtr abort_state_handle;
 		/* thread_id is only accessed from unmanaged code */
 		internal Int64 thread_id;
 		private IntPtr debugger_thread; // FIXME switch to bool as soon as CI testing with corlib version bump works

@@ -389,7 +389,7 @@ struct _MonoInternalThread {
 	guint32	    name_len;
 	guint32	    state;
 	MonoException *abort_exc;
-	int abort_state_handle;
+	gpointer abort_state_handle;
 	guint64 tid;	/* This is accessed as a gsize in the code (so it can hold a 64bit pointer on systems that need it), but needs to reserve 64 bits of space on all machines as it corresponds to a field in managed code */
 	gsize debugger_thread; // FIXME switch to bool as soon as CI testing with corlib version bump works
 	gpointer *static_data;

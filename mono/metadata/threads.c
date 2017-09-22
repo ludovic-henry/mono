@@ -567,6 +567,8 @@ create_internal_thread_object (void)
 	thread->suspended = g_new0 (MonoOSEvent, 1);
 	mono_os_event_init (thread->suspended, TRUE);
 
+	thread->abort_state_handle = GINT_TO_POINTER (-1);
+
 	return thread;
 }
 
@@ -779,9 +781,9 @@ mono_thread_detach_internal (MonoInternalThread *thread)
 	mono_w32mutex_abandon (thread);
 #endif
 
-	if (thread->abort_state_handle) {
-		mono_gchandle_free (thread->abort_state_handle);
-		thread->abort_state_handle = 0;
+	if (thread->abort_state_handle != GINT_TO_POINTER (-1)) {
+		mono_gchandle_free (GPOINTER_TO_UINT (thread->abort_state_handle));
+		thread->abort_state_handle = GINT_TO_POINTER (-1);
 	}
 
 	thread->abort_exc = NULL;
@@ -2356,14 +2358,15 @@ request_thread_abort (MonoInternalThread *thread, MonoObject *state, gboolean ap
 	else
 		thread->flags &= ~MONO_THREAD_FLAG_APPDOMAIN_ABORT;
 
-	if (thread->abort_state_handle)
-		mono_gchandle_free (thread->abort_state_handle);
-	if (state) {
-		thread->abort_state_handle = mono_gchandle_new (state, FALSE);
-		g_assert (thread->abort_state_handle);
-	} else {
-		thread->abort_state_handle = 0;
+	if (thread->abort_state_handle != GINT_TO_POINTER (-1)) {
+		mono_gchandle_free (GPOINTER_TO_UINT (thread->abort_state_handle));
+		thread->abort_state_handle = GINT_TO_POINTER (-1);
 	}
+	if (state) {
+		thread->abort_state_handle = GUINT_TO_POINTER (mono_gchandle_new (state, FALSE));
+		g_assert (thread->abort_state_handle != GINT_TO_POINTER (-1));
+	}
+
 	thread->abort_exc = NULL;
 
 	THREAD_DEBUG (g_message ("%s: (%"G_GSIZE_FORMAT") Abort requested for %p (%"G_GSIZE_FORMAT")", __func__, mono_native_thread_id_get (), thread, (gsize)thread->tid));
@@ -2432,11 +2435,11 @@ ves_icall_System_Threading_Thread_ResetAbort (MonoThread *this_obj)
 
 	mono_get_eh_callbacks ()->mono_clear_abort_threshold ();
 	thread->abort_exc = NULL;
-	if (thread->abort_state_handle) {
-		mono_gchandle_free (thread->abort_state_handle);
+	if (thread->abort_state_handle != GINT_TO_POINTER (-1)) {
+		mono_gchandle_free (GPOINTER_TO_UINT (thread->abort_state_handle));
 		/* This is actually not necessary - the handle
 		   only counts if the exception is set */
-		thread->abort_state_handle = 0;
+		thread->abort_state_handle = GINT_TO_POINTER (-1);
 	}
 }
 
@@ -2450,11 +2453,11 @@ mono_thread_internal_reset_abort (MonoInternalThread *thread)
 	if (thread->abort_exc) {
 		mono_get_eh_callbacks ()->mono_clear_abort_threshold ();
 		thread->abort_exc = NULL;
-		if (thread->abort_state_handle) {
-			mono_gchandle_free (thread->abort_state_handle);
+		if (thread->abort_state_handle != GINT_TO_POINTER (-1)) {
+			mono_gchandle_free (GPOINTER_TO_UINT (thread->abort_state_handle));
 			/* This is actually not necessary - the handle
 			   only counts if the exception is set */
-			thread->abort_state_handle = 0;
+			thread->abort_state_handle = GINT_TO_POINTER (-1);
 		}
 	}
 
@@ -2469,10 +2472,10 @@ ves_icall_System_Threading_Thread_GetAbortExceptionState (MonoThread *this_obj)
 	MonoObject *state, *deserialized = NULL;
 	MonoDomain *domain;
 
-	if (!thread->abort_state_handle)
+	if (thread->abort_state_handle == GINT_TO_POINTER (-1))
 		return NULL;
 
-	state = mono_gchandle_get_target (thread->abort_state_handle);
+	state = mono_gchandle_get_target (GPOINTER_TO_UINT (thread->abort_state_handle));
 	g_assert (state);
 
 	domain = mono_domain_get ();
