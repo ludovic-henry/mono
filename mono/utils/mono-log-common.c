@@ -28,6 +28,7 @@
 #endif
 #include "mono-logger-internals.h"
 #include "mono-proclib.h"
+#include "mono-threads.h"
 
 static FILE *logFile = NULL;
 static void *logUserData = NULL;
@@ -123,8 +124,9 @@ mono_log_write_logfile (const char *log_domain, GLogLevelFlags level, mono_bool 
 
 		fprintf (logFile, "%s level[%c] mono[%d]: %s\n", logTime, mapLogFileLevel (level), pid, message);
 	} else {
-		fprintf (logFile, "%s%s%s\n",
+		fprintf (logFile, "%s[thread:%p]%s%s\n",
 			log_domain != NULL ? log_domain : "",
+			(gpointer)(gsize) mono_native_thread_id_get (),
 			log_domain != NULL ? ": " : "",
 			message);
 	}

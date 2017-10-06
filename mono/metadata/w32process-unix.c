@@ -916,6 +916,7 @@ get_process_foreach_callback (MonoW32Handle *handle_data, gpointer user_data)
 {
 	GetProcessForeachData *foreach_data;
 	MonoW32HandleProcess *process_handle;
+	gpointer handle_duplicate;
 	pid_t pid;
 
 	if (handle_data->type != MONO_W32TYPE_PROCESS)
@@ -939,7 +940,11 @@ get_process_foreach_callback (MonoW32Handle *handle_data, gpointer user_data)
 	if (mono_w32handle_issignalled (handle_data))
 		return FALSE;
 
-	foreach_data->handle = mono_w32handle_duplicate (handle_data);
+	handle_duplicate = mono_w32handle_duplicate (handle_data);
+	if (handle_duplicate == INVALID_HANDLE_VALUE)
+		return FALSE;
+
+	foreach_data->handle = handle_duplicate;
 	return TRUE;
 }
 

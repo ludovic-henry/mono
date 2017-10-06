@@ -360,6 +360,13 @@ mono_w32handle_lookup_and_ref (gpointer handle, MonoW32Handle **handle_data)
 	if (!mono_w32handle_ref_core (*handle_data))
 		return FALSE;
 
+	mono_memory_barrier ();
+
+	if (InterlockedRead (&handle_data->duplicate) == 0) {
+		mono_w32handle_unref (handle_data);
+		return FALSE;
+	}
+
 	return TRUE;
 }
 
