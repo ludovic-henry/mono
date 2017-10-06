@@ -54,22 +54,6 @@ static MonoCoopMutex scan_mutex;
 
 static gboolean shutting_down = FALSE;
 
-static gboolean
-mono_w32handle_lookup_data (gpointer handle, MonoW32Handle **handle_data)
-{
-	g_assert (handle_data);
-
-	if (handle == INVALID_HANDLE_VALUE)
-		return FALSE;
-
-	*handle_data = (MonoW32Handle*) handle;
-
-	if ((*handle_data)->type == MONO_W32TYPE_UNUSED)
-		return FALSE;
-
-	return TRUE;
-}
-
 static const gchar*
 mono_w32handle_ops_typename (MonoW32Type type);
 
@@ -238,10 +222,12 @@ again:
 				if (handle_data->type == MONO_W32TYPE_UNUSED) {
 					last = count + 1;
 
+					g_assert (handle_data->duplicate == 0);
 					g_assert (handle_data->ref == 0);
 
 					handle_data->type = type;
 					handle_data->signalled = FALSE;
+					handle_data->duplicate = 1;
 					handle_data->ref = 1;
 
 					mono_coop_cond_init (&handle_data->signal_cond);
@@ -310,8 +296,20 @@ w32handle_destroy (MonoW32Handle *handle_data);
 gpointer
 mono_w32handle_duplicate (MonoW32Handle *handle_data)
 {
-	if (!mono_w32handle_ref_core (handle_data))
-		g_error ("%s: unknown handle %p", __func__, handle_data);
+	gint32 old, new;
+
+	do {
+		old = handle_data->duplicate;
+		g_assert (old >= 0);
+		g_assert (old < G_MAXINT32);
+		if (old == 0)
+			return INVALID_HANDLE_VALUE;
+
+		new = old + 1;
+	} while (InterlockedCompareExchange (&handle_data->duplicate, new, old) != old);
+
+	mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_W32HANDLE, "%s: duplicate %s handle %p, duplicate: %d -> %d",
+		__func__, mono_w32handle_ops_typename (handle_data->type), handle_data, old, new);
 
 	return (gpointer) handle_data;
 }
@@ -320,16 +318,28 @@ gboolean
 mono_w32handle_close (gpointer handle)
 {
 	MonoW32Handle *handle_data;
-	gboolean destroy;
+	gint32 old, new;
 
 	if (handle == INVALID_HANDLE_VALUE)
 		return FALSE;
-	if (!mono_w32handle_lookup_data (handle, &handle_data))
-		return FALSE;
 
-	destroy = mono_w32handle_unref_core (handle_data);
-	if (destroy)
-		w32handle_destroy (handle_data);
+	handle_data = (MonoW32Handle*) handle;
+
+	do {
+		old = handle_data->duplicate;
+		g_assert (old >= 0);
+		g_assert (old <= G_MAXINT32);
+		if (old == 0)
+			return FALSE;
+
+		new = old - 1;
+	} while (InterlockedCompareExchange (&handle_data->duplicate, new, old) != old);
+
+	mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_W32HANDLE, "%s: close %s handle %p, duplicate: %d -> %d destroy: %s",
+		__func__, mono_w32handle_ops_typename (handle_data->type), handle_data, old, new, new == 0 ? "true" : "false");
+
+	if (new == 0)
+		mono_w32handle_unref (handle_data);
 
 	return TRUE;
 }
@@ -337,7 +347,14 @@ mono_w32handle_close (gpointer handle)
 gboolean
 mono_w32handle_lookup_and_ref (gpointer handle, MonoW32Handle **handle_data)
 {
-	if (!mono_w32handle_lookup_data (handle, handle_data))
+	g_assert (handle_data);
+
+	if (handle == INVALID_HANDLE_VALUE)
+		return FALSE;
+
+	*handle_data = (MonoW32Handle*) handle;
+
+	if ((*handle_data)->type == MONO_W32TYPE_UNUSED)
 		return FALSE;
 
 	if (!mono_w32handle_ref_core (*handle_data))
@@ -408,15 +425,17 @@ done:
 static gboolean
 mono_w32handle_ref_core (MonoW32Handle *handle_data)
 {
-	guint old, new;
+	gint32 old, new;
 
 	do {
 		old = handle_data->ref;
+		g_assert (old >= 0);
+		g_assert (old < G_MAXINT32);
 		if (old == 0)
 			return FALSE;
 
 		new = old + 1;
-	} while (mono_atomic_cas_i32 ((gint32*) &handle_data->ref, (gint32)new, (gint32)old) != (gint32)old);
+	} while (mono_atomic_cas_i32 (&handle_data->ref, new, old) != old);
 
 	mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_W32HANDLE, "%s: ref %s handle %p, ref: %d -> %d",
 		__func__, mono_w32handle_ops_typename (handle_data->type), handle_data, old, new);
@@ -428,17 +447,19 @@ static gboolean
 mono_w32handle_unref_core (MonoW32Handle *handle_data)
 {
 	MonoW32Type type;
-	guint old, new;
+	gint32 old, new;
 
 	type = handle_data->type;
 
 	do {
 		old = handle_data->ref;
-		if (!(old >= 1))
+		g_assert (old >= 0);
+		g_assert (old <= G_MAXINT32);
+		if (old == 0)
 			g_error ("%s: handle %p has ref %d, it should be >= 1", __func__, handle_data, old);
 
 		new = old - 1;
-	} while (mono_atomic_cas_i32 ((gint32*) &handle_data->ref, (gint32)new, (gint32)old) != (gint32)old);
+	} while (mono_atomic_cas_i32 (&handle_data->ref, new, old) != old);
 
 	/* handle_data might contain invalid data from now on, if
 	 * another thread is unref'ing this handle at the same time */
@@ -783,8 +804,8 @@ mono_w32handle_timedwait_signal_handle (MonoW32Handle *handle_data, guint32 time
 static gboolean
 dump_callback (MonoW32Handle *handle_data, gpointer user_data)
 {
-	g_print ("%p [%7s] signalled: %5s ref: %3d ",
-		handle_data, mono_w32handle_ops_typename (handle_data->type), handle_data->signalled ? "true" : "false", handle_data->ref - 1 /* foreach increase ref by 1 */);
+	g_print ("%p [%7s] signalled: %5s duplicate: %3d ",
+		handle_data, mono_w32handle_ops_typename (handle_data->type), handle_data->signalled ? "true" : "false", handle_data->duplicate);
 	mono_w32handle_ops_details (handle_data);
 	g_print ("\n");
 

@@ -38,7 +38,8 @@ typedef enum {
 
 typedef struct {
 	MonoW32Type type;
-	guint ref;
+	gint32 duplicate;
+	gint32 ref;
 	gboolean signalled;
 	gboolean in_use;
 	MonoCoopMutex signal_mutex;
