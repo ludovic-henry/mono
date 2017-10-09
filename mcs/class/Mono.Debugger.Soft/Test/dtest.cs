@@ -38,9 +38,9 @@ public class DebuggerTests
 	}
 
 	// No other way to pass arguments to the tests ?
-	public static bool listening = Environment.GetEnvironmentVariable ("DBG_SUSPEND") != null;
-	public static string runtime = Environment.GetEnvironmentVariable ("DBG_RUNTIME");
-	public static string agent_args = Environment.GetEnvironmentVariable ("DBG_AGENT_ARGS");
+	public static readonly bool listening = Environment.GetEnvironmentVariable ("DBG_SUSPEND") != null;
+	public static readonly string runtime = Environment.GetEnvironmentVariable ("DBG_RUNTIME");
+	public static readonly string agent_args = Environment.GetEnvironmentVariable ("DBG_AGENT_ARGS");
 
 	// Not currently used, but can be useful when debugging individual tests.
 	void StackTraceDump (Event e)
@@ -2385,14 +2385,15 @@ public class DebuggerTests
 
 	[Test]
 	public void LineNumbers () {
-		Event e = run_until ("line_numbers");
+		Event e = run_until ("line_numbers"); Console.WriteLine ("[0] {0}", e.Thread.GetFrames ()[0].Location); // Void Tests:line_numbers ()+0x0 at dtest-app.cs:[1035:37-1035:38]
 
 		create_step (e);
-		e = step_into ();
+
+		e = step_into (); Console.WriteLine ("[1] {0}", e.Thread.GetFrames ()[0].Location); // Void Tests:line_numbers ()+0x1 at dtest-app.cs:[1036:3-1036:22]
 
 		Location l;
 
-		e = step_once ();
+		e = step_once (); Console.WriteLine ("[2] {0}", e.Thread.GetFrames ()[0].Location); // Void LineNumbers:ln1 ()+0x0 at dtest-app.cs:[1781:28-1781:29]
 
 		l = e.Thread.GetFrames ()[0].Location;
 
@@ -2401,32 +2402,32 @@ public class DebuggerTests
 		
 		int line_base = l.LineNumber;
 
-		e = step_once ();
-		e = step_once ();
+		e = step_once (); Console.WriteLine ("[3] {0}", e.Thread.GetFrames ()[0].Location); // Void LineNumbers:ln1 ()+0x1 at dtest-app.cs:[1783:3-1783:10]
+		e = step_once (); Console.WriteLine ("[4] {0}", e.Thread.GetFrames ()[0].Location); // Void LineNumbers:ln2 ()+0x0 at dtest-app.cs:[1788:28-1788:29]
 		l = e.Thread.GetFrames ()[0].Location;
 		Assert.AreEqual ("ln2", l.Method.Name);
 		Assert.AreEqual (line_base + 7, l.LineNumber);
 
-		e = step_once ();
-		e = step_once ();
+		e = step_once (); Console.WriteLine ("[5] {0}", e.Thread.GetFrames ()[0].Location); // Void LineNumbers:ln2 ()+0x1 at dtest-app.cs:[1789:2-1789:3]
+		e = step_once (); Console.WriteLine ("[6] {0}", e.Thread.GetFrames ()[0].Location); // Void LineNumbers:ln1 ()+0x6 at dtest-app.cs:[1783:3-1783:10]
 		l = e.Thread.GetFrames ()[0].Location;
 		Assert.AreEqual ("ln1", l.Method.Name);
 		Assert.AreEqual (line_base + 2, l.LineNumber);
 
-		e = step_once ();
-		e = step_once ();
+		e = step_once (); Console.WriteLine ("[7] {0}", e.Thread.GetFrames ()[0].Location); // Void LineNumbers:ln1 ()+0x7 at dtest-app.cs:[1784:3-1784:10]
+		e = step_once (); Console.WriteLine ("[8] {0}", e.Thread.GetFrames ()[0].Location); // Void LineNumbers:ln3 ()+0x0 at dtest-app.cs:[1792:28-1792:29]
 		l = e.Thread.GetFrames ()[0].Location;
 		Assert.AreEqual ("ln3", l.Method.Name);
 		Assert.AreEqual (line_base + 11, l.LineNumber);
 
-		e = step_once ();
-		e = step_once ();
+		e = step_once (); Console.WriteLine ("[9] {0}", e.Thread.GetFrames ()[0].Location); // Void LineNumbers:ln3 ()+0x1 at dtest-app.cs:[1794:3-1794:13]
+		e = step_once (); Console.WriteLine ("[10] {0}", e.Thread.GetFrames ()[0].Location); // Void LineNumbers:ln3 ()+0x3 at FOO:[55:2-55:3]
 		l = e.Thread.GetFrames ()[0].Location;
 		Assert.AreEqual ("ln3", l.Method.Name);
 		Assert.IsTrue (l.SourceFile.EndsWith ("FOO"));
 		Assert.AreEqual (55, l.LineNumber);
 
-		e = step_once ();
+		e = step_once (); Console.WriteLine ("[11] {0}", e.Thread.GetFrames ()[0].Location); // Void LineNumbers:ln1 ()+0xc at dtest-app.cs:[1784:3-1784:10]
 		l = e.Thread.GetFrames ()[0].Location;
 		Assert.AreEqual ("ln1", l.Method.Name);
 		Assert.AreEqual (line_base + 3, l.LineNumber);
@@ -3198,9 +3199,7 @@ public class DebuggerTests
 		step_once ();
 
 		// Step into invoke2
-		vm.Resume ();
-		e = GetNextEvent ();
-		Assert.IsTrue (e is StepEvent);
+		e = step_once ();
 		Assert.AreEqual ("invoke2", (e as StepEvent).Method.Name);
 
 		req.Disable ();
