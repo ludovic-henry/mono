@@ -20,7 +20,6 @@
 
 #include <mono/metadata/object-internals.h>
 #include <mono/metadata/w32process.h>
-#include <mono/metadata/w32process-win32-internals.h>
 #include <mono/metadata/assembly.h>
 #include <mono/metadata/appdomain.h>
 #include <mono/metadata/image.h>
@@ -54,6 +53,71 @@ mono_w32process_signal_finished (void)
 }
 
 #if G_HAVE_API_SUPPORT(HAVE_CLASSIC_WINAPI_SUPPORT)
+
+static guint32
+mono_w32process_get_pid (gpointer handle)
+{
+	return GetProcessId (handle);
+}
+
+static gboolean
+mono_w32process_try_get_modules (gpointer process, gpointer *modules, guint32 size, guint32 *needed)
+{
+	return EnumProcessModules (process, (HMODULE *) modules, size, (LPDWORD) needed);
+}
+
+static guint32
+mono_w32process_module_get_name (gpointer process, gpointer module, gunichar2 *basename, guint32 size)
+{
+	return GetModuleBaseName (process, module, basename, size);
+}
+
+static guint32
+mono_w32process_module_get_filename (gpointer process, gpointer module, gunichar2 *basename, guint32 size)
+{
+	return GetModuleFileNameEx (process, module, basename, size);
+}
+
+static gboolean
+mono_w32process_module_get_information (gpointer process, gpointer module, MODULEINFO *modinfo, guint32 size)
+{
+	return GetModuleInformation (process, module, modinfo, size);
+}
+
+static gboolean
+mono_w32process_get_fileversion_info (gunichar2 *filename, gpointer *data)
+{
+	guint32 handle;
+	gsize datasize;
+
+	g_assert (data);
+	*data = NULL;
+
+	datasize = GetFileVersionInfoSize (filename, &handle);
+	if (datasize == 0)
+		return FALSE;
+
+	*data = g_malloc0 (datasize);
+	if (!GetFileVersionInfo (filename, handle, datasize, data)) {
+		g_free (data);
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+static gboolean
+mono_w32process_ver_query_value (gconstpointer datablock, const gunichar2 *subblock, gpointer *buffer, guint32 *len)
+{
+	return VerQueryValue (datablock, subblock, buffer, len);
+}
+
+static guint32
+mono_w32process_ver_language_name (guint32 lang, gunichar2 *lang_out, guint32 lang_len)
+{
+	return VerLanguageName (lang, lang_out, lang_len);
+}
+
 HANDLE
 ves_icall_System_Diagnostics_Process_GetProcess_internal (guint32 pid)
 {
@@ -68,9 +132,7 @@ ves_icall_System_Diagnostics_Process_GetProcess_internal (guint32 pid)
 		return NULL;
 	return handle;
 }
-#endif /* G_HAVE_API_SUPPORT(HAVE_CLASSIC_WINAPI_SUPPORT | HAVE_UWP_WINAPI_SUPPORT) */
 
-#if G_HAVE_API_SUPPORT(HAVE_CLASSIC_WINAPI_SUPPORT)
 MonoBoolean
 ves_icall_System_Diagnostics_Process_ShellExecuteEx_internal (MonoW32ProcessStartInfo *proc_start_info, MonoW32ProcessInfo *process_info)
 {
@@ -122,11 +184,9 @@ ves_icall_System_Diagnostics_Process_ShellExecuteEx_internal (MonoW32ProcessStar
 
 	return ret;
 }
-#endif /* G_HAVE_API_SUPPORT(HAVE_CLASSIC_WINAPI_SUPPORT) */
 
-#if G_HAVE_API_SUPPORT(HAVE_CLASSIC_WINAPI_SUPPORT)
 static inline void
-mono_process_init_startup_info (HANDLE stdin_handle, HANDLE stdout_handle, HANDLE stderr_handle, STARTUPINFO *startinfo)
+process_init_startup_info (HANDLE stdin_handle, HANDLE stdout_handle, HANDLE stderr_handle, STARTUPINFO *startinfo)
 {
 	startinfo->cb = sizeof(STARTUPINFO);
 	startinfo->dwFlags = STARTF_USESTDHANDLES;
@@ -137,7 +197,7 @@ mono_process_init_startup_info (HANDLE stdin_handle, HANDLE stdout_handle, HANDL
 }
 
 static gboolean
-mono_process_create_process (MonoW32ProcessInfo *mono_process_info, MonoString *cmd, guint32 creation_flags,
+process_create (MonoW32ProcessInfo *mono_process_info, MonoString *cmd, guint32 creation_flags,
 	gunichar2 *env_vars, gunichar2 *dir, STARTUPINFO *start_info, PROCESS_INFORMATION *process_info)
 {
 	gboolean result = FALSE;
@@ -171,7 +231,6 @@ mono_process_create_process (MonoW32ProcessInfo *mono_process_info, MonoString *
 
 	return result;
 }
-#endif /* G_HAVE_API_SUPPORT(HAVE_CLASSIC_WINAPI_SUPPORT) */
 
 static gchar*
 process_unquote_application_name (gchar *appname)
@@ -280,7 +339,7 @@ ves_icall_System_Diagnostics_Process_CreateProcess_internal (MonoW32ProcessStart
 	MonoString *cmd = NULL;
 	guint32 creation_flags;
 
-	mono_process_init_startup_info (stdin_handle, stdout_handle, stderr_handle, &startinfo);
+	process_init_startup_info (stdin_handle, stdout_handle, stderr_handle, &startinfo);
 
 	creation_flags = CREATE_UNICODE_ENVIRONMENT;
 	if (proc_start_info->create_no_window)
@@ -328,7 +387,7 @@ ves_icall_System_Diagnostics_Process_CreateProcess_internal (MonoW32ProcessStart
 	else
 		dir = mono_string_chars (proc_start_info->working_directory);
 
-	ret = mono_process_create_process (process_info, cmd, creation_flags, env_vars, dir, &startinfo, &procinfo);
+	ret = process_create (process_info, cmd, creation_flags, env_vars, dir, &startinfo, &procinfo);
 
 	g_free (env_vars);
 
@@ -347,14 +406,6 @@ ves_icall_System_Diagnostics_Process_CreateProcess_internal (MonoW32ProcessStart
 	return ret;
 }
 
-#if G_HAVE_API_SUPPORT(HAVE_CLASSIC_WINAPI_SUPPORT)
-static inline gboolean
-mono_process_win_enum_processes (DWORD *pids, DWORD count, DWORD *needed)
-{
-	return EnumProcesses (pids, count, needed);
-}
-#endif /* G_HAVE_API_SUPPORT(HAVE_CLASSIC_WINAPI_SUPPORT) */
-
 MonoArray *
 ves_icall_System_Diagnostics_Process_GetProcesses_internal (void)
 {
@@ -368,7 +419,7 @@ ves_icall_System_Diagnostics_Process_GetProcesses_internal (void)
 	count = 512;
 	do {
 		pids = g_new0 (DWORD, count);
-		ret = mono_process_win_enum_processes (pids, count * sizeof (guint32), &needed);
+		ret = EnumProcesses (pids, count * sizeof (guint32), &needed);
 		if (ret == FALSE) {
 			MonoException *exc;
 
@@ -399,6 +450,8 @@ ves_icall_System_Diagnostics_Process_GetProcesses_internal (void)
 	return procs;
 }
 
+#endif /* G_HAVE_API_SUPPORT(HAVE_CLASSIC_WINAPI_SUPPORT) */
+
 MonoBoolean
 ves_icall_Microsoft_Win32_NativeMethods_CloseProcess (gpointer handle)
 {
@@ -418,60 +471,32 @@ ves_icall_Microsoft_Win32_NativeMethods_GetExitCodeProcess (gpointer handle, gin
 }
 
 #if G_HAVE_API_SUPPORT(HAVE_CLASSIC_WINAPI_SUPPORT)
-static inline MonoBoolean
-mono_icall_get_process_working_set_size (gpointer handle, gsize *min, gsize *max)
-{
-	return GetProcessWorkingSetSize (handle, min, max);
-}
-#endif /* G_HAVE_API_SUPPORT(HAVE_CLASSIC_WINAPI_SUPPORT) */
 
 MonoBoolean
 ves_icall_Microsoft_Win32_NativeMethods_GetProcessWorkingSetSize (gpointer handle, gsize *min, gsize *max)
 {
-	return mono_icall_get_process_working_set_size (handle, min, max);
+	return GetProcessWorkingSetSize (handle, min, max);
 }
-
-#if G_HAVE_API_SUPPORT(HAVE_CLASSIC_WINAPI_SUPPORT)
-static inline MonoBoolean
-mono_icall_set_process_working_set_size (gpointer handle, gsize min, gsize max)
-{
-	return SetProcessWorkingSetSize (handle, min, max);
-}
-#endif /* G_HAVE_API_SUPPORT(HAVE_CLASSIC_WINAPI_SUPPORT) */
 
 MonoBoolean
 ves_icall_Microsoft_Win32_NativeMethods_SetProcessWorkingSetSize (gpointer handle, gsize min, gsize max)
 {
-	return mono_icall_set_process_working_set_size (handle, min, max);
+	return SetProcessWorkingSetSize (handle, min, max);
 }
-
-#if G_HAVE_API_SUPPORT(HAVE_CLASSIC_WINAPI_SUPPORT)
-static inline gint32
-mono_icall_get_priority_class (gpointer handle)
-{
-	return GetPriorityClass (handle);
-}
-#endif /* G_HAVE_API_SUPPORT(HAVE_CLASSIC_WINAPI_SUPPORT) */
 
 gint32
 ves_icall_Microsoft_Win32_NativeMethods_GetPriorityClass (gpointer handle)
 {
-	return mono_icall_get_priority_class (handle);
+	return GetPriorityClass (handle);
 }
-
-#if G_HAVE_API_SUPPORT(HAVE_CLASSIC_WINAPI_SUPPORT)
-static inline MonoBoolean
-mono_icall_set_priority_class (gpointer handle, gint32 priorityClass)
-{
-	return SetPriorityClass (handle, (guint32) priorityClass);
-}
-#endif /* G_HAVE_API_SUPPORT(HAVE_CLASSIC_WINAPI_SUPPORT) */
 
 MonoBoolean
 ves_icall_Microsoft_Win32_NativeMethods_SetPriorityClass (gpointer handle, gint32 priorityClass)
 {
-	return mono_icall_set_priority_class (handle, priorityClass);
+	return SetPriorityClass (handle, (guint32) priorityClass);
 }
+
+#endif /* G_HAVE_API_SUPPORT(HAVE_CLASSIC_WINAPI_SUPPORT) */
 
 MonoBoolean
 ves_icall_Microsoft_Win32_NativeMethods_GetProcessTimes (gpointer handle, gint64 *creationtime, gint64 *exittime, gint64 *kerneltime, gint64 *usertime)
