@@ -4365,6 +4365,66 @@ public class DebuggerTests
 		vm = null;
 	}
 
+	[Test]
+	public void StaticCtor ()
+	{
+		Event e = run_until ("static_cctor");
+
+		create_step (e);
+		e = step_into ();
+
+		Location l;
+
+		e = step_once ();
+
+		l = e.Thread.GetFrames ()[0].Location;
+
+		Assert.AreEqual ("dtest-app.cs", Path.GetFileName (l.SourceFile));
+		Assert.AreEqual ("StaticMethod", l.Method.Name);
+		
+		// int line_base = l.LineNumber;
+
+		// e = step_once ();
+		// e = step_once ();
+		// l = e.Thread.GetFrames ()[0].Location;
+		// Assert.AreEqual ("ln2", l.Method.Name);
+		// Assert.AreEqual (line_base + 7, l.LineNumber);
+
+		// e = step_once ();
+		// e = step_once ();
+		// l = e.Thread.GetFrames ()[0].Location;
+		// Assert.AreEqual ("ln1", l.Method.Name);
+		// Assert.AreEqual (line_base + 2, l.LineNumber);
+
+		// e = step_once ();
+		// e = step_once ();
+		// l = e.Thread.GetFrames ()[0].Location;
+		// Assert.AreEqual ("ln3", l.Method.Name);
+		// Assert.AreEqual (line_base + 11, l.LineNumber);
+
+		// e = step_once ();
+		// e = step_once ();
+		// l = e.Thread.GetFrames ()[0].Location;
+		// Assert.AreEqual ("ln3", l.Method.Name);
+		// Assert.IsTrue (l.SourceFile.EndsWith ("FOO"));
+		// Assert.AreEqual (55, l.LineNumber);
+
+		// e = step_once ();
+		// l = e.Thread.GetFrames ()[0].Location;
+		// Assert.AreEqual ("ln1", l.Method.Name);
+		// Assert.AreEqual (line_base + 3, l.LineNumber);
+
+		// // GetSourceFiles ()
+		// string[] sources = l.Method.DeclaringType.GetSourceFiles ();
+		// Assert.AreEqual (2, sources.Length);
+		// Assert.AreEqual ("dtest-app.cs", sources [0]);
+		// Assert.AreEqual ("FOO", sources [1]);
+
+		// sources = l.Method.DeclaringType.GetSourceFiles (true);
+		// Assert.AreEqual (2, sources.Length);
+		// Assert.IsTrue (sources [0].EndsWith ("dtest-app.cs"));
+		// Assert.IsTrue (sources [1].EndsWith ("FOO"));
+	}
 }
 
 }

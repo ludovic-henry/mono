@@ -344,6 +344,7 @@ public class Tests : TestsBase, ITest2
 		set_ip ();
 		step_filters ();
 		local_reflect ();
+		static_cctor ();
 		if (args.Length > 0 && args [0] == "domain-test")
 			/* This takes a lot of time, so execute it conditionally */
 			domains ();
@@ -1034,6 +1035,11 @@ public class Tests : TestsBase, ITest2
 	[MethodImplAttribute (MethodImplOptions.NoInlining)]
 	public static void line_numbers () {
 		LineNumbers.ln1 ();
+	}
+
+	[MethodImplAttribute (MethodImplOptions.NoInlining)]
+	public static void static_cctor () {
+		StaticCtor.StaticMethod ();
 	}
 
 	[MethodImplAttribute (MethodImplOptions.NoInlining)]
@@ -1793,9 +1799,25 @@ public class LineNumbers
 #pragma warning disable 0219
 		int i = 5;
 #pragma warning restore 0219
-		#line 55 "FOO"
+#line 55 "FOO"
 	}
 }
 
+#line default
 
+public class StaticCtor
+{
+	static object staticField = ShouldNotBeSteppedIn();
+
+	[MethodImplAttribute (MethodImplOptions.NoInlining)]
+	static string ShouldNotBeSteppedIn()
+	{
+		return null;
+	}
+
+	[MethodImplAttribute (MethodImplOptions.NoInlining)]
+	public static void StaticMethod()
+	{
+	}
+}
 
