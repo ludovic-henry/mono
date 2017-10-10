@@ -6,7 +6,6 @@
 
 #include "w32process.h"
 #include "w32process-internals.h"
-#include "w32process-win32-internals.h"
 #include "w32file.h"
 #include "object.h"
 #include "object-internals.h"
@@ -19,73 +18,7 @@
 #define LOGDEBUG(...)
 /* define LOGDEBUG(...) g_message(__VA_ARGS__)  */
 
-#if G_HAVE_API_SUPPORT(HAVE_CLASSIC_WINAPI_SUPPORT) && defined(HOST_WIN32)
-
-static guint32
-mono_w32process_get_pid (gpointer handle)
-{
-	return GetProcessId (handle);
-}
-
-static gboolean
-mono_w32process_try_get_modules (gpointer process, gpointer *modules, guint32 size, guint32 *needed)
-{
-	return EnumProcessModules (process, (HMODULE *) modules, size, (LPDWORD) needed);
-}
-
-static guint32
-mono_w32process_module_get_name (gpointer process, gpointer module, gunichar2 *basename, guint32 size)
-{
-	return GetModuleBaseName (process, module, basename, size);
-}
-
-static guint32
-mono_w32process_module_get_filename (gpointer process, gpointer module, gunichar2 *basename, guint32 size)
-{
-	return GetModuleFileNameEx (process, module, basename, size);
-}
-
-static gboolean
-mono_w32process_module_get_information (gpointer process, gpointer module, MODULEINFO *modinfo, guint32 size)
-{
-	return GetModuleInformation (process, module, modinfo, size);
-}
-
-static gboolean
-mono_w32process_get_fileversion_info (gunichar2 *filename, gpointer *data)
-{
-	guint32 handle;
-	gsize datasize;
-
-	g_assert (data);
-	*data = NULL;
-
-	datasize = GetFileVersionInfoSize (filename, &handle);
-	if (datasize <= 0)
-		return FALSE;
-
-	*data = g_malloc0 (datasize);
-	if (!GetFileVersionInfo (filename, handle, datasize, *data)) {
-		g_free (*data);
-		return FALSE;
-	}
-
-	return TRUE;
-}
-
-static gboolean
-mono_w32process_ver_query_value (gconstpointer datablock, const gunichar2 *subblock, gpointer *buffer, guint32 *len)
-{
-	return VerQueryValue (datablock, subblock, buffer, len);
-}
-
-static guint32
-mono_w32process_ver_language_name (guint32 lang, gunichar2 *lang_out, guint32 lang_len)
-{
-	return VerLanguageName (lang, lang_out, lang_len);
-}
-
-#endif /* G_HAVE_API_SUPPORT(HAVE_CLASSIC_WINAPI_SUPPORT) && defined(HOST_WIN32) */
+#if G_HAVE_API_SUPPORT(HAVE_CLASSIC_WINAPI_SUPPORT)
 
 static MonoImage *system_image;
 
@@ -251,8 +184,6 @@ process_set_field_bool (MonoObject *obj, const gchar *fieldname, gboolean val)
 
 	*(guint8 *)(((char *)obj) + field->offset) = val;
 }
-
-#if G_HAVE_API_SUPPORT(HAVE_CLASSIC_WINAPI_SUPPORT)
 
 #define SFI_COMMENTS		"\\StringFileInfo\\%02X%02X%02X%02X\\Comments"
 #define SFI_COMPANYNAME		"\\StringFileInfo\\%02X%02X%02X%02X\\CompanyName"
@@ -423,8 +354,6 @@ cleanup:
 	g_free (data);
 }
 
-#endif /* #if G_HAVE_API_SUPPORT(HAVE_CLASSIC_WINAPI_SUPPORT) */
-
 void
 ves_icall_System_Diagnostics_FileVersionInfo_GetVersionInfo_internal (MonoObject *this_obj, MonoString *filename)
 {
@@ -443,8 +372,6 @@ ves_icall_System_Diagnostics_FileVersionInfo_GetVersionInfo_internal (MonoObject
 		mono_error_set_pending_exception (&error);
 	}
 }
-
-#if G_HAVE_API_SUPPORT(HAVE_CLASSIC_WINAPI_SUPPORT)
 
 static GPtrArray*
 get_domain_assemblies (MonoDomain *domain)
@@ -628,10 +555,6 @@ ves_icall_System_Diagnostics_Process_GetModules_internal (MonoObject *this_obj, 
 
 	return arr;
 }
-
-#endif /* G_HAVE_API_SUPPORT(HAVE_CLASSIC_WINAPI_SUPPORT) */
-
-#if G_HAVE_API_SUPPORT(HAVE_CLASSIC_WINAPI_SUPPORT)
 
 MonoString *
 ves_icall_System_Diagnostics_Process_ProcessName_internal (HANDLE process)

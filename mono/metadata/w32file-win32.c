@@ -10,7 +10,6 @@
 
 #include <winsock2.h>
 #include <windows.h>
-#include "mono/metadata/w32file-win32-internals.h"
 
 void
 mono_w32file_init (void)
