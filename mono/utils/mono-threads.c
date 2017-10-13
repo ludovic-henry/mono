@@ -393,7 +393,7 @@ register_thread (MonoThreadInfo *info)
 
 	info->stackdata = g_byte_array_new ();
 
-	info->internal_thread_gchandle = G_MAXUINT32;
+	info->internal_thread = NULL;
 
 	info->profiler_signal_ack = 1;
 
@@ -682,30 +682,30 @@ mono_thread_info_detach (void)
 }
 
 gboolean
-mono_thread_info_try_get_internal_thread_gchandle (MonoThreadInfo *info, guint32 *gchandle)
+mono_thread_info_try_get_internal_thread (MonoThreadInfo *info, gpointer *internal_thread)
 {
 	g_assert (info);
 
-	if (info->internal_thread_gchandle == G_MAXUINT32)
+	if (info->internal_thread == NULL)
 		return FALSE;
 
-	*gchandle = info->internal_thread_gchandle;
+	*internal_thread = info->internal_thread;
 	return TRUE;
 }
 
 void
-mono_thread_info_set_internal_thread_gchandle (MonoThreadInfo *info, guint32 gchandle)
+mono_thread_info_set_internal_thread (MonoThreadInfo *info, gpointer internal_thread)
 {
 	g_assert (info);
-	g_assert (gchandle != G_MAXUINT32);
-	info->internal_thread_gchandle = gchandle;
+	g_assert (internal_thread);
+	info->internal_thread = internal_thread;
 }
 
 void
-mono_thread_info_unset_internal_thread_gchandle (THREAD_INFO_TYPE *info)
+mono_thread_info_unset_internal_thread (MonoThreadInfo *info)
 {
 	g_assert (info);
-	info->internal_thread_gchandle = G_MAXUINT32;
+	info->internal_thread = NULL;
 }
 
 /*

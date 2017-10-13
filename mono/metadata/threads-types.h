@@ -75,9 +75,49 @@ mono_thread_create_internal (MonoDomain *domain, gpointer func, gpointer arg, Mo
 
 void mono_threads_install_cleanup (MonoThreadCleanupFunc func);
 
-void ves_icall_System_Threading_Thread_ConstructInternalThread (MonoThread *this_obj);
+MonoInternalThread*
+ves_icall_System_Threading_InternalThread_New (void);
+
+void
+ves_icall_System_Threading_InternalThread_Release (MonoInternalThread *internal);
+
+gint64
+ves_icall_System_Thread_InternalThread_get_ThreadId (MonoInternalThread *internal);
+
+gint
+ves_icall_System_Thread_InternalThread_get_ManagedThreadId (MonoInternalThread *internal);
+
+MonoArray*
+ves_icall_System_Thread_InternalThread_GetSerializedPrincipal (MonoInternalThread *internal);
+void
+ves_icall_System_Thread_InternalThread_SetSerializedPrincipal (MonoInternalThread *internal, MonoArray* serialized_principal);
+
+gint32
+ves_icall_System_Thread_InternalThread_GetSerializedPrincipalVersion (MonoInternalThread *internal);
+void
+ves_icall_System_Thread_InternalThread_SetSerializedPrincipalVersion (MonoInternalThread *internal, gint32 serialized_principal_version);
+
+MonoBoolean
+ves_icall_System_Thread_InternalThread_GetIsThreadPoolThread (MonoInternalThread *internal);
+void
+ves_icall_System_Thread_InternalThread_SetIsThreadPoolThread (MonoInternalThread *internal, gboolean is_threadpool_thread);
+
+gint32
+ves_icall_System_Thread_InternalThread_GetStackSize (MonoInternalThread *internal);
+void
+ves_icall_System_Thread_InternalThread_SetStackSize (MonoInternalThread *internal, gint32 stack_size);
+
+guchar
+ves_icall_System_Thread_InternalThread_GetApartmentState (MonoInternalThread *internal);
+void
+ves_icall_System_Thread_InternalThread_SetApartmentState (MonoInternalThread *internal, guchar apartment_state);
+
+void
+ves_icall_System_Thread_InternalThread_IncrementCriticalRegionLevel (MonoInternalThread *internal);
+void
+ves_icall_System_Thread_InternalThread_DecrementCriticalRegionLevel (MonoInternalThread *internal);
+
 gpointer ves_icall_System_Threading_Thread_Thread_internal(MonoThread *this_obj, MonoObject *start);
-void ves_icall_System_Threading_InternalThread_Thread_free_internal(MonoInternalThread *this_obj);
 void ves_icall_System_Threading_Thread_Sleep_internal(gint32 ms);
 gboolean ves_icall_System_Threading_Thread_Join_internal(MonoThread *this_obj, int ms);
 gint32 ves_icall_System_Threading_Thread_GetDomainID (void);

@@ -226,14 +226,6 @@ mono_gc_run_finalize (void *obj, void *data)
 	if (log_finalizers)
 		g_log ("mono-gc-finalizers", G_LOG_LEVEL_MESSAGE, "<%s at %p> Registered finalizer as processed.", o->vtable->klass->name, o);
 
-	if (o->vtable->klass == mono_defaults.internal_thread_class) {
-		MonoInternalThread *t = (MonoInternalThread*)o;
-
-		if (mono_gc_is_finalizer_internal_thread (t))
-			/* Avoid finalizing ourselves */
-			return;
-	}
-
 	if (o->vtable->klass->image == mono_defaults.corlib && !strcmp (o->vtable->klass->name, "DynamicMethod") && finalizing_root_domain) {
 		/*
 		 * These can't be finalized during unloading/shutdown, since that would

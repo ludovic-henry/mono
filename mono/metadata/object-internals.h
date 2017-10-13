@@ -380,31 +380,30 @@ typedef enum {
 } MonoThreadFlags;
 
 struct _MonoInternalThread {
-	MonoObject  obj;
-	volatile int lock_thread_id; /* to be used as the pre-shifted thread id in thin locks. Used for appdomain_ref push/pop */
+	gint32 refcount;
+	volatile gint32 lock_thread_id; /* to be used as the pre-shifted thread id in thin locks. Used for appdomain_ref push/pop */
 	MonoThreadHandle *handle;
 	gpointer native_handle;
-	gpointer unused3;
 	gunichar2  *name;
 	guint32	    name_len;
 	guint32	    state;
 	MonoException *abort_exc;
-	int abort_state_handle;
+	gint32 abort_state_handle;
 	guint64 tid;	/* This is accessed as a gsize in the code (so it can hold a 64bit pointer on systems that need it), but needs to reserve 64 bits of space on all machines as it corresponds to a field in managed code */
 	gsize debugger_thread; // FIXME switch to bool as soon as CI testing with corlib version bump works
 	gpointer *static_data;
-	void *thread_info; /*This is MonoThreadInfo*, but to simplify dependencies, let's make it a void* here. */
+	gpointer thread_info; /*This is MonoThreadInfo*, but to simplify dependencies, let's make it a void* here. */
 	MonoAppContext *current_appcontext;
 	MonoThread *root_domain_thread;
-	MonoObject *_serialized_principal;
-	int _serialized_principal_version;
+	MonoArray *_serialized_principal;
+	gint32 _serialized_principal_version;
 	gpointer appdomain_refs;
 	/* This is modified using atomic ops, so keep it a gint32 */
 	gint32 __interruption_requested;
 	MonoCoopMutex *synch_cs;
 	MonoBoolean threadpool_thread;
 	MonoBoolean thread_interrupt_requested;
-	int stack_size;
+	gint32 stack_size;
 	guint8	apartment_state;
 	gint32 critical_region_level;
 	gint32 managed_id;
@@ -412,7 +411,6 @@ struct _MonoInternalThread {
 	MonoThreadManageCallback manage_callback;
 	gpointer unused4;
 	gsize    flags;
-	gpointer thread_pinning_ref;
 	gsize __abort_protected_block_count;
 	gint32 priority;
 	GPtrArray *owned_mutexes;
@@ -427,6 +425,7 @@ struct _MonoInternalThread {
 	 * same field there.
 	 */
 	gsize unused2;
+	gpointer unused3;
 
 	/* This is used only to check that we are in sync between the representation
 	 * of MonoInternalThread in native and InternalThread in managed
@@ -443,7 +442,7 @@ TYPED_HANDLE_DECL (MonoInternalThread);
 
 struct _MonoThread {
 	MonoObject obj;
-	struct _MonoInternalThread *internal_thread;
+	MonoInternalThread *internal_thread;
 	MonoObject *start_obj;
 	MonoException *pending_exception;
 };

@@ -222,8 +222,8 @@ typedef struct {
 	/* Stack mark for targets that explicitly require one */
 	gpointer stack_mark;
 
-	/* GCHandle to MonoInternalThread */
-	guint32 internal_thread_gchandle;
+	/* MonoInternalThread* */
+	gpointer internal_thread;
 
 	/*
 	 * Used by the sampling code in mini-posix.c to ensure that a thread has
@@ -339,13 +339,13 @@ MONO_API void
 mono_thread_info_detach (void);
 
 gboolean
-mono_thread_info_try_get_internal_thread_gchandle (THREAD_INFO_TYPE *info, guint32 *gchandle);
+mono_thread_info_try_get_internal_thread (THREAD_INFO_TYPE *info, gpointer *internal_thread);
 
 void
-mono_thread_info_set_internal_thread_gchandle (THREAD_INFO_TYPE *info, guint32 gchandle);
+mono_thread_info_set_internal_thread (THREAD_INFO_TYPE *info, gpointer internal_thread);
 
 void
-mono_thread_info_unset_internal_thread_gchandle (THREAD_INFO_TYPE *info);
+mono_thread_info_unset_internal_thread (THREAD_INFO_TYPE *info);
 
 gboolean
 mono_thread_info_is_exiting (void);

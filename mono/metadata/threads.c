@@ -523,6 +523,9 @@ set_current_thread_for_domain (MonoDomain *domain, MonoInternalThread *thread, M
 	*current_thread_ptr = current;
 }
 
+static void
+internal_thread_ref (MonoInternalThread *internal);
+
 static MonoThread*
 create_thread_object (MonoDomain *domain, MonoInternalThread *internal)
 {
@@ -537,39 +540,145 @@ create_thread_object (MonoDomain *domain, MonoInternalThread *internal)
 	/* only possible failure mode is OOM, from which we don't expect to recover. */
 	mono_error_assert_ok (&error);
 
-	MONO_OBJECT_SETREF (thread, internal_thread, internal);
+	mono_memory_barrier ();
+
+	internal_thread_ref (internal);
+	thread->internal_thread = internal;
 
 	return thread;
 }
 
+// static void
+// internal_thread_mark (gpointer addr, MonoGCMarkFunc mark_func, gpointer gc_data)
+// {
+// 	MonoInternalThread *internal;
+
+// 	internal = (MonoInternalThread*) addr;
+// 	g_assert (internal);
+
+// 	if (internal->abort_exc)
+// 		mark_func ((MonoObject**) &internal->abort_exc, gc_data);
+// 	if (internal->current_appcontext)
+// 		mark_func ((MonoObject**) &internal->current_appcontext, gc_data);
+// 	if (internal->root_domain_thread)
+// 		mark_func ((MonoObject**) &internal->root_domain_thread, gc_data);
+// 	if (internal->_serialized_principal)
+// 		mark_func ((MonoObject**) &internal->_serialized_principal, gc_data);
+// }
+
 static MonoInternalThread*
-create_internal_thread_object (void)
+internal_thread_create (void)
 {
-	MonoError error;
-	MonoInternalThread *thread;
-	MonoVTable *vt;
+	static MonoGCDescriptor desc = MONO_GC_DESCRIPTOR_NULL;
+	MonoInternalThread *internal;
 
-	vt = mono_class_vtable (mono_get_root_domain (), mono_defaults.internal_thread_class);
-	thread = (MonoInternalThread*) mono_object_new_mature (vt, &error);
-	/* only possible failure mode is OOM, from which we don't exect to recover */
-	mono_error_assert_ok (&error);
+	// if (mono_gc_user_markers_supported () && desc == MONO_GC_DESCRIPTOR_NULL)
+	// 	desc = mono_gc_make_root_descr_user (internal_thread_mark);
 
-	thread->synch_cs = g_new0 (MonoCoopMutex, 1);
-	mono_coop_mutex_init_recursive (thread->synch_cs);
+	internal = mono_gc_alloc_fixed (sizeof (MonoInternalThread), desc, MONO_ROOT_SOURCE_THREADING, "InternalThread");
+	internal->refcount = 0;
 
-	thread->apartment_state = ThreadApartmentState_Unknown;
-	thread->managed_id = get_next_managed_thread_id ();
-	if (mono_gc_is_moving ()) {
-		thread->thread_pinning_ref = thread;
-		MONO_GC_REGISTER_ROOT_PINNING (thread->thread_pinning_ref, MONO_ROOT_SOURCE_THREADING, "thread pinning reference");
+	internal->synch_cs = g_new0 (MonoCoopMutex, 1);
+	mono_coop_mutex_init_recursive (internal->synch_cs);
+
+	internal->apartment_state = ThreadApartmentState_Unknown;
+	internal->managed_id = get_next_managed_thread_id ();
+
+	internal->priority = MONO_THREAD_PRIORITY_NORMAL;
+
+	internal->suspended = g_new0 (MonoOSEvent, 1);
+	mono_os_event_init (internal->suspended, TRUE);
+
+	g_message ("%s: create %p", __func__, internal);
+
+	return internal;
+}
+
+static void
+internal_thread_destroy (MonoInternalThread *internal)
+{
+	g_message ("%s: destroy %p", __func__, internal);
+
+	/*
+	 * Since threads keep a reference to their thread object while running, by
+	 * the time this function is called, the thread has already exited/detached,
+	 * i.e. mono_thread_detach_internal () has ran. The exception is during
+	 * shutdown, when mono_thread_detach_internal () can be called after this.
+	 */
+	if (internal->handle) {
+		mono_threads_close_thread_handle (internal->handle);
+		internal->handle = NULL;
 	}
 
-	thread->priority = MONO_THREAD_PRIORITY_NORMAL;
+#if HOST_WIN32
+	CloseHandle (internal->native_handle);
+#endif
 
-	thread->suspended = g_new0 (MonoOSEvent, 1);
-	mono_os_event_init (thread->suspended, TRUE);
+	if (internal->synch_cs) {
+		MonoCoopMutex *synch_cs = internal->synch_cs;
+		internal->synch_cs = NULL;
+		mono_coop_mutex_destroy (synch_cs);
+		g_free (synch_cs);
+	}
 
-	return thread;
+	if (internal->name) {
+		void *name = internal->name;
+		internal->name = NULL;
+		g_free (name);
+	}
+
+	mono_gc_free_fixed (internal);
+}
+
+#define INTERNAL_THREAD_STATUS_MASK   ((gint32)  0x1)
+#define INTERNAL_THREAD_STATUS_CLOSED ((gint32)  0x1)
+#define INTERNAL_THREAD_REFCOUNT_MASK ((gint32) ~0x1)
+#define INTERNAL_THREAD_REFCOUNT_ONE  ((gint32)  0x2)
+
+static void
+internal_thread_ref (MonoInternalThread *internal)
+{
+	gint32 old, new;
+
+	do {
+		old = internal->refcount;
+		g_assert ((old & INTERNAL_THREAD_STATUS_MASK) != INTERNAL_THREAD_STATUS_CLOSED);
+		g_assert ((old & INTERNAL_THREAD_REFCOUNT_MASK) >= (         0 & INTERNAL_THREAD_REFCOUNT_MASK));
+		g_assert ((old & INTERNAL_THREAD_REFCOUNT_MASK) <  (G_MAXINT32 & INTERNAL_THREAD_REFCOUNT_MASK));
+
+		new = old + INTERNAL_THREAD_REFCOUNT_ONE;
+	} while (InterlockedCompareExchange (&internal->refcount, new, old) != old);
+
+	g_message ("%s: ref %p, ref: %d -> %d",
+		__func__, internal, (old & INTERNAL_THREAD_REFCOUNT_MASK) / INTERNAL_THREAD_REFCOUNT_ONE,
+			(new & INTERNAL_THREAD_REFCOUNT_MASK) / INTERNAL_THREAD_REFCOUNT_ONE);
+}
+
+static gboolean
+internal_thread_unref (MonoInternalThread *internal)
+{
+	gint32 old, new;
+
+	do {
+		old = internal->refcount;
+		g_assert ((old & INTERNAL_THREAD_REFCOUNT_MASK) >  (         0 & INTERNAL_THREAD_REFCOUNT_MASK));
+		g_assert ((old & INTERNAL_THREAD_REFCOUNT_MASK) <= (G_MAXINT32 & INTERNAL_THREAD_REFCOUNT_MASK));
+
+		new = old - INTERNAL_THREAD_REFCOUNT_ONE;
+		if ((new & INTERNAL_THREAD_STATUS_MASK) == 0)
+			new |= INTERNAL_THREAD_STATUS_CLOSED;
+	} while (InterlockedCompareExchange (&internal->refcount, new, old) != old);
+
+	if (!((new & INTERNAL_THREAD_STATUS_CLOSED) ^ ((new & INTERNAL_THREAD_REFCOUNT_MASK) > 0))) {
+		g_error ("%s: thread cannot be closed and alive at the same time, closed: %s, ref: %d",
+			__func__, (new & INTERNAL_THREAD_STATUS_CLOSED) ? "true" : "false", (new & INTERNAL_THREAD_REFCOUNT_MASK) / INTERNAL_THREAD_REFCOUNT_ONE);
+	}
+
+	g_message ("%s: unref %p, %d -> %d, closed: %s",
+		__func__, internal, (old & INTERNAL_THREAD_REFCOUNT_MASK) / INTERNAL_THREAD_REFCOUNT_ONE,
+			(new & INTERNAL_THREAD_REFCOUNT_MASK) / INTERNAL_THREAD_REFCOUNT_ONE, (new & INTERNAL_THREAD_STATUS_CLOSED) ? "true" : "false");
+
+	return new & INTERNAL_THREAD_STATUS_CLOSED;
 }
 
 static void
@@ -670,7 +779,7 @@ mono_thread_attach_internal (MonoThread *thread, gboolean force_attach, gboolean
 	 *  - the MonoThreadInfo TLS key is destroyed: calls mono_thread_info_detach
 	 *    - it calls MonoThreadInfoCallbacks.thread_detach
 	 *      - mono_thread_internal_current returns NULL -> fails to detach the MonoInternalThread. */
-	mono_thread_info_set_internal_thread_gchandle (info, mono_gchandle_new ((MonoObject*) internal, FALSE));
+	mono_thread_info_set_internal_thread (info, internal);
 
 	internal->handle = mono_threads_open_thread_handle (info->handle);
 #ifdef HOST_WIN32
@@ -682,6 +791,7 @@ mono_thread_attach_internal (MonoThread *thread, gboolean force_attach, gboolean
 
 	THREAD_DEBUG (g_message ("%s: (%"G_GSIZE_FORMAT") Setting current_object_key to %p", __func__, mono_native_thread_id_get (), internal));
 
+	internal_thread_ref (internal);
 	SET_CURRENT_OBJECT (internal);
 
 	domain = mono_object_domain (thread);
@@ -772,7 +882,7 @@ mono_thread_detach_internal (MonoInternalThread *thread)
 
 	/*
 	 * thread->synch_cs can be NULL if this was called after
-	 * ves_icall_System_Threading_InternalThread_Thread_free_internal.
+	 * ves_icall_System_Threading_InternalThread_Release.
 	 * This can happen only during shutdown.
 	 * The shutting_down flag is not always set, so we can't assert on it.
 	 */
@@ -874,16 +984,14 @@ mono_thread_detach_internal (MonoInternalThread *thread)
 
 	mono_memory_barrier ();
 
-	if (mono_gc_is_moving ()) {
-		MONO_GC_UNREGISTER_ROOT (thread->thread_pinning_ref);
-		thread->thread_pinning_ref = NULL;
-	}
-
 done:
+	if (internal_thread_unref (thread))
+		internal_thread_destroy (thread);
+
 	SET_CURRENT_OBJECT (NULL);
 	mono_domain_unset ();
 
-	mono_thread_info_unset_internal_thread_gchandle ((MonoThreadInfo*) thread->thread_info);
+	mono_thread_info_unset_internal_thread ((MonoThreadInfo*) thread->thread_info);
 
 	/* Don't need to close the handle to this thread, even though we took a
 	 * reference in mono_thread_attach (), because the GC will do it
@@ -1208,7 +1316,7 @@ mono_thread_create_internal (MonoDomain *domain, gpointer func, gpointer arg, Mo
 
 	error_init (error);
 
-	internal = create_internal_thread_object ();
+	internal = internal_thread_create ();
 
 	thread = create_thread_object (domain, internal);
 
@@ -1259,7 +1367,7 @@ mono_thread_attach_full (MonoDomain *domain, gboolean force_attach)
 
 	tid=mono_native_thread_id_get ();
 
-	internal = create_internal_thread_object ();
+	internal = internal_thread_create ();
 
 	thread = create_thread_object (domain, internal);
 
@@ -1354,16 +1462,16 @@ mono_thread_exit (void)
 	mono_thread_info_exit (0);
 }
 
-void
-ves_icall_System_Threading_Thread_ConstructInternalThread (MonoThread *this_obj)
+MonoInternalThread*
+ves_icall_System_Threading_InternalThread_New (void)
 {
 	MonoInternalThread *internal;
 
-	internal = create_internal_thread_object ();
-
+	internal = internal_thread_create ();
+	internal_thread_ref (internal);
 	internal->state = ThreadState_Unstarted;
 
-	InterlockedCompareExchangePointer ((volatile gpointer *)&this_obj->internal_thread, internal, NULL);
+	return internal;
 }
 
 MonoThread *
@@ -1382,9 +1490,8 @@ ves_icall_System_Threading_Thread_Thread_internal (MonoThread *this_obj,
 
 	THREAD_DEBUG (g_message("%s: Trying to start a new thread: this (%p) start (%p)", __func__, this_obj, start));
 
-	if (!this_obj->internal_thread)
-		ves_icall_System_Threading_Thread_ConstructInternalThread (this_obj);
 	internal = this_obj->internal_thread;
+	g_assert (internal);
 
 	LOCK_THREAD (internal);
 
@@ -1414,41 +1521,13 @@ ves_icall_System_Threading_Thread_Thread_internal (MonoThread *this_obj,
 	return internal->handle;
 }
 
-/*
- * This is called from the finalizer of the internal thread object.
- */
 void
-ves_icall_System_Threading_InternalThread_Thread_free_internal (MonoInternalThread *this_obj)
+ves_icall_System_Threading_InternalThread_Release (MonoInternalThread *internal)
 {
-	THREAD_DEBUG (g_message ("%s: Closing thread %p, handle %p", __func__, this, this_obj->handle));
+	THREAD_DEBUG (g_message ("%s: Closing thread %p, handle %p", __func__, this, internal->handle));
 
-	/*
-	 * Since threads keep a reference to their thread object while running, by
-	 * the time this function is called, the thread has already exited/detached,
-	 * i.e. mono_thread_detach_internal () has ran. The exception is during
-	 * shutdown, when mono_thread_detach_internal () can be called after this.
-	 */
-	if (this_obj->handle) {
-		mono_threads_close_thread_handle (this_obj->handle);
-		this_obj->handle = NULL;
-	}
-
-#if HOST_WIN32
-	CloseHandle (this_obj->native_handle);
-#endif
-
-	if (this_obj->synch_cs) {
-		MonoCoopMutex *synch_cs = this_obj->synch_cs;
-		this_obj->synch_cs = NULL;
-		mono_coop_mutex_destroy (synch_cs);
-		g_free (synch_cs);
-	}
-
-	if (this_obj->name) {
-		void *name = this_obj->name;
-		this_obj->name = NULL;
-		g_free (name);
-	}
+	if (internal_thread_unref (internal))
+		internal_thread_destroy (internal);
 }
 
 void
@@ -2989,7 +3068,6 @@ static void
 thread_detach (MonoThreadInfo *info)
 {
 	MonoInternalThread *internal;
-	guint32 gchandle;
 
 	/* If a delegate is passed to native code and invoked on a thread we dont
 	 * know about, marshal will register it with mono_threads_attach_coop, but
@@ -2999,13 +3077,8 @@ thread_detach (MonoThreadInfo *info)
 
 	g_assert (info);
 
-	if (!mono_thread_info_try_get_internal_thread_gchandle (info, &gchandle))
+	if (!mono_thread_info_try_get_internal_thread (info, &internal))
 		return;
-
-	internal = (MonoInternalThread*) mono_gchandle_get_target (gchandle);
-	g_assert (internal);
-
-	mono_gchandle_free (gchandle);
 
 	mono_thread_detach_internal (internal);
 }
@@ -5337,4 +5410,88 @@ mono_thread_internal_is_current (MonoInternalThread *internal)
 {
 	g_assert (internal);
 	return mono_native_thread_id_equals (mono_native_thread_id_get (), MONO_UINT_TO_NATIVE_THREAD_ID (internal->tid));
+}
+
+gint64
+ves_icall_System_Thread_InternalThread_get_ThreadId (MonoInternalThread *internal)
+{
+	return internal->tid;
+}
+
+gint
+ves_icall_System_Thread_InternalThread_get_ManagedThreadId (MonoInternalThread *internal)
+{
+	return internal->managed_id;
+}
+
+MonoArray*
+ves_icall_System_Thread_InternalThread_GetSerializedPrincipal (MonoInternalThread *internal)
+{
+	return ves_icall_System_Threading_Thread_ByteArrayToCurrentDomain (internal->_serialized_principal);
+}
+
+void
+ves_icall_System_Thread_InternalThread_SetSerializedPrincipal (MonoInternalThread *internal, MonoArray* serialized_principal)
+{
+	internal->_serialized_principal = ves_icall_System_Threading_Thread_ByteArrayToRootDomain (serialized_principal);
+}
+
+gint32
+ves_icall_System_Thread_InternalThread_GetSerializedPrincipalVersion (MonoInternalThread *internal)
+{
+	return internal->_serialized_principal_version;
+}
+
+void
+ves_icall_System_Thread_InternalThread_SetSerializedPrincipalVersion (MonoInternalThread *internal, gint32 serialized_principal_version)
+{
+	internal->_serialized_principal_version = serialized_principal_version;
+}
+
+MonoBoolean
+ves_icall_System_Thread_InternalThread_GetIsThreadPoolThread (MonoInternalThread *internal)
+{
+	return internal->threadpool_thread;
+}
+
+void
+ves_icall_System_Thread_InternalThread_SetIsThreadPoolThread (MonoInternalThread *internal, gboolean is_threadpool_thread)
+{
+	internal->threadpool_thread = is_threadpool_thread;
+}
+
+gint32
+ves_icall_System_Thread_InternalThread_GetStackSize (MonoInternalThread *internal)
+{
+	return internal->stack_size;
+}
+
+void
+ves_icall_System_Thread_InternalThread_SetStackSize (MonoInternalThread *internal, gint32 stack_size)
+{
+	internal->stack_size = stack_size;
+}
+
+guchar
+ves_icall_System_Thread_InternalThread_GetApartmentState (MonoInternalThread *internal)
+{
+	return internal->apartment_state;
+}
+
+void
+ves_icall_System_Thread_InternalThread_SetApartmentState (MonoInternalThread *internal, guchar apartment_state)
+{
+	internal->apartment_state = apartment_state;
+}
+
+void
+ves_icall_System_Thread_InternalThread_IncrementCriticalRegionLevel (MonoInternalThread *internal)
+{
+	internal->critical_region_level += 1;
+}
+
+void
+ves_icall_System_Thread_InternalThread_DecrementCriticalRegionLevel (MonoInternalThread *internal)
+{
+	internal->critical_region_level -= 1;
 }

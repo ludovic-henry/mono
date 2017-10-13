@@ -779,8 +779,6 @@ static void
 process_object_for_domain_clearing (GCObject *start, MonoDomain *domain)
 {
 	MonoVTable *vt = SGEN_LOAD_VTABLE (start);
-	if (vt->klass == mono_defaults.internal_thread_class)
-		g_assert (mono_object_domain (start) == mono_get_root_domain ());
 	/* The object could be a proxy for an object in the domain
 	   we're deleting. */
 #ifndef DISABLE_REMOTING

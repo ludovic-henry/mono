@@ -951,8 +951,6 @@ is_xdomain_ref_allowed (GCObject **ptr, GCObject *obj, MonoDomain *domain)
 
 	if (o->vtable->klass == mono_defaults.thread_class && offset == G_STRUCT_OFFSET (MonoThread, internal_thread))
 		return TRUE;
-	if (o->vtable->klass == mono_defaults.internal_thread_class && offset == G_STRUCT_OFFSET (MonoInternalThread, current_appcontext))
-		return TRUE;
 
 #ifndef DISABLE_REMOTING
 	if (mono_defaults.real_proxy_class->supertypes && mono_class_has_parent_fast (o->vtable->klass, mono_defaults.real_proxy_class) &&
