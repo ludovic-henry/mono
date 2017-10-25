@@ -781,14 +781,12 @@ mono_thread_detach_internal (MonoInternalThread *thread)
 	 * This can happen only during shutdown.
 	 * The shutting_down flag is not always set, so we can't assert on it.
 	 */
-	if (thread->synch_cs)
-		LOCK_THREAD (thread);
+	LOCK_THREAD (thread);
 
 	thread->state |= ThreadState_Stopped;
 	thread->state &= ~ThreadState_Background;
 
-	if (thread->synch_cs)
-		UNLOCK_THREAD (thread);
+	UNLOCK_THREAD (thread);
 
 	/*
 	An interruption request has leaked to cleanup. Adjust the global counter.
@@ -819,7 +817,7 @@ mono_thread_detach_internal (MonoInternalThread *thread)
 	mono_release_type_locks (thread);
 
 	/* Can happen when we attach the profiler helper thread in order to heapshot. */
-	if (!mono_thread_info_lookup (MONO_UINT_TO_NATIVE_THREAD_ID (thread->tid))->tools_thread)
+	if (!((MonoThreadInfo*) thread->thread_info)->tools_thread)
 		MONO_PROFILER_RAISE (thread_stopped, (thread->tid));
 
 	mono_hazard_pointer_clear (mono_hazard_pointer_get (), 1);
@@ -3144,11 +3142,12 @@ wait_for_tids (struct wait_data *wait, guint32 timeout, gboolean check_state_cha
 	
 	if (ret < wait->num) {
 		MonoInternalThread *internal;
+		gpointer value;
 
 		internal = wait->threads [ret];
 
 		mono_threads_lock ();
-		if (mono_g_hash_table_lookup (threads, (gpointer) internal->tid) == internal)
+		if (mono_g_hash_table_lookup_extended (threads, (gpointer) internal->tid, NULL, &value) && internal == value)
 			g_error ("%s: failed to call mono_thread_detach_internal on thread %p, InternalThread: %p", __func__, internal->tid, internal);
 		mono_threads_unlock ();
 	}
