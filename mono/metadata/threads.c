@@ -747,6 +747,8 @@ mono_thread_detach_internal (MonoInternalThread *thread)
 {
 	gpointer value;
 
+	/* We are detaching the current thread */
+
 	g_assert (thread != NULL);
 	SET_CURRENT_OBJECT (thread);
 
@@ -829,8 +831,7 @@ mono_thread_detach_internal (MonoInternalThread *thread)
 	mono_domain_unset ();
 	mono_memory_barrier ();
 
-	if (thread == mono_thread_internal_current ())
-		mono_thread_pop_appdomain_ref ();
+	mono_thread_pop_appdomain_ref ();
 
 	mono_free_static_data (thread->static_data);
 	thread->static_data = NULL;
