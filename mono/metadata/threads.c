@@ -707,6 +707,9 @@ mono_thread_attach_internal (MonoThread *thread, gboolean force_attach, gboolean
 		threads = mono_g_hash_table_new_type (NULL, NULL, MONO_HASH_VALUE_GC, MONO_ROOT_SOURCE_THREADING, "threads table");
 	}
 
+	if (mono_g_hash_table_lookup_extended (threads, (gpointer)(gsize)(internal->tid), NULL, NULL))
+		g_error ("%s: duplicate thread tid %p for internal %p", __func__, (gpointer)(gsize)(internal->tid), internal);
+
 	/* We don't need to duplicate thread->handle, because it is
 	 * only closed when the thread object is finalized by the GC. */
 	mono_g_hash_table_insert (threads, (gpointer)(gsize)(internal->tid), internal);
@@ -742,7 +745,7 @@ mono_thread_attach_internal (MonoThread *thread, gboolean force_attach, gboolean
 static void
 mono_thread_detach_internal (MonoInternalThread *thread)
 {
-	gboolean removed;
+	gpointer value;
 
 	g_assert (thread != NULL);
 	SET_CURRENT_OBJECT (thread);
@@ -797,25 +800,6 @@ mono_thread_detach_internal (MonoInternalThread *thread)
 	*/
 	mono_thread_clear_interruption_requested (thread);
 
-	mono_threads_lock ();
-
-	if (!threads) {
-		removed = FALSE;
-	} else if (mono_g_hash_table_lookup (threads, (gpointer)thread->tid) != thread) {
-		/* We have to check whether the thread object for the
-		 * tid is still the same in the table because the
-		 * thread might have been destroyed and the tid reused
-		 * in the meantime, in which case the tid would be in
-		 * the table, but with another thread object.
-		 */
-		removed = FALSE;
-	} else {
-		mono_g_hash_table_remove (threads, (gpointer)thread->tid);
-		removed = TRUE;
-	}
-
-	mono_threads_unlock ();
-
 	/* Don't close the handle here, wait for the object finalizer
 	 * to do it. Otherwise, the following race condition applies:
 	 *
@@ -829,17 +813,6 @@ mono_thread_detach_internal (MonoInternalThread *thread)
 	 * thread calling Join() still has a reference to the first
 	 * thread's object.
 	 */
-
-	/* if the thread is not in the hash it has been removed already */
-	if (!removed) {
-		mono_domain_unset ();
-		mono_memory_barrier ();
-
-		if (mono_thread_cleanup_fn)
-			mono_thread_cleanup_fn (thread_get_tid (thread));
-
-		goto done;
-	}
 
 	mono_release_type_locks (thread);
 
@@ -879,11 +852,26 @@ mono_thread_detach_internal (MonoInternalThread *thread)
 		thread->thread_pinning_ref = NULL;
 	}
 
-done:
 	SET_CURRENT_OBJECT (NULL);
 	mono_domain_unset ();
 
 	mono_thread_info_unset_internal_thread_gchandle ((MonoThreadInfo*) thread->thread_info);
+
+	mono_memory_barrier ();
+
+	mono_threads_lock ();
+
+	g_assert (threads);
+
+	if (!mono_g_hash_table_lookup_extended (threads, (gpointer)thread->tid, NULL, &value))
+		g_error ("%s: the thread %p (internal: %p) wasn't inserted into threads", __func__, (gpointer) thread->tid, thread);
+
+	if (value != thread)
+		g_error ("%s: the thread %p (internal: %p) doesn't match with %p", __func__, (gpointer) thread->tid, thread, value);
+
+	mono_g_hash_table_remove (threads, (gpointer)thread->tid);
+
+	mono_threads_unlock ();
 
 	/* Don't need to close the handle to this thread, even though we took a
 	 * reference in mono_thread_attach (), because the GC will do it
