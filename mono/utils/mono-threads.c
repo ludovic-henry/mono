@@ -401,12 +401,10 @@ register_thread (MonoThreadInfo *info)
 
 	THREADS_DEBUG ("registering info %p tid %p small id %x\n", info, mono_thread_info_get_tid (info), info->small_id);
 
-	if (threads_callbacks.thread_attach) {
-		if (!threads_callbacks.thread_attach (info)) {
-			// g_warning ("thread registation failed\n");
-			mono_native_tls_set_value (thread_info_key, NULL);
-			return FALSE;
-		}
+	if (!threads_callbacks.thread_attach (info)) {
+		// g_warning ("thread registation failed\n");
+		mono_native_tls_set_value (thread_info_key, NULL);
+		return FALSE;
 	}
 
 	/*
@@ -475,8 +473,7 @@ unregister_thread (void *arg)
 	This callback has the potential of taking other locks, so we do it before.
 	After it completes, the thread remains functional.
 	*/
-	if (threads_callbacks.thread_detach)
-		threads_callbacks.thread_detach (info);
+	threads_callbacks.thread_detach (info);
 
 	mono_thread_info_suspend_lock_with_info (info);
 
@@ -486,8 +483,7 @@ unregister_thread (void *arg)
 	be done while holding the suspend lock to give no other thread chance
 	to suspend it.
 	*/
-	if (threads_callbacks.thread_detach_with_lock)
-		threads_callbacks.thread_detach_with_lock (info);
+	threads_callbacks.thread_detach_with_lock (info);
 
 	/* The thread is no longer active, so unref its handle */
 	mono_threads_close_thread_handle (info->handle);
@@ -723,13 +719,11 @@ mono_thread_info_set_flags (MonoThreadInfoFlags flags)
 	MonoThreadInfo *info = mono_thread_info_current ();
 	MonoThreadInfoFlags old = mono_atomic_load_i32 (&info->flags);
 
-	if (threads_callbacks.thread_flags_changing)
-		threads_callbacks.thread_flags_changing (old, flags);
+	threads_callbacks.thread_flags_changing (old, flags);
 
 	mono_atomic_store_i32 (&info->flags, flags);
 
-	if (threads_callbacks.thread_flags_changed)
-		threads_callbacks.thread_flags_changed (old, flags);
+	threads_callbacks.thread_flags_changed (old, flags);
 }
 
 void
@@ -901,9 +895,8 @@ is_thread_in_critical_region (MonoThreadInfo *info)
 		return TRUE;
 
 	/* Are we inside a GC critical region? */
-	if (threads_callbacks.thread_in_critical_region && threads_callbacks.thread_in_critical_region (info)) {
+	if (threads_callbacks.thread_in_critical_region (info))
 		return TRUE;
-	}
 
 	/* The target thread might be shutting down and the domain might be null, which means no managed code left to run. */
 	state = mono_thread_info_get_suspend_state (info);
@@ -915,10 +908,7 @@ is_thread_in_critical_region (MonoThreadInfo *info)
 	if (stack_start < info->stack_start_limit || stack_start >= info->stack_end)
 		return TRUE;
 
-	if (threads_callbacks.ip_in_critical_region)
-		return threads_callbacks.ip_in_critical_region ((MonoDomain *) state->unwind_data [MONO_UNWIND_DATA_DOMAIN], (char *) MONO_CONTEXT_GET_IP (&state->ctx));
-
-	return FALSE;
+	return threads_callbacks.ip_in_critical_region ((MonoDomain *) state->unwind_data [MONO_UNWIND_DATA_DOMAIN], (char *) MONO_CONTEXT_GET_IP (&state->ctx));
 }
 
 gboolean
