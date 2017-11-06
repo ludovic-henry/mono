@@ -226,6 +226,46 @@ mono_threads_unlock (void)
 	mono_locks_coop_release (&threads_mutex, ThreadsLock);
 }
 
+typedef struct {
+	void (*callback)(MonoInternalThread *internal, gpointer user_data);
+	gpointer user_data;
+} ThreadsForeachData;
+
+static void
+threads_foreach_callback (gpointer key, gpointer value, gpointer data)
+{
+	ThreadsForeachData *foreach_data;
+
+	foreach_data = (ThreadsForeachData*) data;
+	foreach_data->callback((MonoInternalThread*) value, foreach_data->user_data);
+}
+
+static void
+threads_foreach (void (*callback)(MonoInternalThread *internal, gpointer user_data), gpointer user_data)
+{
+	ThreadsForeachData foreach_data;
+	foreach_data.callback = callback;
+	foreach_data.user_data = user_data;
+	mono_g_hash_table_foreach (threads, threads_foreach_callback, &foreach_data);
+}
+
+static void
+threads_insert (MonoInternalThread *internal)
+{
+	mono_g_hash_table_insert (threads, (gpointer)(gsize)internal->tid, internal);
+}
+
+static void
+threads_remove (MonoInternalThread *internal)
+{
+	mono_g_hash_table_remove (threads, (gpointer)(gsize)internal->tid);
+}
+
+static gboolean
+threads_lookup (gpointer tid, MonoInternalThread **value)
+{
+	return mono_g_hash_table_lookup_extended (threads, tid, NULL, (gpointer*) value);
+}
 
 static guint32
 get_next_managed_thread_id (void)
@@ -769,7 +809,7 @@ mono_thread_attach_internal (MonoThread *thread, gboolean force_attach, gboolean
 
 	/* We don't need to duplicate thread->handle, because it is
 	 * only closed when the thread object is finalized by the GC. */
-	mono_g_hash_table_insert (threads, (gpointer)(gsize)(internal->tid), internal);
+	threads_insert (internal);
 
 	/* We have to do this here because mono_thread_start_cb
 	 * requires that root_domain_thread is set up. */
@@ -890,7 +930,7 @@ mono_thread_detach_internal (MonoInternalThread *thread)
 
 	g_assert (threads);
 
-	if (!mono_g_hash_table_lookup_extended (threads, (gpointer)thread->tid, NULL, (gpointer*) &value)) {
+	if (!threads_lookup ((gpointer)thread->tid, &value)) {
 		g_error ("%s: thread %p (tid: %p) should not have been removed yet from threads", __func__, thread, thread->tid);
 	} else if (thread != value) {
 		/* We have to check whether the thread object for the tid is still the same in the table because the
@@ -3253,7 +3293,7 @@ mono_thread_set_manage_callback (MonoThread *thread, MonoThreadManageCallback fu
 }
 
 G_GNUC_UNUSED
-static void print_tids (gpointer key, gpointer value, gpointer user)
+static void print_tids (MonoInternalThread *internal, gpointer user)
 {
 	/* GPOINTER_TO_UINT breaks horribly if sizeof(void *) >
 	 * sizeof(uint) and a cast to uint would overflow
@@ -3261,7 +3301,7 @@ static void print_tids (gpointer key, gpointer value, gpointer user)
 	/* Older versions of glib don't have G_GSIZE_FORMAT, so just
 	 * print this as a pointer.
 	 */
-	g_message ("Waiting for: %p", key);
+	g_message ("Waiting for: %p", (gpointer)(gsize)internal->tid);
 }
 
 struct wait_data 
@@ -3302,24 +3342,22 @@ wait_for_tids (struct wait_data *wait, guint32 timeout, gboolean check_state_cha
 		return;
 	
 	if (ret < wait->num) {
-		MonoInternalThread *internal;
+		MonoInternalThread *internal, *value;
 
 		internal = wait->threads [ret];
 
 		mono_threads_lock ();
-		if (mono_g_hash_table_lookup (threads, (gpointer) internal->tid) == internal)
+		if (threads_lookup ((gpointer) internal->tid, &value) && value == internal)
 			g_error ("%s: failed to call mono_thread_detach_internal on thread %p, InternalThread: %p", __func__, internal->tid, internal);
 		mono_threads_unlock ();
 	}
 }
 
-static void build_wait_tids (gpointer key, gpointer value, gpointer user)
+static void build_wait_tids (MonoInternalThread *thread, gpointer user)
 {
 	struct wait_data *wait=(struct wait_data *)user;
 
 	if(wait->num<MONO_W32HANDLE_MAXIMUM_WAIT_OBJECTS - 1) {
-		MonoInternalThread *thread=(MonoInternalThread *)value;
-
 		/* Ignore background threads, we abort them later */
 		/* Do not lock here since it is not needed and the caller holds threads_lock */
 		if (thread->state & ThreadState_Background) {
@@ -3367,11 +3405,10 @@ static void build_wait_tids (gpointer key, gpointer value, gpointer user)
 }
 
 static void
-abort_threads (gpointer key, gpointer value, gpointer user)
+abort_threads (MonoInternalThread *thread, gpointer user)
 {
 	struct wait_data *wait=(struct wait_data *)user;
 	MonoNativeThreadId self = mono_native_thread_id_get ();
-	MonoInternalThread *thread = (MonoInternalThread *)value;
 
 	if (wait->num >= MONO_W32HANDLE_MAXIMUM_WAIT_OBJECTS)
 		return;
@@ -3467,14 +3504,14 @@ mono_thread_manage (void)
 			mono_threads_unlock ();
 			break;
 		}
-		THREAD_DEBUG (g_message ("%s: There are %d threads to join", __func__, mono_g_hash_table_size (threads));
-			mono_g_hash_table_foreach (threads, print_tids, NULL));
+		THREAD_DEBUG (g_message ("%s: threads to join:", __func__);
+			threads_foreach (print_tids, NULL));
 	
 		mono_os_event_reset (&background_change_event);
 		wait->num=0;
 		/* We must zero all InternalThread pointers to avoid making the GC unhappy. */
 		memset (wait->threads, 0, MONO_W32HANDLE_MAXIMUM_WAIT_OBJECTS * SIZEOF_VOID_P);
-		mono_g_hash_table_foreach (threads, build_wait_tids, wait);
+		threads_foreach (build_wait_tids, wait);
 		mono_threads_unlock ();
 		if (wait->num > 0)
 			/* Something to wait for */
@@ -3499,7 +3536,7 @@ mono_thread_manage (void)
 		wait->num = 0;
 		/*We must zero all InternalThread pointers to avoid making the GC unhappy.*/
 		memset (wait->threads, 0, MONO_W32HANDLE_MAXIMUM_WAIT_OBJECTS * SIZEOF_VOID_P);
-		mono_g_hash_table_foreach (threads, abort_threads, wait);
+		threads_foreach (abort_threads, wait);
 
 		mono_threads_unlock ();
 
@@ -3519,9 +3556,8 @@ mono_thread_manage (void)
 }
 
 static void
-collect_threads_for_suspend (gpointer key, gpointer value, gpointer user_data)
+collect_threads_for_suspend (MonoInternalThread *thread, gpointer user_data)
 {
-	MonoInternalThread *thread = (MonoInternalThread*)value;
 	struct wait_data *wait = (struct wait_data*)user_data;
 
 	/* 
@@ -3585,7 +3621,7 @@ void mono_thread_suspend_all_other_threads (void)
 		/*We must zero all InternalThread pointers to avoid making the GC unhappy.*/
 		memset (wait->threads, 0, MONO_W32HANDLE_MAXIMUM_WAIT_OBJECTS * SIZEOF_VOID_P);
 		mono_threads_lock ();
-		mono_g_hash_table_foreach (threads, collect_threads_for_suspend, wait);
+		threads_foreach (collect_threads_for_suspend, wait);
 		mono_threads_unlock ();
 
 		eventidx = 0;
@@ -3700,10 +3736,9 @@ typedef struct {
 } CollectThreadsUserData;
 
 static void
-collect_thread (gpointer key, gpointer value, gpointer user)
+collect_thread (MonoInternalThread *thread, gpointer user)
 {
 	CollectThreadsUserData *ud = (CollectThreadsUserData *)user;
-	MonoInternalThread *thread = (MonoInternalThread *)value;
 
 	if (ud->nthreads < ud->max_threads)
 		ud->threads [ud->nthreads ++] = thread;
@@ -3724,7 +3759,7 @@ collect_threads (MonoInternalThread **thread_array, int max_threads)
 	ud.max_threads = max_threads;
 
 	mono_threads_lock ();
-	mono_g_hash_table_foreach (threads, collect_thread, &ud);
+	threads_foreach (collect_thread, &ud);
 	mono_threads_unlock ();
 
 	return ud.nthreads;
@@ -4047,9 +4082,8 @@ typedef struct abort_appdomain_data {
 } abort_appdomain_data;
 
 static void
-collect_appdomain_thread (gpointer key, gpointer value, gpointer user_data)
+collect_appdomain_thread (MonoInternalThread *thread, gpointer user_data)
 {
-	MonoInternalThread *thread = (MonoInternalThread*)value;
 	abort_appdomain_data *data = (abort_appdomain_data*)user_data;
 	MonoDomain *domain = data->domain;
 
@@ -4090,7 +4124,7 @@ mono_threads_abort_appdomain_threads (MonoDomain *domain, int timeout)
 		user_data.domain = domain;
 		user_data.wait.num = 0;
 		/* This shouldn't take any locks */
-		mono_g_hash_table_foreach (threads, collect_appdomain_thread, &user_data);
+		threads_foreach (collect_appdomain_thread, &user_data);
 		mono_threads_unlock ();
 
 		if (user_data.wait.num > 0) {
@@ -4368,9 +4402,8 @@ context_adjust_static_data (MonoAppContext *ctx)
  * LOCKING: requires that threads_mutex is held
  */
 static void 
-alloc_thread_static_data_helper (gpointer key, gpointer value, gpointer user)
+alloc_thread_static_data_helper (MonoInternalThread *thread, gpointer user)
 {
-	MonoInternalThread *thread = (MonoInternalThread *)value;
 	guint32 offset = GPOINTER_TO_UINT (user);
 
 	mono_alloc_static_data (&(thread->static_data), offset, (void *) MONO_UINT_TO_NATIVE_THREAD_ID (thread->tid), TRUE);
@@ -4478,7 +4511,7 @@ mono_alloc_special_static_data (guint32 static_type, guint32 size, guint32 align
 	if (static_type == SPECIAL_STATIC_THREAD) {
 		/* This can be called during startup */
 		if (threads != NULL)
-			mono_g_hash_table_foreach (threads, alloc_thread_static_data_helper, GUINT_TO_POINTER (offset));
+			threads_foreach (alloc_thread_static_data_helper, GUINT_TO_POINTER (offset));
 	} else {
 		if (contexts != NULL)
 			g_hash_table_foreach (contexts, alloc_context_static_data_helper, GUINT_TO_POINTER (offset));
@@ -4518,9 +4551,8 @@ typedef struct {
  * LOCKING: requires that threads_mutex is held
  */
 static void 
-free_thread_static_data_helper (gpointer key, gpointer value, gpointer user)
+free_thread_static_data_helper (MonoInternalThread *thread, gpointer user)
 {
-	MonoInternalThread *thread = (MonoInternalThread *)value;
 	OffsetSize *data = (OffsetSize *)user;
 	int idx = ACCESS_SPECIAL_STATIC_OFFSET (data->offset, index);
 	int off = ACCESS_SPECIAL_STATIC_OFFSET (data->offset, offset);
@@ -4578,7 +4610,7 @@ do_free_special_slot (guint32 offset, guint32 size)
 
 	if (static_type == SPECIAL_STATIC_OFFSET_TYPE_THREAD) {
 		if (threads != NULL)
-			mono_g_hash_table_foreach (threads, free_thread_static_data_helper, &data);
+			threads_foreach (free_thread_static_data_helper, &data);
 	} else {
 		if (contexts != NULL)
 			g_hash_table_foreach (contexts, free_context_static_data_helper, &data);
