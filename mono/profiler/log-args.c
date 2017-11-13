@@ -126,6 +126,24 @@ parse_arg (const char *arg, ProfilerConfig *config)
 		if (config->cov_filter_files == NULL)
 			config->cov_filter_files = g_ptr_array_new ();
 		g_ptr_array_add (config->cov_filter_files, g_strdup (val));
+	} else if (match_option (arg, "nocalls", NULL)) {
+		g_warning ("the log profiler support for \"nocalls\" is obsolete");
+		config->enter_leave = FALSE;
+	} else if (match_option (arg, "alloc", NULL)) {
+		g_warning ("the log profiler support for \"alloc\" is obsolete");
+		config->enable_mask |= PROFLOG_ALLOC_ALIAS;
+	} else if (match_option (arg, "noalloc", NULL)) {
+		g_warning ("the log profiler support for \"noalloc\" is obsolete");
+		// we don't use the `config->disable_mask` to keep the old behaviour of `alloc,noalloc,alloc` ending up enabling alloc 
+		config->enable_mask &= ~PROFLOG_ALLOC_ALIAS;
+	} else if (match_option (arg, "counters", NULL)) {
+		g_warning ("the log profiler support for \"counters\" is obsolete");
+		config->enable_mask |= PROFLOG_COUNTER_EVENTS;
+	} else if (match_option (arg, "sampling-real", &val)) {
+		g_warning ("the log profiler support for \"sampling-real\" is obsolete");
+		set_sample_freq (config, val);
+		config->sampling_mode = MONO_PROFILER_SAMPLE_MODE_REAL;
+		config->enable_mask |= PROFLOG_SAMPLE_EVENTS;
 	} else {
 		int i;
 
@@ -265,6 +283,39 @@ set_sample_freq (ProfilerConfig *config, const char *val)
 	}
 
 	config->sample_freq = freq;
+
+	if (!val)
+		return;
+
+	char *p = val;
+
+	// Is it only the frequency (new option style)?
+	if (isdigit (*p))
+		goto parse;
+
+	// Skip the sample type for backwards compatibility.
+	while (isalpha (*p))
+		p++;
+
+	// Skip the forward slash only if we got a sample type.
+	if (p != val && *p == '/') {
+		p++;
+
+		char *end;
+
+	parse:
+		sample_freq = strtoul (p, &end, 10);
+
+		if (p == end)
+			usage (1);
+
+		p = end;
+	}
+
+	if (*p)
+		usage (1);
+
+	g_free (val);
 }
 
 static void
