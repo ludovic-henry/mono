@@ -2,10 +2,11 @@
 .stamp-*
 *.mk.generated
 *.config.cache
-android-arm/
-android-arm64/
-android-x86/
-android-x86_64/
+android-targetarmv5/
+android-targetarmv7/
+android-targetarm64/
+android-targetx86/
+android-targetx86_64/
 ios-target32/
 ios-target64/
 ios-cross32/
