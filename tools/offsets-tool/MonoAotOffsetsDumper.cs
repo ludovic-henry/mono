@@ -24,11 +24,8 @@ namespace CppSharp
         static List<string> Abis = new List<string> ();
         static string OutputDir;
 
-        static string MonodroidDir = @"";
         static string AndroidNdkPath = @"";
-        static string MaccoreDir = @"";
         static string TargetDir = @"";
-        static bool GenIOS;
 
         public enum TargetPlatform
         {
@@ -121,7 +118,7 @@ namespace CppSharp
 
             /*Targets.Add(new Target {
                     Platform = TargetPlatform.Android,
-                    Triple = "mipsel-none-linux-android",
+                    Triple = "mipsel-linux-android",
                     Defines = { "TARGET_MIPS", "__mips__" }
                 });*/
 
@@ -192,23 +189,13 @@ namespace CppSharp
         {
             ParseCommandLineArgs(args);
 
-            string monodroidDir;
-            if (!Directory.Exists (MonodroidDir) &&
-                GetParentSubDirectoryPath ("monodroid", out monodroidDir)) {
-                MonodroidDir = Path.Combine (monodroidDir);
+            if (string.IsNullOrEmpty (MonoDir)) {
+                Console.Error.WriteLine ("The --mono= option is required.");
+                Environment.Exit (1);
             }
 
-            if (Directory.Exists (MonodroidDir))
-                SetupAndroidTargets();
-
-            string maccoreDir;
-            if (!Directory.Exists (MaccoreDir) &&
-                GetParentSubDirectoryPath ("maccore", out maccoreDir)) {
-                MaccoreDir = Path.Combine (maccoreDir);
-            }
-
-            if (Directory.Exists(MaccoreDir) || GenIOS)
-                SetupiOSTargets();
+            SetupAndroidTargets();
+            SetupiOSTargets();
 
             foreach (var target in Targets)
              {
@@ -251,17 +238,12 @@ namespace CppSharp
 
         static string GetAndroidNdkPath()
         {
-            if (!String.IsNullOrEmpty (AndroidNdkPath))
-                return AndroidNdkPath;
+            if (string.IsNullOrEmpty (AndroidNdkPath)) {
+                Console.Error.WriteLine ("The --android-ndk= option is required when targeting android.");
+                Environment.Exit (1);
+            }
 
-            // Find the Android NDK's path from Monodroid's config.
-            var configFile = Path.Combine(MonodroidDir, "env.config");
-            if (!File.Exists(configFile))
-                throw new Exception("Expected a valid Monodroid environment config file at " + configFile);
-
-            var config = File.ReadAllText(configFile);
-            var match = Regex.Match(config, @"ANDROID_NDK_PATH\s*:=\s(.*)");
-            return match.Groups[1].Value.Trim();
+            return AndroidNdkPath;
         }
 
         static void ParseCommandLineArgs(string[] args)
@@ -271,12 +253,9 @@ namespace CppSharp
             var options = new Mono.Options.OptionSet () {
                 { "abi=", "ABI triple to generate", v => Abis.Add(v) },
                 { "o|out=", "output directory", v => OutputDir = v },
-                { "maccore=", "include directory", v => MaccoreDir = v },
-                { "monodroid=", "top monodroid directory", v => MonodroidDir = v },
                 { "android-ndk=", "Path to Android NDK", v => AndroidNdkPath = v },
                 { "targetdir=", "Path to the directory containing the mono build", v =>TargetDir = v },
                 { "mono=", "include directory", v => MonoDir = v },
-                { "gen-ios", "generate iOS offsets", v => GenIOS = v != null },
                 { "h|help",  "show this message and exit",  v => showHelp = v != null },
             };
 
@@ -322,46 +301,10 @@ namespace CppSharp
 
         static void SetupMono(Driver driver, Target target)
         {
-            string targetBuild;
-            switch (target.Platform) {
-            case TargetPlatform.Android:
-                if (TargetDir == "") {
-                    Console.Error.WriteLine ("The --targetdir= option is required when targeting android.");
-                    Environment.Exit (1);
-                }
-                if (MonoDir == "") {
-                    Console.Error.WriteLine ("The --mono= option is required when targeting android.");
-                    Environment.Exit (1);
-                }
-                if (Abis.Count != 1) {
-                    Console.Error.WriteLine ("Exactly one --abi= argument is required when targeting android.");
-                    Environment.Exit (1);
-                }
-                targetBuild = TargetDir;
-                break;
-            case TargetPlatform.WatchOS:
-            case TargetPlatform.iOS: {
-                if (!string.IsNullOrEmpty (TargetDir)) {
-                    targetBuild = TargetDir;
-                } else {
-                    string targetPath = Path.Combine (MaccoreDir, "builds");
-                    if (!Directory.Exists (MonoDir))
-                        MonoDir = Path.GetFullPath (Path.Combine (targetPath, "../../mono"));
-                    targetBuild = Path.Combine(targetPath, target.Build);
-                }
-                break;
-            }
-            default:
-                throw new ArgumentOutOfRangeException ();
-            }
-
-            if (!Directory.Exists(targetBuild))
-                throw new Exception(string.Format("Could not find the target build directory: {0}", targetBuild));
-
             var includeDirs = new[]
             {
-                targetBuild,
-                Path.Combine(targetBuild, "mono", "eglib"),
+                TargetDir,
+                Path.Combine(TargetDir, "mono", "eglib"),
                 MonoDir,
                 Path.Combine(MonoDir, "mono"),
                 Path.Combine(MonoDir, "mono", "mini"),

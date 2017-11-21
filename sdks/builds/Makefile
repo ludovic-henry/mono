@@ -14,6 +14,9 @@ endif
 $(TOP)/configure: $(TOP)/configure.ac $(TOP)/autogen.sh
 	cd $(TOP) && PATH=$(EXTRA_PATH):$$PATH NOCONFIGURE=1 ./autogen.sh
 
+$(TOP)/tools/offsets-tool/MonoAotOffsetsDumper.exe: $(wildcard $(TOP)/tools/offsets-tool/*.cs)
+	$(MAKE) -C $(dir $@) $(notdir $@)
+
 TARGETS=
 
 ## BCL targets
@@ -39,6 +42,8 @@ endif
 ## Generic targets
 .PHONY: $(foreach target,$(TARGETS),toolchain-$(target))
 $(foreach target,$(TARGETS),toolchain-$(target)): toolchain-%: .stamp-%-toolchain
+
+$(foreach target,$(TARGETS),.stamp-$(target)-configure): .stamp-%-configure: $(TOP)/configure .stamp-%-toolchain
 
 .PHONY: $(foreach target,$(TARGETS),configure-$(target))
 $(foreach target,$(TARGETS),configure-$(target)): configure-%: .stamp-%-configure

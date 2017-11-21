@@ -115,7 +115,7 @@ _ios_$(1)_CONFIGURE_FLAGS = \
 .stamp-ios-$(1)-toolchain:
 	touch $$@
 
-.stamp-ios-$(1)-configure: $$(TOP)/configure
+.stamp-ios-$(1)-configure:
 	mkdir -p $$(TOP)/sdks/builds/ios-$(1)
 	cd $$(TOP)/sdks/builds/ios-$(1) && PATH="$$(PLATFORM_BIN):$$$$PATH" $$(TOP)/configure $$(_ios_$(1)_AC_VARS) $$(_ios_$(1)_CONFIGURE_ENVIRONMENT) $$(_ios_$(1)_CONFIGURE_FLAGS)
 	touch $$@
@@ -219,7 +219,7 @@ _ios_$(1)_CONFIGURE_FLAGS= \
 .stamp-ios-$(1)-toolchain:
 	touch $$@
 
-.stamp-ios-$(1)-configure: $$(TOP)/configure
+.stamp-ios-$(1)-configure:
 	mkdir -p $$(TOP)/sdks/builds/ios-$(1)
 	cd $$(TOP)/sdks/builds/ios-$(1) && PATH="$$(PLATFORM_BIN):$$$$PATH" $$(TOP)/configure $$(_ios_$(1)_AC_VARS) $$(_ios_$(1)_CONFIGURE_ENVIRONMENT) $$(_ios_$(1)_CONFIGURE_FLAGS)
 	touch $$@
@@ -239,9 +239,6 @@ endef
 
 $(eval $(call iOSSimulatorTemplate,sim32,i386))
 $(eval $(call iOSSimulatorTemplate,sim64,x86_64))
-
-$(TOP)/tools/offsets-tool/MonoAotOffsetsDumper.exe: $(wildcard $(TOP)/tools/offsets-tool/*.cs)
-	$(MAKE) -C $(dir $@) MonoAotOffsetsDumper.exe
 
 ##
 # Parameters:
@@ -308,7 +305,7 @@ _ios_$(1)_CONFIGURE_ENVIRONMENT= \
 .stamp-ios-$(1)-toolchain:
 	touch $$@
 
-.stamp-ios-$(1)-configure: $$(TOP)/configure
+.stamp-ios-$(1)-configure:
 	mkdir -p $$(TOP)/sdks/builds/ios-$(1)
 	cd $$(TOP)/sdks/builds/ios-$(1) && PATH="$$(PLATFORM_BIN):$$$$PATH" $$(TOP)/configure $$(_ios_$(1)_AC_VARS) $$(_ios_$(1)_CONFIGURE_ENVIRONMENT) $$(_ios_$(1)_CONFIGURE_FLAGS)
 	touch $$@
@@ -320,7 +317,7 @@ $$(TOP)/sdks/builds/ios-$(1)/$(2)-apple-darwin10.h: .stamp-ios-$(1)-configure $$
 	cd $$(TOP)/sdks/builds/ios-$(1) && \
 		MONO_PATH=$(TOP)/tools/offsets-tool/CppSharp/osx_32 \
 			mono --arch=32 --debug $$(TOP)/tools/offsets-tool/MonoAotOffsetsDumper.exe \
-				--abi $(2)-apple-darwin10 --platform ios --out $$(TOP)/sdks/builds/ios-$(1)/ --mono $$(TOP) --targetdir $$(TOP)/sdks/builds/ios-$(1)
+				--mono $$(TOP) --abi $(2)-apple-darwin10 --out $$(TOP)/sdks/builds/ios-$(1)/ --targetdir $$(TOP)/sdks/builds/ios-$(1)
 
 build-ios-$(1): $$(TOP)/sdks/builds/ios-$(1)/$(2)-apple-darwin10.h
 

@@ -7,6 +7,10 @@ android-armeabi-v7a-*/
 android-arm64-v8a-*/
 android-x86-*/
 android-x86_64-*/
+android-cross-arm/
+android-cross-arm64/
+android-cross-x86/
+android-cross-x86_64/
 ios-target32/
 ios-target64/
 ios-cross32/
