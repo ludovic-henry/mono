@@ -112,9 +112,9 @@ ikvm_native=yes
 
 host_win32=no
 target_win32=no
-platform_android=no
-platform_tizen=no
-platform_ios=no
+host_android=no
+host_tizen=no
+host_tizen=no
 host_darwin=no
 
 
@@ -220,7 +220,7 @@ case "$host" in
 		with_sgen_default_concurrent=yes
 		;;
 	*-*-linux-android*)
-		platform_android=yes
+		host_android=yes
 		AC_DEFINE(HOST_ANDROID,1,[Targeting the Android platform])
 		AC_DEFINE(TARGET_ANDROID,1,[Targeting the Android platform])
 
@@ -270,7 +270,7 @@ case "$host" in
                 fi
 		case "$host" in
 		*-tizen-linux-*)
-			platform_tizen=yes
+			host_tizen=yes
 			;;
 		esac
 		case "$host" in
@@ -351,11 +351,11 @@ case "$host" in
 				with_sgen_default_concurrent=yes
 				;;
 			arm*-darwin*)
-				platform_ios=yes
+				host_ios=yes
 				has_dtrace=no
 				;;
 			aarch64*-darwin*)
-				platform_ios=yes
+				host_ios=yes
 				;;
 		esac
 		;;
@@ -410,9 +410,9 @@ AM_CONDITIONAL(TARGET_WIN32, test x$target_win32 = xyes)
 AM_CONDITIONAL(HOST_LINUX, echo x$target_os | grep -q linux)
 AM_CONDITIONAL(HOST_DARWIN, test x$host_darwin = xyes)
 AM_CONDITIONAL(HOST_SIGPOSIX, test x$use_sigposix = xyes)
-AM_CONDITIONAL(HOST_ANDROID, test x$platform_android = xyes)
-AM_CONDITIONAL(HOST_TIZEN, test x$platform_tizen = xyes)
-AM_CONDITIONAL(HOST_IOS, test x$platform_ios = xyes)
+AM_CONDITIONAL(HOST_ANDROID, test x$host_android = xyes)
+AM_CONDITIONAL(HOST_TIZEN, test x$host_tizen = xyes)
+AM_CONDITIONAL(HOST_IOS, test x$host_ios = xyes)
 
 if test -z "$HOST_DARWIN_TRUE"; then :
 PLATFORM_AOT_SUFFIX=.dylib
@@ -568,7 +568,7 @@ AC_CHECK_FUNCS(_finite, , AC_MSG_CHECKING(for _finite in math.h)
 AC_CHECK_HEADERS(linux/magic.h)
 
 # For Android NDK unified headers
-if test x$platform_android = xyes; then
+if test x$host_android = xyes; then
 	AC_CHECK_HEADERS(machine/endian.h sys/endian.h)
 	AC_CHECK_HEADERS(android/legacy_signal_inlines.h, [have_android_signal_inlines=yes], [have_android_signal_inlines=no])
 
@@ -1540,7 +1540,7 @@ AC_CHECK_FUNCS(signal)
 
 # signal() is declared inline in Android headers
 # so we need to workaround it by overriding the check.
-if test x$platform_android = xyes; then
+if test x$host_android = xyes; then
 	AC_DEFINE(HAVE_SIGNAL,1)
 fi
 
@@ -1624,7 +1624,7 @@ if test x$host_win32 = xno; then
 	AC_CHECK_FUNCS(sched_setaffinity)
 	AC_CHECK_FUNCS(sched_getcpu)
 
-	if test x$platform_android != xyes; then
+	if test x$host_android != xyes; then
 		AC_CHECK_FUNCS(getpwnam_r)
 		AC_CHECK_FUNCS(getpwuid_r)
 	fi
@@ -4172,7 +4172,7 @@ if test ${TARGET} = unknown; then
 	AC_MSG_WARN("mono has not been ported to $host: some things may not work.")
 fi
 
-if test "x$platform_android" = "xyes"; then
+if test "x$host_android" = "xyes"; then
 	case "x${TARGET}" in
 	xARM)
 		case "x$arm_ver" in
@@ -4414,7 +4414,7 @@ if test "x$enable_btls" = "xyes"; then
 		AC_MSG_ERROR(Invalid BTLS platform)
 	esac
 
-	if test "x$platform_android" = "xyes"; then
+	if test "x$host_android" = "xyes"; then
 		btls_android=yes
 		BTLS_CMAKE_ARGS="$BTLS_CMAKE_ARGS -DCMAKE_TOOLCHAIN_FILE=$BTLS_ROOT/util/android-cmake/android.toolchain.cmake"
 		if test "x$with_btls_android_ndk" != "x"; then
