@@ -3412,14 +3412,14 @@ emit_move_return_value (MonoCompile *cfg, MonoInst *ins, guint8 *code)
 
 #endif /* DISABLE_JIT */
 
-#ifdef TARGET_MACH
+#ifdef TARGET_DARWIN
 static int tls_gs_offset;
 #endif
 
 gboolean
 mono_arch_have_fast_tls (void)
 {
-#ifdef TARGET_MACH
+#ifdef TARGET_DARWIN
 	static gboolean have_fast_tls = FALSE;
 	static gboolean inited = FALSE;
 	guint8 *ins;
@@ -3531,7 +3531,7 @@ mono_amd64_emit_tls_get (guint8* code, int dreg, int tls_offset)
 		amd64_mov_reg_membase (code, dreg, dreg, (tls_offset * 8) - 0x200, 8);
 		amd64_patch (buf [0], code);
 	}
-#elif defined(TARGET_MACH)
+#elif defined(TARGET_DARWIN)
 	x86_prefix (code, X86_GS_PREFIX);
 	amd64_mov_reg_mem (code, dreg, tls_gs_offset + (tls_offset * 8), 8);
 #else
@@ -3552,7 +3552,7 @@ mono_amd64_emit_tls_set (guint8 *code, int sreg, int tls_offset)
 {
 #ifdef TARGET_WIN32
 	g_assert_not_reached ();
-#elif defined(TARGET_MACH)
+#elif defined(TARGET_DARWIN)
 	x86_prefix (code, X86_GS_PREFIX);
 	amd64_mov_mem_reg (code, tls_gs_offset + (tls_offset * 8), sreg, 8);
 #else

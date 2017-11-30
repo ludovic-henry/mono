@@ -1671,7 +1671,7 @@ find_symbol (MonoDl *module, gpointer *globals, const char *name, gpointer *valu
 		guint32 hash;		
 		char *symbol = (char*)name;
 
-#ifdef TARGET_MACH
+#ifdef TARGET_DARWIN
 		symbol = g_strdup_printf ("_%s", name);
 #endif
 

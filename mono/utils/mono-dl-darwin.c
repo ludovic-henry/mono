@@ -11,7 +11,7 @@
  */
 #include <config.h>
 
-#if defined (TARGET_MACH)
+#if defined (TARGET_DARWIN)
 
 #include "mono/utils/mono-dl.h"
 #include "mono/utils/mono-embed.h"

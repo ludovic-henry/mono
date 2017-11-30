@@ -87,7 +87,7 @@
 
 #if defined(__linux__)
 #define RODATA_SECT ".rodata"
-#elif defined(TARGET_MACH)
+#elif defined(TARGET_DARWIN)
 #define RODATA_SECT ".section __TEXT, __const"
 #elif defined(TARGET_WIN32_MSVC)
 #define RODATA_SECT ".rdata"
@@ -768,7 +768,7 @@ emit_string_symbol (MonoAotCompile *acfg, const char *name, const char *value)
 	}
 
 	mono_img_writer_emit_section_change (acfg->w, RODATA_SECT, 1);
-#ifdef TARGET_MACH
+#ifdef TARGET_DARWIN
 	/* On apple, all symbols need to be aligned to avoid warnings from ld */
 	emit_alignment (acfg, 4);
 #endif
@@ -999,7 +999,7 @@ arch_emit_unwind_info_sections (MonoAotCompile *acfg, const char *function_start
 #endif
 
 #ifdef TARGET_ARM
-#ifdef TARGET_MACH
+#ifdef TARGET_DARWIN
 #define AOT_TARGET_STR "ARM (MACH)"
 #else
 #define AOT_TARGET_STR "ARM (!MACH)"
@@ -1007,7 +1007,7 @@ arch_emit_unwind_info_sections (MonoAotCompile *acfg, const char *function_start
 #endif
 
 #ifdef TARGET_ARM64
-#ifdef TARGET_MACH
+#ifdef TARGET_DARWIN
 #define AOT_TARGET_STR "ARM64 (MACH)"
 #else
 #define AOT_TARGET_STR "ARM64 (!MACH)"
@@ -1095,7 +1095,7 @@ arch_init (MonoAotCompile *acfg)
 		mono_arch_set_target (acfg->aot_opts.mtriple);
 #endif
 
-#ifdef TARGET_MACH
+#ifdef TARGET_DARWIN
 	acfg->user_symbol_prefix = "_";
 	acfg->llvm_label_prefix = "_";
 	acfg->inst_directive = ".word";
@@ -1129,7 +1129,7 @@ arm64_emit_load_got_slot (MonoAotCompile *acfg, int dreg, int got_slot)
 	emit_unset_mode (acfg);
 	/* r16==ip0 */
 	offset = (int)(got_slot * sizeof (gpointer));
-#ifdef TARGET_MACH
+#ifdef TARGET_DARWIN
 	/* clang's integrated assembler */
 	fprintf (acfg->fp, "adrp x16, %s@PAGE+%d\n", acfg->got_symbol, offset & 0xfffff000);
 	fprintf (acfg->fp, "add x16, x16, %s@PAGEOFF\n", acfg->got_symbol);
@@ -1257,7 +1257,7 @@ arm64_emit_specific_trampoline_pages (MonoAotCompile *acfg)
 	if (!acfg->aot_opts.use_trampolines_page)
 		return;
 
-#ifdef TARGET_MACH
+#ifdef TARGET_DARWIN
 	/* Have to match the target pagesize */
 	pagesize = 16384;
 #else
@@ -3541,7 +3541,7 @@ is_plt_patch (MonoJumpInfo *patch_info)
 static char*
 get_plt_symbol (MonoAotCompile *acfg, int plt_offset, MonoJumpInfo *patch_info)
 {
-#ifdef TARGET_MACH
+#ifdef TARGET_DARWIN
 	/* 
 	 * The Apple linker reorganizes object files, so it doesn't like branches to local
 	 * labels, since those have no relocations.
@@ -5717,7 +5717,7 @@ get_debug_sym (MonoMethod *method, const char *prefix, GHashTable *cache)
 
 	name1 = mono_method_full_name (method, TRUE);
 
-#ifdef TARGET_MACH
+#ifdef TARGET_DARWIN
 	// This is so that we don't accidentally create a local symbol (which starts with 'L')
 	if ((!prefix || !*prefix) && name1 [0] == 'L')
 		prefix = "_";
@@ -6666,7 +6666,7 @@ emit_plt (MonoAotCompile *acfg)
 			emit_label (acfg, plt_entry->llvm_symbol);
 			if (acfg->llvm) {
 				emit_global_inner (acfg, plt_entry->llvm_symbol, TRUE);
-#if defined(TARGET_MACH)
+#if defined(TARGET_DARWIN)
 				fprintf (acfg->fp, ".private_extern %s\n", plt_entry->llvm_symbol);
 #endif
 			}
@@ -6716,7 +6716,7 @@ emit_plt (MonoAotCompile *acfg)
 			}
 
 			if (debug_sym) {
-#if defined(TARGET_MACH)
+#if defined(TARGET_DARWIN)
 				fprintf (acfg->fp, "	.thumb_func %s\n", debug_sym);
 				fprintf (acfg->fp, "	.no_dead_strip %s\n", debug_sym);
 #endif
@@ -8842,7 +8842,7 @@ mono_aot_get_plt_symbol (MonoJumpInfoType type, gconstpointer data)
 	plt_entry = get_plt_entry (llvm_acfg, ji);
 	plt_entry->llvm_used = TRUE;
 
-#if defined(TARGET_MACH)
+#if defined(TARGET_DARWIN)
 	return g_strdup_printf (plt_entry->llvm_symbol + strlen (llvm_acfg->llvm_label_prefix));
 #else
 	return g_strdup_printf (plt_entry->llvm_symbol);
@@ -8990,7 +8990,7 @@ emit_llvm_file (MonoAotCompile *acfg)
 	g_string_append_printf (acfg->llc_args, " -disable-tail-calls");
 #endif
 
-#if ( defined(TARGET_MACH) && defined(TARGET_ARM) ) || defined(TARGET_ORBIS)
+#if ( defined(TARGET_DARWIN) && defined(TARGET_ARM) ) || defined(TARGET_ORBIS)
 	/* ios requires PIC code now */
 	g_string_append_printf (acfg->llc_args, " -relocation-model=pic");
 #else
@@ -9965,7 +9965,7 @@ emit_got (MonoAotCompile *acfg)
 	/* Don't make GOT global so accesses to it don't need relocations */
 	sprintf (symbol, "%s", acfg->got_symbol);
 
-#ifdef TARGET_MACH
+#ifdef TARGET_DARWIN
 	emit_unset_mode (acfg);
 	fprintf (acfg->fp, ".section __DATA, __bss\n");
 	emit_alignment (acfg, 8);
@@ -10122,7 +10122,7 @@ emit_globals (MonoAotCompile *acfg)
 
 		sprintf (symbol, "name_%d", i);
 		emit_section_change (acfg, RODATA_SECT, 1);
-#ifdef TARGET_MACH
+#ifdef TARGET_DARWIN
 		emit_alignment (acfg, 4);
 #endif
 		emit_label (acfg, symbol);
@@ -11033,13 +11033,13 @@ compile_asm (MonoAotCompile *acfg)
 
 #ifdef TARGET_WIN32_MSVC
 #define AS_OPTIONS "-c -x assembler"
-#elif defined(TARGET_AMD64) && !defined(TARGET_MACH)
+#elif defined(TARGET_AMD64) && !defined(TARGET_DARWIN)
 #define AS_OPTIONS "--64"
 #elif defined(TARGET_POWERPC64)
 #define AS_OPTIONS "-a64 -mppc64"
 #elif defined(sparc) && SIZEOF_VOID_P == 8
 #define AS_OPTIONS "-xarch=v9"
-#elif defined(TARGET_X86) && defined(TARGET_MACH)
+#elif defined(TARGET_X86) && defined(TARGET_DARWIN)
 #define AS_OPTIONS "-arch i386"
 #else
 #define AS_OPTIONS ""
@@ -11062,10 +11062,10 @@ compile_asm (MonoAotCompile *acfg)
 #if defined(sparc)
 #define LD_NAME "ld"
 #define LD_OPTIONS "-shared -G"
-#elif defined(__ppc__) && defined(TARGET_MACH)
+#elif defined(__ppc__) && defined(TARGET_DARWIN)
 #define LD_NAME "gcc"
 #define LD_OPTIONS "-dynamiclib"
-#elif defined(TARGET_AMD64) && defined(TARGET_MACH)
+#elif defined(TARGET_AMD64) && defined(TARGET_DARWIN)
 #define LD_NAME "clang"
 #define LD_OPTIONS "--shared"
 #elif defined(TARGET_WIN32_MSVC)
@@ -11075,7 +11075,7 @@ compile_asm (MonoAotCompile *acfg)
 #elif defined(TARGET_WIN32) && !defined(TARGET_ANDROID)
 #define LD_NAME "gcc"
 #define LD_OPTIONS "-shared"
-#elif defined(TARGET_X86) && defined(TARGET_MACH)
+#elif defined(TARGET_X86) && defined(TARGET_DARWIN)
 #define LD_NAME "clang"
 #define LD_OPTIONS "-m32 -dynamiclib"
 #elif defined(TARGET_ARM) && !defined(TARGET_ANDROID)
@@ -11207,7 +11207,7 @@ compile_asm (MonoAotCompile *acfg)
 	execute_system (com);
 	g_free (com);*/
 
-#if defined(TARGET_ARM) && !defined(TARGET_MACH)
+#if defined(TARGET_ARM) && !defined(TARGET_DARWIN)
 	/* 
 	 * gas generates 'mapping symbols' each time code and data is mixed, which 
 	 * happens a lot in emit_and_reloc_code (), so we need to get rid of them.
@@ -11231,7 +11231,7 @@ compile_asm (MonoAotCompile *acfg)
 		}
 	}
 
-#if defined(TARGET_MACH)
+#if defined(TARGET_DARWIN)
 	command = g_strdup_printf ("dsymutil \"%s\"", outfile_name);
 	aot_printf (acfg, "Executing dsymutil: %s\n", command);
 	if (execute_system (command) != 0) {

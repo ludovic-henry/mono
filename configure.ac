@@ -111,27 +111,24 @@ parallel_mark=yes
 ikvm_native=yes
 
 host_win32=no
-target_win32=no
+host_netbsd=no
+host_kfreebsd_gnu=no
+host_freebsd=no
+host_openbsd=no
 host_android=no
 host_tizen=no
-host_tizen=no
+host_linux=no
+host_hpux=no
+host_solaris=no
 host_darwin=no
+host_ios=no
+host_haiku=no
 
-
-if test "x$enable_wasm" = "xyes"; then
-CFLAGS="$CFLAGS -D_REENTRANT -D_GNU_SOURCE -DNO_UNALIGNED_ACCESS -s WASM=1"
-CPPFLAGS="$CPPFLAGS -D_REENTRANT -DUSE_MMAP -D_GNU_SOURCE -DNO_UNALIGNED_ACCESS -s WASM=1"
-libdl="-ldl"
-libgc_threads=pthreads
-
-else
+target_win32=no
 
 case "$host" in
 	*-mingw*|*-*-cygwin*)
-		AC_DEFINE(DISABLE_PORTABILITY,1,[Disable the io-portability layer])
-		AC_DEFINE(HOST_NO_SYMLINKS,1,[This platform does not support symlinks])
 		host_win32=yes
-		mono_cv_clang=no
 		if test "x$cross_compiling" = "xno"; then
 			if test "x$host" = "x$build" -a "x$host" = "x$target"; then
 				target_win32=yes
@@ -141,245 +138,276 @@ case "$host" in
 				target_win32=yes
 			fi
 		fi
-		HOST_CC="gcc"
-		# Windows Vista or later is required
-		CPPFLAGS="$CPPFLAGS -DWINVER=0x0600 -D_WIN32_WINNT=0x0600 -D_WIN32_IE=0x0501 -D_UNICODE -DUNICODE -DWIN32_THREADS -DFD_SETSIZE=1024"
-		LDFLAGS="$LDFLAGS -lmswsock -lws2_32 -lole32 -loleaut32 -lpsapi -lversion -ladvapi32 -lwinmm -lkernel32 -liphlpapi"
-		libmono_cflags="-mms-bitfields -mwindows"
-		libmono_ldflags="-mms-bitfields -mwindows"
-		libdl=
-		libgc_threads=win32
-		with_sigaltstack=no
-		with_tls=pthread
-		with_sgen_default_concurrent=yes
-		LN_S=cp
-		# This forces libgc to use the DllMain based thread registration code on win32
-		libgc_configure_args="$libgc_configure_args --enable-win32-dllmain=yes"
 		;;
 	*-*-*netbsd*)
-		CPPFLAGS="$CPPFLAGS -D_REENTRANT -DGC_NETBSD_THREADS -D_GNU_SOURCE"
-		libmono_cflags="-D_REENTRANT"
-		LDFLAGS="$LDFLAGS -pthread"
-		CPPFLAGS="$CPPFLAGS -DHOST_BSD"
-		libmono_ldflags="-pthread"
-		need_link_unlink=yes
-		libdl="-ldl"
-		libgc_threads=pthreads
-		with_sigaltstack=no
-		use_sigposix=yes
-		with_sgen_default_concurrent=yes
+		host_netbsd=yes
 		;;
 	*-*-kfreebsd*-gnu)
-		CPPFLAGS="$CPPFLAGS -DGC_FREEBSD_THREADS -D_GNU_SOURCE -D_REENTRANT -DUSE_MMAP -DUSE_MUNMAP -DTHREAD_LOCAL_ALLOC -pthread"
-		libmono_cflags="-D_REENTRANT -DTHREAD_LOCAL_ALLOC -pthread"
-		libmono_ldflags="-lpthread -pthread"
-		libdl="-ldl"
-		libgc_threads=pthreads
-		need_link_unlink=yes
-		with_sigaltstack=no
-		use_sigposix=yes
-		with_sgen_default_concurrent=yes
+		host_kfreebsd_gnu=yes
 		;;
 	*-*-*freebsd*)
-		if test "x$PTHREAD_CFLAGS" = "x"; then
-			CPPFLAGS="$CPPFLAGS -DGC_FREEBSD_THREADS"
-			libmono_cflags=
-		else
-			CPPFLAGS="$CPPFLAGS $PTHREAD_CFLAGS -DGC_FREEBSD_THREADS"
-			libmono_cflags="$PTHREAD_CFLAGS"
-		fi
-		if test "x$PTHREAD_LIBS" = "x"; then
-			LDFLAGS="$LDFLAGS -pthread -L/usr/local/lib"
-			libmono_ldflags="-pthread"
-		else
-			LDFLAGS="$LDFLAGS $PTHREAD_LIBS -L/usr/local/lib"
-			libmono_ldflags="$PTHREAD_LIBS"
-		fi
-		CPPFLAGS="$CPPFLAGS -DHOST_BSD"
-		need_link_unlink=yes
-		AC_DEFINE(PTHREAD_POINTER_ID, 1, [pthread is a pointer])
-		libdl=
-		libgc_threads=pthreads
-		use_sigposix=yes
-		has_dtrace=yes
-		with_sgen_default_concurrent=yes
+		host_freebsd=yes
 		;;
 	*-*-*openbsd*)
-		CPPFLAGS="$CPPFLAGS -D_THREAD_SAFE -DGC_OPENBSD_THREADS -DHOST_BSD -D_REENTRANT -DUSE_MMAP"
-		if test "x$disable_munmap" != "xyes"; then
-		CPPFLAGS="$CPPFLAGS -DUSE_MUNMAP"
-		fi
-		libmono_cflags="-D_THREAD_SAFE -D_REENTRANT"
-		LDFLAGS="$LDFLAGS -pthread"
-		need_link_unlink=yes
-		AC_DEFINE(PTHREAD_POINTER_ID)
-		libdl=
-		libgc_threads=pthreads
-		with_sigaltstack=no
-		use_sigposix=yes
-		with_sgen_default_concurrent=yes
+		host_openbsd=yes
 		;;
 	*-*-linux-android*)
 		host_android=yes
-		AC_DEFINE(HOST_ANDROID,1,[Targeting the Android platform])
-		AC_DEFINE(TARGET_ANDROID,1,[Targeting the Android platform])
-
-		CPPFLAGS="$CPPFLAGS -DGC_LINUX_THREADS -D_GNU_SOURCE -D_REENTRANT -DUSE_MMAP"
-		if test "x$disable_munmap" != "xyes"; then
-			CPPFLAGS="$CPPFLAGS -DUSE_MUNMAP"
-		fi
-		libmono_cflags="-D_REENTRANT"
-		libdl="-ldl"
-		libgc_threads=pthreads
-		use_sigposix=yes
-
-		with_tls=pthread
-		with_sigaltstack=no
-		with_static_mono=no
-
-		# Android doesn't support boehm, as it's missing <link.h>
-		support_boehm=no
-		with_gc=sgen
-
-		# isinf(3) requires -lm; see isinf check below
-		LDFLAGS="$LDFLAGS -lm"
-
-		# Bionic's <pthread.h> sets PTHREAD_STACK_MIN=2*PAGE_SIZE; doesn't define
-		# PAGE_SIZE; breaks mono/io-layer/collection.c
-		# Bionic doesn't provide S_IWRITE; breaks io-layer/io.c
-		CFLAGS="$CFLAGS -DPAGE_SIZE=4096 -DS_IWRITE=S_IWUSR"
-		CXXFLAGS="$CXXFLAGS -DPAGE_SIZE=4096 -DS_IWRITE=S_IWUSR"
-
-		# to bypass the underscore linker check, can't work when cross-compiling
-		mono_cv_uscore=yes
-		mono_cv_clang=no
+		;;
+	*-tizen-linux-*)
+		host_tizen=yes
 		;;
 	*-*-linux*)
-		CPPFLAGS="$CPPFLAGS -DGC_LINUX_THREADS -D_GNU_SOURCE -D_REENTRANT -DUSE_MMAP"
-		if test "x$disable_munmap" != "xyes"; then
-			CPPFLAGS="$CPPFLAGS -DUSE_MUNMAP"
-		fi
-		libmono_cflags="-D_REENTRANT"
-		libdl="-ldl"
-		libgc_threads=pthreads
-		use_sigposix=yes
-		if test "x$cross_compiling" != "xno"; then
-                	# to bypass the underscore linker check, not
-                	# available during cross-compilation
-                	mono_cv_uscore=no
-                fi
-		case "$host" in
-		*-tizen-linux-*)
-			host_tizen=yes
-			;;
-		esac
-		case "$host" in
-		aarch64-*)
-			support_boehm=no
-			with_gc=sgen
-			;;
-		powerpc*-*-linux*)
-			# https://bugzilla.novell.com/show_bug.cgi?id=504411
-			disable_munmap=yes
-			;;
-		esac
-		with_sgen_default_concurrent=yes
+		host_linux=yes
 		;;
 	*-*-nacl*)
-		echo "nacl no longer supported."
-		exit 1
+		AC_MSG_ERROR([nacl is no longer supported.])
 		;;
 	*-*-hpux*)
-		CPPFLAGS="$CPPFLAGS -DGC_HPUX_THREADS -D_HPUX_SOURCE -D_XOPEN_SOURCE_EXTENDED -D_REENTRANT"
-		# +ESdbgasm only valid on bundled cc on RISC
-		# silently ignored for ia64
-		if test $GCC != "yes"; then
-			CFLAGS="$CFLAGS +ESdbgasm"
-			# Arrange for run-time dereferencing of null
-			# pointers to produce a SIGSEGV signal.
-			LDFLAGS="$LDFLAGS -z"
-		fi
-		CFLAGS="$CFLAGS +ESdbgasm"
-		LDFLAGS="$LDFLAGS -z"
-		libmono_cflags="-D_REENTRANT"
-		libmono_ldflags="-lpthread"
-		libgc_threads=pthreads
-		need_link_unlink=yes
-		use_sigposix=yes
+		host_hpux=yes
 		;;
 	*-*-solaris*)
-		CPPFLAGS="$CPPFLAGS -DGC_SOLARIS_THREADS -DGC_SOLARIS_PTHREADS -D_REENTRANT -D_POSIX_PTHREAD_SEMANTICS -DUSE_MMAP -DUSE_MUNMAP -DHOST_SOLARIS"
-		need_link_unlink=yes
-		libmono_cflags="-D_REENTRANT"
-		libgc_threads=pthreads
-		has_dtrace=yes
-		use_sigposix=yes
-		enable_solaris_tar_check=yes
+		host_solaris=yes
 		;;
-	*-*-darwin*)
-		parallel_mark="Disabled_Currently_Hangs_On_MacOSX"
+	i*86-*-darwin*)
 		host_darwin=yes
-		target_mach=yes
-		CPPFLAGS="$CPPFLAGS -D_THREAD_SAFE -DGC_MACOSX_THREADS -DUSE_MMAP -DUSE_MUNMAP"
-		libmono_cflags="-D_THREAD_SAFE"
-		need_link_unlink=yes
-		AC_DEFINE(PTHREAD_POINTER_ID)
-		AC_DEFINE(USE_MACH_SEMA, 1, [...])
-		libdl=
-		libgc_threads=pthreads
-		has_dtrace=yes
-		if test "x$cross_compiling" = "xyes"; then
-			has_broken_apple_cpp=yes
-		fi
-		dnl Snow Leopard is horribly broken -- it reports itself as i386-apple-darwin*, but
-		dnl its gcc defaults to 64-bit mode.  They have also deprecated the usage of ucontext
-		dnl we need to set some flags to build our 32-bit binaries on 10.6 properly
-		case "$host" in
-			dnl Snow Leopard and newer config.guess reports as this
-			i*86-*-darwin*)
-				BROKEN_DARWIN_FLAGS="-arch i386 -D_XOPEN_SOURCE"
-				BROKEN_DARWIN_CPPFLAGS="-D_XOPEN_SOURCE"
-				CPPFLAGS="$CPPFLAGS $BROKEN_DARWIN_CPPFLAGS"
-				CFLAGS="$CFLAGS $BROKEN_DARWIN_FLAGS"
-				CXXFLAGS="$CXXFLAGS $BROKEN_DARWIN_FLAGS"
-				CCASFLAGS="$CCASFLAGS $BROKEN_DARWIN_FLAGS"
-				CPPFLAGS_FOR_LIBGC="$CPPFLAGS_FOR_LIBGC $BROKEN_DARWIN_CPPFLAGS"
-				CFLAGS_FOR_LIBGC="$CFLAGS_FOR_LIBGC $BROKEN_DARWIN_FLAGS"
-				with_sgen_default_concurrent=yes
-				;;
-			x*64-*-darwin*)
-				with_sgen_default_concurrent=yes
-				;;
-			arm*-darwin*)
-				host_ios=yes
-				has_dtrace=no
-				;;
-			aarch64*-darwin*)
-				host_ios=yes
-				;;
-		esac
+		target_darwin=yes
+		;;
+	x*64-*-darwin*)
+		host_darwin=yes
+		target_darwin=yes
+		;;
+	arm*-darwin*)
+		host_darwin=yes
+		host_ios=yes
+		target_darwin=yes
+		;;
+	aarch64*-darwin*)
+		host_darwin=yes
+		host_ios=yes
+		target_darwin=yes
 		;;
 	*-*-haiku*)
-		CPPFLAGS="$CPPFLAGS -D_REENTRANT -D_THREAD_SAFE"
-		libmono_cflags="-D_REENTRANT -D_THREAD_SAFE"
-		libdl=
-		LIBS="$LIBS -lnetwork -ltextencoding"
-		need_link_unlink=yes
-		AC_DEFINE(PTHREAD_POINTER_ID)
-		dnl Haiku does not support static TLS with __thread
-		with_tls=pthread
-		dnl Boehm is too much work to backport Haiku support for
-		support_boehm=no
-		libgc_threads=pthreads
-		use_sigposix=yes
+		host_haiku=yes
 		;;
 	*)
-		AC_MSG_WARN([*** Please add $host to configure.ac checks!])
-		libdl="-ldl"
+		AC_MSG_ERROR([*** Please add $host to configure.ac checks!])
 		;;
 esac
 
-# WASM hack
+if test "x$enable_wasm" = "xyes"; then
+	CFLAGS="$CFLAGS -D_REENTRANT -D_GNU_SOURCE -DNO_UNALIGNED_ACCESS -s WASM=1"
+	CPPFLAGS="$CPPFLAGS -D_REENTRANT -DUSE_MMAP -D_GNU_SOURCE -DNO_UNALIGNED_ACCESS -s WASM=1"
+	libdl="-ldl"
+	libgc_threads=pthreads
+elif test "x$host_win32" = "xyes"; then
+	AC_DEFINE(DISABLE_PORTABILITY,1,[Disable the io-portability layer])
+	AC_DEFINE(HOST_NO_SYMLINKS,1,[This platform does not support symlinks])
+	mono_cv_clang=no
+	HOST_CC="gcc"
+	# Windows Vista or later is required
+	CPPFLAGS="$CPPFLAGS -DWINVER=0x0600 -D_WIN32_WINNT=0x0600 -D_WIN32_IE=0x0501 -D_UNICODE -DUNICODE -DWIN32_THREADS -DFD_SETSIZE=1024"
+	LDFLAGS="$LDFLAGS -lmswsock -lws2_32 -lole32 -loleaut32 -lpsapi -lversion -ladvapi32 -lwinmm -lkernel32 -liphlpapi"
+	libmono_cflags="-mms-bitfields -mwindows"
+	libmono_ldflags="-mms-bitfields -mwindows"
+	libdl=
+	libgc_threads=win32
+	with_sigaltstack=no
+	with_tls=pthread
+	with_sgen_default_concurrent=yes
+	LN_S=cp
+	# This forces libgc to use the DllMain based thread registration code on win32
+	libgc_configure_args="$libgc_configure_args --enable-win32-dllmain=yes"
+elif test "x$host_netbsd" = "xyes"; then
+	CPPFLAGS="$CPPFLAGS -D_REENTRANT -DGC_NETBSD_THREADS -D_GNU_SOURCE"
+	libmono_cflags="-D_REENTRANT"
+	LDFLAGS="$LDFLAGS -pthread"
+	CPPFLAGS="$CPPFLAGS -DHOST_BSD"
+	libmono_ldflags="-pthread"
+	need_link_unlink=yes
+	libdl="-ldl"
+	libgc_threads=pthreads
+	with_sigaltstack=no
+	use_sigposix=yes
+	with_sgen_default_concurrent=yes
+elif test "x$host_kfreebsd_gnu" = "xyes"; then
+	CPPFLAGS="$CPPFLAGS -DGC_FREEBSD_THREADS -D_GNU_SOURCE -D_REENTRANT -DUSE_MMAP -DUSE_MUNMAP -DTHREAD_LOCAL_ALLOC -pthread"
+	libmono_cflags="-D_REENTRANT -DTHREAD_LOCAL_ALLOC -pthread"
+	libmono_ldflags="-lpthread -pthread"
+	libdl="-ldl"
+	libgc_threads=pthreads
+	need_link_unlink=yes
+	with_sigaltstack=no
+	use_sigposix=yes
+	with_sgen_default_concurrent=yes
+elif test "x$host_freebsd" = "xyes"; then
+	if test "x$PTHREAD_CFLAGS" = "x"; then
+		CPPFLAGS="$CPPFLAGS -DGC_FREEBSD_THREADS"
+		libmono_cflags=
+	else
+		CPPFLAGS="$CPPFLAGS $PTHREAD_CFLAGS -DGC_FREEBSD_THREADS"
+		libmono_cflags="$PTHREAD_CFLAGS"
+	fi
+	if test "x$PTHREAD_LIBS" = "x"; then
+		LDFLAGS="$LDFLAGS -pthread -L/usr/local/lib"
+		libmono_ldflags="-pthread"
+	else
+		LDFLAGS="$LDFLAGS $PTHREAD_LIBS -L/usr/local/lib"
+		libmono_ldflags="$PTHREAD_LIBS"
+	fi
+	CPPFLAGS="$CPPFLAGS -DHOST_BSD"
+	need_link_unlink=yes
+	AC_DEFINE(PTHREAD_POINTER_ID, 1, [pthread is a pointer])
+	libdl=
+	libgc_threads=pthreads
+	use_sigposix=yes
+	has_dtrace=yes
+	with_sgen_default_concurrent=yes
+elif test "x$host_openbsd" = "xyes"; then
+	CPPFLAGS="$CPPFLAGS -D_THREAD_SAFE -DGC_OPENBSD_THREADS -DHOST_BSD -D_REENTRANT -DUSE_MMAP"
+	if test "x$disable_munmap" != "xyes"; then
+	CPPFLAGS="$CPPFLAGS -DUSE_MUNMAP"
+	fi
+	libmono_cflags="-D_THREAD_SAFE -D_REENTRANT"
+	LDFLAGS="$LDFLAGS -pthread"
+	need_link_unlink=yes
+	AC_DEFINE(PTHREAD_POINTER_ID)
+	libdl=
+	libgc_threads=pthreads
+	with_sigaltstack=no
+	use_sigposix=yes
+	with_sgen_default_concurrent=yes
+elif test "x$host_android" = "xyes"; then
+	AC_DEFINE(HOST_ANDROID,1,[Targeting the Android platform])
+	AC_DEFINE(TARGET_ANDROID,1,[Targeting the Android platform])
+
+	CPPFLAGS="$CPPFLAGS -DGC_LINUX_THREADS -D_GNU_SOURCE -D_REENTRANT -DUSE_MMAP"
+	if test "x$disable_munmap" != "xyes"; then
+		CPPFLAGS="$CPPFLAGS -DUSE_MUNMAP"
+	fi
+	libmono_cflags="-D_REENTRANT"
+	libdl="-ldl"
+	libgc_threads=pthreads
+	use_sigposix=yes
+
+	with_tls=pthread
+	with_sigaltstack=no
+	with_static_mono=no
+
+	# Android doesn't support boehm, as it's missing <link.h>
+	support_boehm=no
+	with_gc=sgen
+
+	# isinf(3) requires -lm; see isinf check below
+	LDFLAGS="$LDFLAGS -lm"
+
+	# Bionic's <pthread.h> sets PTHREAD_STACK_MIN=2*PAGE_SIZE; doesn't define
+	# PAGE_SIZE; breaks mono/io-layer/collection.c
+	# Bionic doesn't provide S_IWRITE; breaks io-layer/io.c
+	CFLAGS="$CFLAGS -DPAGE_SIZE=4096 -DS_IWRITE=S_IWUSR"
+	CXXFLAGS="$CXXFLAGS -DPAGE_SIZE=4096 -DS_IWRITE=S_IWUSR"
+
+	# to bypass the underscore linker check, can't work when cross-compiling
+	mono_cv_uscore=yes
+	mono_cv_clang=no
+elif test "x$host_linux" = "xyes"; then
+	CPPFLAGS="$CPPFLAGS -DGC_LINUX_THREADS -D_GNU_SOURCE -D_REENTRANT -DUSE_MMAP"
+	if test "x$disable_munmap" != "xyes"; then
+		CPPFLAGS="$CPPFLAGS -DUSE_MUNMAP"
+	fi
+	libmono_cflags="-D_REENTRANT"
+	libdl="-ldl"
+	libgc_threads=pthreads
+	use_sigposix=yes
+	if test "x$cross_compiling" != "xno"; then
+            	# to bypass the underscore linker check, not
+            	# available during cross-compilation
+            	mono_cv_uscore=no
+            fi
+	case "$host" in
+	aarch64-*)
+		support_boehm=no
+		with_gc=sgen
+		;;
+	powerpc*-*-linux*)
+		# https://bugzilla.novell.com/show_bug.cgi?id=504411
+		disable_munmap=yes
+		;;
+	esac
+elif test "x$host_hpux" = "xyes"; then
+	CPPFLAGS="$CPPFLAGS -DGC_HPUX_THREADS -D_HPUX_SOURCE -D_XOPEN_SOURCE_EXTENDED -D_REENTRANT"
+	# +ESdbgasm only valid on bundled cc on RISC
+	# silently ignored for ia64
+	if test $GCC != "yes"; then
+		CFLAGS="$CFLAGS +ESdbgasm"
+		# Arrange for run-time dereferencing of null
+		# pointers to produce a SIGSEGV signal.
+		LDFLAGS="$LDFLAGS -z"
+	fi
+	CFLAGS="$CFLAGS +ESdbgasm"
+	LDFLAGS="$LDFLAGS -z"
+	libmono_cflags="-D_REENTRANT"
+	libmono_ldflags="-lpthread"
+	libgc_threads=pthreads
+	need_link_unlink=yes
+	use_sigposix=yes
+elif test "x$host_solaris" = "xyes"; then
+	CPPFLAGS="$CPPFLAGS -DGC_SOLARIS_THREADS -DGC_SOLARIS_PTHREADS -D_REENTRANT -D_POSIX_PTHREAD_SEMANTICS -DUSE_MMAP -DUSE_MUNMAP -DHOST_SOLARIS"
+	need_link_unlink=yes
+	libmono_cflags="-D_REENTRANT"
+	libgc_threads=pthreads
+	has_dtrace=yes
+	use_sigposix=yes
+	enable_solaris_tar_check=yes
+elif test "x$host_darwin" = "xyes"; then
+	parallel_mark="Disabled_Currently_Hangs_On_MacOSX"
+	CPPFLAGS="$CPPFLAGS -D_THREAD_SAFE -DGC_MACOSX_THREADS -DUSE_MMAP -DUSE_MUNMAP"
+	libmono_cflags="-D_THREAD_SAFE"
+	need_link_unlink=yes
+	AC_DEFINE(PTHREAD_POINTER_ID)
+	AC_DEFINE(USE_MACH_SEMA, 1, [...])
+	libdl=
+	libgc_threads=pthreads
+	has_dtrace=yes
+	if test "x$cross_compiling" = "xyes"; then
+		has_broken_apple_cpp=yes
+	fi
+	dnl Snow Leopard is horribly broken -- it reports itself as i386-apple-darwin*, but
+	dnl its gcc defaults to 64-bit mode.  They have also deprecated the usage of ucontext
+	dnl we need to set some flags to build our 32-bit binaries on 10.6 properly
+	case "$host_cpu" in
+		dnl Snow Leopard and newer config.guess reports as this
+		i*86)
+			BROKEN_DARWIN_FLAGS="-arch i386 -D_XOPEN_SOURCE"
+			BROKEN_DARWIN_CPPFLAGS="-D_XOPEN_SOURCE"
+			CPPFLAGS="$CPPFLAGS $BROKEN_DARWIN_CPPFLAGS"
+			CFLAGS="$CFLAGS $BROKEN_DARWIN_FLAGS"
+			CXXFLAGS="$CXXFLAGS $BROKEN_DARWIN_FLAGS"
+			CCASFLAGS="$CCASFLAGS $BROKEN_DARWIN_FLAGS"
+			CPPFLAGS_FOR_LIBGC="$CPPFLAGS_FOR_LIBGC $BROKEN_DARWIN_CPPFLAGS"
+			CFLAGS_FOR_LIBGC="$CFLAGS_FOR_LIBGC $BROKEN_DARWIN_FLAGS"
+			with_sgen_default_concurrent=yes
+			;;
+		x*64)
+			with_sgen_default_concurrent=yes
+			;;
+		arm*)
+			has_dtrace=no
+			;;
+	esac
+elif test "x$host_haiku" = "xyes"; then
+	CPPFLAGS="$CPPFLAGS -D_REENTRANT -D_THREAD_SAFE"
+	libmono_cflags="-D_REENTRANT -D_THREAD_SAFE"
+	libdl=
+	LIBS="$LIBS -lnetwork -ltextencoding"
+	need_link_unlink=yes
+	AC_DEFINE(PTHREAD_POINTER_ID)
+	dnl Haiku does not support static TLS with __thread
+	with_tls=pthread
+	dnl Boehm is too much work to backport Haiku support for
+	support_boehm=no
+	libgc_threads=pthreads
+	use_sigposix=yes
 fi
 
 AC_MSG_RESULT(ok)
@@ -405,26 +433,28 @@ AC_DEFINE(HAVE_CLASSIC_WINAPI_SUPPORT, 1, [Use classic Windows API support])
 AC_DEFINE(HAVE_UWP_WINAPI_SUPPORT, 0, [Don't use UWP Windows API support])
 
 AC_SUBST(extra_runtime_ldflags)
-AM_CONDITIONAL(HOST_WIN32, test x$host_win32 = xyes)
-AM_CONDITIONAL(TARGET_WIN32, test x$target_win32 = xyes)
-AM_CONDITIONAL(HOST_LINUX, echo x$target_os | grep -q linux)
-AM_CONDITIONAL(HOST_DARWIN, test x$host_darwin = xyes)
-AM_CONDITIONAL(HOST_SIGPOSIX, test x$use_sigposix = xyes)
-AM_CONDITIONAL(HOST_ANDROID, test x$host_android = xyes)
-AM_CONDITIONAL(HOST_TIZEN, test x$host_tizen = xyes)
-AM_CONDITIONAL(HOST_IOS, test x$host_ios = xyes)
 
-if test -z "$HOST_DARWIN_TRUE"; then :
+AM_CONDITIONAL(HOST_WIN32, test "x$host_win32" = "xyes")
+AM_CONDITIONAL(HOST_LINUX, test "x$host_linux" = "xyes")
+AM_CONDITIONAL(HOST_DARWIN, test "x$host_darwin" = "xyes")
+AM_CONDITIONAL(HOST_SIGPOSIX, test "x$use_sigposix" = "xyes")
+AM_CONDITIONAL(HOST_ANDROID, test "x$host_android" = "xyes")
+AM_CONDITIONAL(HOST_TIZEN, test "x$host_tizen" = "xyes")
+AM_CONDITIONAL(HOST_IOS, test "x$host_ios" = "xyes")
+
+if test "x$host_darwin" = "xyes"; then
 PLATFORM_AOT_SUFFIX=.dylib
 fi
 
-if test -z "$HOST_LINUX_TRUE"; then :
+if test "x$host_linux" = "xyes"; then
 PLATFORM_AOT_SUFFIX=.so
 fi
 
-if test -z "$HOST_WIN32_TRUE"; then :
+if test "x$host_win32" = "xyes"; then
 PLATFORM_AOT_SUFFIX=.dll
 fi
+
+AM_CONDITIONAL(TARGET_WIN32, test "x$target_win32" = "xyes")
 
 AC_SUBST(PLATFORM_AOT_SUFFIX)
 
@@ -707,14 +737,10 @@ if test x"$GCC" = xyes; then
 		   # We rely on zero length arrays in structs
 		   WARN="$WARN -Wno-zero-length-array"
 		fi
-else
+elif test "x$host_solaris" = "xyes"; then
 	# The Sun Forte compiler complains about inline functions that access static variables
 	# so disable all inlining.
-	case "$host" in
-	*-*-solaris*)
-		CFLAGS="$CFLAGS -Dinline="
-		;;
-	esac
+	CFLAGS="$CFLAGS -Dinline="
 fi
 CFLAGS="$CFLAGS -g $WARN"
 CFLAGS_FOR_LIBGC="$CFLAGS_FOR_LIBGC -g"
@@ -3176,7 +3202,7 @@ if test "x$enable_llvm_runtime" = "xyes"; then
 fi
 AM_CONDITIONAL(ENABLE_LLVM_RUNTIME, [test x$enable_llvm_runtime = xyes])
 
-TARGET="unknown"
+HOST="unknown"
 ACCESS_UNALIGNED="yes"
 
 LIBC="libc.so.6"
@@ -3196,20 +3222,20 @@ BTLS_SUPPORTED=no
 BTLS_PLATFORM=
 
 if test "x$enable_wasm" = "xyes"; then
-TARGET=WASM
 HOST=WASM
+TARGET=WASM
 arch_target=wasm
 AC_DEFINE(TARGET_WASM, 1, [Target wasm])
 AC_DEFINE(HOST_WASM, 1, [Host wasm])
 BTLS_SUPPORTED=no
 with_tls=pthread
-target_mach=no
+target_darwin=no
 
 else
 
 case "$host" in
 	mips*)
-		TARGET=MIPS;
+		HOST=MIPS;
 		arch_target=mips;
 		with_tls=pthread;
 		ACCESS_UNALIGNED="no"
@@ -3228,14 +3254,14 @@ case "$host" in
 		])
 		;;
 	i*86-*-*)
-		TARGET=X86;
+		HOST=X86;
 		arch_target=x86;
 		case $host_os in
 		  solaris*)
 			LIBC="libc.so"
 			INTL="libintl.so"
 			if test "x$ac_cv_sizeof_void_p" = "x8"; then
-				TARGET=AMD64
+				HOST=AMD64
 				arch_target=amd64
 			fi
 
@@ -3273,7 +3299,7 @@ case "$host" in
 		esac
 		;;
 	x86_64-*-* | amd64-*-*)
-		TARGET=AMD64;
+		HOST=AMD64;
 		arch_target=amd64;
 		if test "x$ac_cv_sizeof_void_p" = "x4"; then
 			AC_DEFINE(__mono_ilp32__, 1, [64 bit mode with 4 byte longs and pointers])
@@ -3300,9 +3326,9 @@ case "$host" in
 		;;
 	sparc*-*-*)
 		if test "x$ac_cv_sizeof_void_p" = "x8"; then
-		   TARGET=SPARC64
+		   HOST=SPARC64
 		else
-			TARGET=SPARC
+			HOST=SPARC
 		fi
 		arch_target=sparc;
 		ACCESS_UNALIGNED="no"
@@ -3328,11 +3354,11 @@ case "$host" in
 	macppc-*-openbsd* | powerpc*-*-linux* | powerpc-*-openbsd* | \
         powerpc-*-sysv* | powerpc-*-darwin* | powerpc-*-netbsd* | powerpc-*-freebsd* )
 		if test "x$ac_cv_sizeof_void_p" = "x8"; then
-			TARGET=POWERPC64;
+			HOST=POWERPC64;
 			CPPFLAGS="$CPPFLAGS -D__mono_ppc__ -D__mono_ppc64__"
 			CFLAGS="$CFLAGS -mminimal-toc"
 		else
-			TARGET=POWERPC;
+			HOST=POWERPC;
 			CPPFLAGS="$CPPFLAGS -D__mono_ppc__"
 		fi
 		arch_target=ppc;
@@ -3342,7 +3368,7 @@ case "$host" in
 		esac
 		;;
 	armv7k-*-darwin*)
-		TARGET=ARM;
+		HOST=ARM;
 		TARGET_SYS=WATCHOS
 		arch_target=arm;
 		arm_fpu=VFP_HARD
@@ -3351,13 +3377,13 @@ case "$host" in
 		;;
 
 	arm*-darwin*)
-		TARGET=ARM;
+		HOST=ARM;
 		arch_target=arm;
 		ACCESS_UNALIGNED="no"
 		CPPFLAGS="$CPPFLAGS -D__ARM_EABI__"
 		;;
 	arm*-linux*)
-		TARGET=ARM;
+		HOST=ARM;
 		arch_target=arm;
 		ACCESS_UNALIGNED="no"
 		AOT_SUPPORTED="yes"
@@ -3372,14 +3398,14 @@ case "$host" in
 		esac
 		;;
 	arm*-netbsd*-eabi*)
-		TARGET=ARM;
+		HOST=ARM;
 		arch_target=arm;
 		ACCESS_UNALIGNED="no"
 		CPPFLAGS="$CPPFLAGS -D__ARM_EABI__"
 		;;
 	aarch64-*)
 		# https://lkml.org/lkml/2012/7/15/133
-		TARGET=ARM64
+		HOST=ARM64
 		arch_target=arm64
 		boehm_supported=false
 		AOT_SUPPORTED="yes"
@@ -3388,22 +3414,22 @@ case "$host" in
 		AC_CHECK_HEADER(stdalign.h,[],[BTLS_SUPPORTED=no])
 		;;
 	s390x-*-linux*)
-		TARGET=S390X;
+		HOST=S390X;
 		arch_target=s390x;
 		ACCESS_UNALIGNED="yes"
 		CFLAGS="$CFLAGS -mbackchain -D__USE_STRING_INLINES"
 		;;
 esac
 
-HOST=$TARGET
-
-if test "x$host" != "x$target"; then
-   AC_DEFINE(MONO_CROSS_COMPILE,1,[The runtime is compiled for cross-compiling mode])
-   enable_mcs_build=no
-   enable_support_build=no
-   BTLS_SUPPORTED=no
-   case "$target" in
-   arm*-darwin*)
+if test "x$host" == "x$target"; then
+	TARGET=$HOST
+else
+	AC_DEFINE(MONO_CROSS_COMPILE,1,[The runtime is compiled for cross-compiling mode])
+	enable_mcs_build=no
+	enable_support_build=no
+	BTLS_SUPPORTED=no
+	case "$target" in
+	arm*-darwin*)
 		TARGET=ARM;
 		arch_target=arm;
 		ACCESS_UNALIGNED="no"
@@ -3418,7 +3444,7 @@ if test "x$host" != "x$target"; then
 			;;
 		esac		
 		;;
-   powerpc64-ps3-linux-gnu)
+	powerpc64-ps3-linux-gnu)
 		TARGET=POWERPC64
 		arch_target=powerpc64
 		AC_DEFINE(TARGET_PS3, 1, [...])
@@ -3429,7 +3455,7 @@ if test "x$host" != "x$target"; then
 		sizeof_register=8
 		target_byte_order=G_BIG_ENDIAN
 		;;
-   powerpc64-xbox360-linux-gnu)
+	powerpc64-xbox360-linux-gnu)
 		TARGET=POWERPC64
 		arch_target=powerpc64
 		AC_DEFINE(TARGET_XBOX360, 1, [...])
@@ -3438,7 +3464,7 @@ if test "x$host" != "x$target"; then
 		sizeof_register=8
 		target_byte_order=G_BIG_ENDIAN
 		;;
-   arm*-linux-*)
+	arm*-linux-*)
 		TARGET=ARM;
 		arch_target=arm;
 		AC_DEFINE(TARGET_ARM, 1, [...])
@@ -3447,23 +3473,23 @@ if test "x$host" != "x$target"; then
 		# Can't use tls, since it depends on the runtime detection of tls offsets
 		# in mono-compiler.h
 		with_tls=pthread
-		target_mach=no
+		target_darwin=no
 		case "$target" in
 		armv7l-unknown-linux-gnueabi*)
 			# TEGRA
 			CPPFLAGS="$CPPFLAGS"
 			;;
-   		armv5-*-linux-androideabi*)
+		armv5-*-linux-androideabi*)
 			AC_DEFINE(TARGET_ANDROID, 1, [...])
 			CPPFLAGS="$CPPFLAGS"
 			;;
-   		*-linux-androideabi*)
+			*-linux-androideabi*)
 			AC_DEFINE(TARGET_ANDROID, 1, [...])
 			CPPFLAGS="$CPPFLAGS"
 			;;
 		esac
 		;;
-   arm*-netbsd*-eabi*)
+	arm*-netbsd*-eabi*)
 		TARGET=ARM;
 		arch_target=arm;
 		AC_DEFINE(TARGET_ARM, 1, [...])
@@ -3472,9 +3498,9 @@ if test "x$host" != "x$target"; then
 		# Can't use tls, since it depends on the runtime detection of tls offsets
 		# in mono-compiler.h
 		with_tls=pthread
-		target_mach=no
+		target_darwin=no
 		;;
-   i686*-linux-*)
+	i686*-linux-*)
 		TARGET=X86;
 		arch_target=x86;
 		AC_DEFINE(TARGET_X86, 1, [...])
@@ -3482,7 +3508,7 @@ if test "x$host" != "x$target"; then
 		# Can't use tls, since it depends on the runtime detection of tls offsets
 		# in mono-compiler.h		
 		with_tls=pthread
-		target_mach=no
+		target_darwin=no
 
 		case "$target" in
 		*-linux-android*)
@@ -3490,7 +3516,7 @@ if test "x$host" != "x$target"; then
 			;;
 		esac
 		;;
-   x86_64*-linux-*)
+	x86_64*-linux-*)
 		TARGET=AMD64;
 		arch_target=amd64;
 		AC_DEFINE(TARGET_AMD64, 1, [...])
@@ -3498,7 +3524,7 @@ if test "x$host" != "x$target"; then
 		# Can't use tls, since it depends on the runtime detection of tls offsets
 		# in mono-compiler.h
 		with_tls=pthread
-		target_mach=no
+		target_darwin=no
 
 		case "$target" in
 		*-linux-android*)
@@ -3506,7 +3532,7 @@ if test "x$host" != "x$target"; then
 			;;
 		esac
 		;;
-   x86_64-ps4-freebsd)
+	x86_64-ps4-freebsd)
 		TARGET=AMD64;
 		arch_target=amd64;
 		AC_DEFINE(TARGET_AMD64, 1, [...])
@@ -3516,10 +3542,10 @@ if test "x$host" != "x$target"; then
 		# Can't use tls, since it depends on the runtime detection of tls offsets
 		# in mono-compiler.h
 		with_tls=pthread
-		target_mach=no
+		target_darwin=no
 		target_win32=no
 		;;
-   aarch64*-linux-*)
+	aarch64*-linux-*)
 		TARGET=ARM64;
 		arch_target=arm64;
 		AC_DEFINE(TARGET_ARM64, 1, [...])
@@ -3527,7 +3553,7 @@ if test "x$host" != "x$target"; then
 		# Can't use tls, since it depends on the runtime detection of tls offsets
 		# in mono-compiler.h
 		with_tls=pthread
-		target_mach=no
+		target_darwin=no
 		case "$target" in
 		*-linux-android*)
 			AC_DEFINE(TARGET_ANDROID, 1, [...])
@@ -3663,7 +3689,7 @@ if test x$GCC = "xyes"; then
 	esac
 fi
 
-if test "x$target_mach" = "xyes"; then
+if test "x$target_darwin" = "xyes"; then
 
    if test "x$TARGET_SYS" = "xWATCHOS"; then
 	  AC_DEFINE(TARGET_WATCHOS,1,[The JIT/AOT targets WatchOS])
@@ -3694,7 +3720,7 @@ if test "x$target_mach" = "xyes"; then
 		  target_ios=yes
        ])
 	fi
-   AC_DEFINE(TARGET_MACH,1,[The JIT/AOT targets Apple platforms])
+   AC_DEFINE(TARGET_DARWIN,1,[The JIT/AOT targets Apple platforms])
 fi
 
 AM_CONDITIONAL(TARGET_OSX, test x$target_osx = xyes)

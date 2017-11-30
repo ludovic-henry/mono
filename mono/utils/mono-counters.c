@@ -346,7 +346,7 @@ static double
 cpu_load (int kind)
 {
 #if defined(TARGET_WIN32)
-#elif defined(TARGET_MACH)
+#elif defined(TARGET_DARWIN)
 	double load [3];
 	if (getloadavg (load, 3) > 0)
 		return load [kind];

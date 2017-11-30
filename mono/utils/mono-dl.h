@@ -10,11 +10,11 @@
 
 #ifdef TARGET_WIN32
 #define MONO_SOLIB_EXT ".dll"
-#elif defined(__ppc__) && defined(TARGET_MACH)
+#elif defined(__ppc__) && defined(TARGET_DARWIN)
 #define MONO_SOLIB_EXT ".dylib"
-#elif defined(TARGET_MACH) && defined(TARGET_X86)
+#elif defined(TARGET_DARWIN) && defined(TARGET_X86)
 #define MONO_SOLIB_EXT ".dylib"
-#elif defined(TARGET_MACH) && defined(TARGET_AMD64)
+#elif defined(TARGET_DARWIN) && defined(TARGET_AMD64)
 #define MONO_SOLIB_EXT ".dylib"
 #else
 #define MONO_SOLIB_EXT ".so"

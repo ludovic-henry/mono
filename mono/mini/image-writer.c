@@ -55,7 +55,7 @@
  * TARGET_ASM_GAS == GNU assembler
  */
 #if !defined(TARGET_ASM_APPLE) && !defined(TARGET_ASM_GAS)
-#if defined(TARGET_MACH)
+#if defined(TARGET_DARWIN)
 #define TARGET_ASM_APPLE
 #else
 #define TARGET_ASM_GAS
@@ -65,7 +65,7 @@
 /*
  * Defines for the directives used by different assemblers
  */
-#if defined(TARGET_POWERPC) || defined(TARGET_MACH)
+#if defined(TARGET_POWERPC) || defined(TARGET_DARWIN)
 #define AS_STRING_DIRECTIVE ".asciz"
 #else
 #define AS_STRING_DIRECTIVE ".string"

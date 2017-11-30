@@ -28,7 +28,7 @@
 #include <glib.h>
 #include <dlfcn.h>
 
-#if !defined (TARGET_MACH)
+#if !defined (TARGET_DARWIN)
 const char *
 mono_dl_get_so_prefix (void)
 {

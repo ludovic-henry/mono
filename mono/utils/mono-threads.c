@@ -13,7 +13,7 @@
 #include <config.h>
 
 /* enable pthread extensions */
-#ifdef TARGET_MACH
+#ifdef TARGET_DARWIN
 #define _DARWIN_C_SOURCE
 #endif
 
@@ -218,7 +218,7 @@ dump_threads (void)
 	MOSTLY_ASYNC_SAFE_PRINTF ("\t0x?08\t- blocking with pending suspend (GOOD)\n");
 
 	FOREACH_THREAD_SAFE (info) {
-#ifdef TARGET_MACH
+#ifdef TARGET_DARWIN
 		char thread_name [256] = { 0 };
 		pthread_getname_np (mono_thread_info_get_tid (info), thread_name, 255);
 

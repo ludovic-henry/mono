@@ -2263,14 +2263,14 @@ emit_move_return_value (MonoCompile *cfg, MonoInst *ins, guint8 *code)
 	return code;
 }
 
-#ifdef TARGET_MACH
+#ifdef TARGET_DARWIN
 static int tls_gs_offset;
 #endif
 
 gboolean
 mono_arch_have_fast_tls (void)
 {
-#ifdef TARGET_MACH
+#ifdef TARGET_DARWIN
 	static gboolean have_fast_tls = FALSE;
 	static gboolean inited = FALSE;
 	guint32 *ins;
@@ -2304,7 +2304,7 @@ mono_arch_have_fast_tls (void)
 static guint8*
 mono_x86_emit_tls_get (guint8* code, int dreg, int tls_offset)
 {
-#if defined(TARGET_MACH)
+#if defined(TARGET_DARWIN)
 	x86_prefix (code, X86_GS_PREFIX);
 	x86_mov_reg_mem (code, dreg, tls_gs_offset + (tls_offset * 4), 4);
 #elif defined(TARGET_WIN32)
@@ -2344,7 +2344,7 @@ mono_x86_emit_tls_get (guint8* code, int dreg, int tls_offset)
 static guint8*
 mono_x86_emit_tls_set (guint8* code, int sreg, int tls_offset)
 {
-#if defined(TARGET_MACH)
+#if defined(TARGET_DARWIN)
 	x86_prefix (code, X86_GS_PREFIX);
 	x86_mov_mem_reg (code, tls_gs_offset + (tls_offset * 4), sreg, 4);
 #elif defined(TARGET_WIN32)

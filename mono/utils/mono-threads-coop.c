@@ -12,7 +12,7 @@
 #include <config.h>
 
 /* enable pthread extensions */
-#ifdef TARGET_MACH
+#ifdef TARGET_DARWIN
 #define _DARWIN_C_SOURCE
 #endif
 

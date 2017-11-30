@@ -31,7 +31,7 @@ typedef struct _MonoImageWriter MonoImageWriter;
 #define USE_ELF_WRITER 1
 #endif
 
-#if defined(TARGET_ARM) && !defined(TARGET_MACH) && !defined(HOST_WIN32)
+#if defined(TARGET_ARM) && !defined(TARGET_DARWIN) && !defined(HOST_WIN32)
 //#define USE_ELF_WRITER 1
 #endif
 

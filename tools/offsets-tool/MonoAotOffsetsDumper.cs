@@ -149,7 +149,7 @@ namespace CppSharp
 
             foreach (var target in iOSTargets) {
                 target.Defines.AddRange (new string[] { "HOST_DARWIN",
-                    "TARGET_IOS", "TARGET_MACH", "MONO_CROSS_COMPILE", "USE_MONO_CTX",
+                    "TARGET_IOS", "TARGET_DARWIN", "MONO_CROSS_COMPILE", "USE_MONO_CTX",
                     "_XOPEN_SOURCE"
                 });
             }
@@ -163,7 +163,7 @@ namespace CppSharp
 
             foreach (var target in DarwinTargets) {
                 target.Defines.AddRange (new string[] { "HOST_DARWIN",
-                    "TARGET_IOS", "TARGET_MACH", "MONO_CROSS_COMPILE", "USE_MONO_CTX",
+                    "TARGET_IOS", "TARGET_DARWIN", "MONO_CROSS_COMPILE", "USE_MONO_CTX",
                     "_XOPEN_SOURCE"
                 });
             }
