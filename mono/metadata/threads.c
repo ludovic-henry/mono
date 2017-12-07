@@ -764,6 +764,8 @@ mono_thread_detach_internal (MonoInternalThread *thread)
 	gboolean removed;
 	guint32 gchandle;
 
+	g_assert (mono_thread_internal_is_current (thread));
+
 	g_assert (thread != NULL);
 	SET_CURRENT_OBJECT (thread);
 
