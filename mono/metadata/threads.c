@@ -389,33 +389,10 @@ thread_get_tid (MonoInternalThread *thread)
 	return MONO_UINT_TO_NATIVE_THREAD_ID (thread->tid);
 }
 
-static void ensure_synch_cs_set (MonoInternalThread *thread)
-{
-	MonoCoopMutex *synch_cs;
-
-	if (thread->synch_cs != NULL) {
-		return;
-	}
-
-	synch_cs = g_new0 (MonoCoopMutex, 1);
-	mono_coop_mutex_init_recursive (synch_cs);
-
-	if (mono_atomic_cas_ptr ((gpointer *)&thread->synch_cs,
-					       synch_cs, NULL) != NULL) {
-		/* Another thread must have installed this CS */
-		mono_coop_mutex_destroy (synch_cs);
-		g_free (synch_cs);
-	}
-}
-
 static inline void
 lock_thread (MonoInternalThread *thread)
 {
-	if (!thread->synch_cs)
-		ensure_synch_cs_set (thread);
-
 	g_assert (thread->synch_cs);
-
 	mono_coop_mutex_lock (thread->synch_cs);
 }
 
@@ -806,14 +783,12 @@ mono_thread_detach_internal (MonoInternalThread *thread)
 	 * This can happen only during shutdown.
 	 * The shutting_down flag is not always set, so we can't assert on it.
 	 */
-	if (thread->synch_cs)
-		LOCK_THREAD (thread);
+	LOCK_THREAD (thread);
 
 	thread->state |= ThreadState_Stopped;
 	thread->state &= ~ThreadState_Background;
 
-	if (thread->synch_cs)
-		UNLOCK_THREAD (thread);
+	UNLOCK_THREAD (thread);
 
 	/*
 	An interruption request has leaked to cleanup. Adjust the global counter.
@@ -1472,12 +1447,10 @@ ves_icall_System_Threading_InternalThread_Thread_free_internal (MonoInternalThre
 	CloseHandle (this_obj->native_handle);
 #endif
 
-	if (this_obj->synch_cs) {
-		MonoCoopMutex *synch_cs = this_obj->synch_cs;
-		this_obj->synch_cs = NULL;
-		mono_coop_mutex_destroy (synch_cs);
-		g_free (synch_cs);
-	}
+	g_assert (this_obj->synch_cs);
+	mono_coop_mutex_destroy (this_obj->synch_cs);
+	g_free (this_obj->synch_cs);
+	this_obj->synch_cs = NULL;
 
 	if (this_obj->name) {
 		void *name = this_obj->name;
