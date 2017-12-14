@@ -726,7 +726,7 @@ mono_domain_try_type_resolve (MonoDomain *domain, char *name, MonoObject *typebu
 
 	MonoReflectionAssembly * const ret = name
 		? mono_domain_try_type_resolve_name (domain, name, &error)
-		: mono_domain_try_type_resolve_typebuilder (domain, (MonoReflectionTypeBuilder *)typebuilder, &error);
+		: mono_domain_try_type_resolve_typebuilder (domain, typebuilder, &error);
 
 	mono_error_cleanup (&error);
 	return ret;
@@ -797,7 +797,7 @@ mono_domain_try_type_resolve_name (MonoDomain *domain, const char *name, MonoErr
  * \returns A \c MonoReflectionAssembly or NULL if not found
  */
 MonoReflectionAssembly *
-mono_domain_try_type_resolve_typebuilder (MonoDomain *domain, MonoReflectionTypeBuilder *typebuilder, MonoError *error)
+mono_domain_try_type_resolve_typebuilder (MonoDomain *domain, MonoObject *typebuilder, MonoError *error)
 {
 	g_assert (domain);
 	g_assert (typebuilder);

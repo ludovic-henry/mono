@@ -611,7 +611,7 @@ MonoReflectionAssembly *
 mono_domain_try_type_resolve_name (MonoDomain *domain, const char *name, MonoError *error);
 
 MonoReflectionAssembly *
-mono_domain_try_type_resolve_typebuilder (MonoDomain *domain, MonoReflectionTypeBuilder *typebuilder, MonoError *error);
+mono_domain_try_type_resolve_typebuilder (MonoDomain *domain, MonoObject *typebuilder, MonoError *error);
 
 void
 mono_runtime_init_checked (MonoDomain *domain, MonoThreadStartCB start_cb, MonoThreadAttachCB attach_cb, MonoError *error);

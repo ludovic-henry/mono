@@ -1234,7 +1234,7 @@ typedef enum {
 	MonoTypeBuilderFinished = 2
 } MonoTypeBuilderState;
 
-struct _MonoReflectionTypeBuilder {
+typedef struct {
 	MonoReflectionType type;
 	MonoString *name;
 	MonoString *nspace;
@@ -1260,7 +1260,7 @@ struct _MonoReflectionTypeBuilder {
 	MonoArray *permissions;
 	MonoReflectionType *created;
 	gint32 state;
-};
+} MonoReflectionTypeBuilder;
 
 /* Safely access System.Reflection.Emit.TypeBuilder from native code */
 TYPED_HANDLE_DECL (MonoReflectionTypeBuilder);
