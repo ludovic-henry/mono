@@ -854,11 +854,6 @@ mono_thread_detach_internal (MonoInternalThread *thread)
 	ref_stack_destroy (thread->appdomain_refs);
 	thread->appdomain_refs = NULL;
 
-	g_assert (thread->suspended);
-	mono_os_event_destroy (thread->suspended);
-	g_free (thread->suspended);
-	thread->suspended = NULL;
-
 	if (mono_thread_cleanup_fn)
 		mono_thread_cleanup_fn (thread_get_tid (thread));
 
@@ -1451,6 +1446,11 @@ ves_icall_System_Threading_InternalThread_Thread_free_internal (MonoInternalThre
 	mono_coop_mutex_destroy (this_obj->synch_cs);
 	g_free (this_obj->synch_cs);
 	this_obj->synch_cs = NULL;
+
+	g_assert (this_obj->suspended);
+	mono_os_event_destroy (this_obj->suspended);
+	g_free (this_obj->suspended);
+	this_obj->suspended = NULL;
 
 	if (this_obj->name) {
 		void *name = this_obj->name;
