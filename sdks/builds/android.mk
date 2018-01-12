@@ -244,8 +244,14 @@ $$(eval $$(call RuntimeTemplate,android-$(1)))
 
 endef
 
+ifeq ($(UNAME),Darwin)
 $(eval $(call AndroidHostTemplate,host-Darwin))
+else
+ifeq ($(UNAME),Linux)
+android-host-Linux_CFLAGS=-DLINUX
 $(eval $(call AndroidHostTemplate,host-Linux))
+endif
+endif
 
 ##
 # Parameters
@@ -270,11 +276,13 @@ _android-$(1)_AC_VARS= \
 	ac_cv_search_dlopen=no
 
 _android-$(1)_CFLAGS= \
+	-DWINDOWS=1 \
 	-DXAMARIN_PRODUCT_VERSION=0 \
 	$(if $(filter $(CONFIGURATION),release),-DRELEASE=1) \
 	$$(patsubst %,-I%,$$(JDK_INCLUDE_DIRS))
 
 _android-$(1)_CXXFLAGS= \
+	-DWINDOWS=1 \
 	-DXAMARIN_PRODUCT_VERSION=0 \
 	$(if $(filter $(CONFIGURATION),release),-DRELEASE=1) \
 	$$(patsubst %,-I%,$$(JDK_INCLUDE_DIRS))

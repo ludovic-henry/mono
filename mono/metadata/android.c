@@ -1,4 +1,6 @@
 
+#include "android.h"
+
 #include <config.h>
 #include <glib.h>
 
@@ -86,12 +88,6 @@ mono_jvm_initialize (JavaVM *vm);
 MONO_API void
 _monodroid_detect_cpu_and_architecture (gushort *built_for_cpu, gushort *running_on_cpu, guchar *is64bit);
 
-MONO_API gint
-_monodroid_getifaddrs (struct _monodroid_ifaddrs **ifap);
-
-MONO_API void
-_monodroid_freeifaddrs (struct _monodroid_ifaddrs *ifa);
-
 JNIEXPORT void JNICALL
 Java_mono_android_Runtime_init (JNIEnv *env, jclass klass, jstring lang, jobjectArray runtimeApks, jstring runtimeNativeLibDir, jobjectArray appDirs, jobject loader, jobjectArray externalStorageDirs, jobjectArray assemblies, jstring packageName);
 
@@ -134,8 +130,6 @@ static struct {
 	void (*_monodroid_gref_log_delete) (jobject handle, gchar type, const gchar *threadName, gint32 threadId, gchar *from, gint32 from_writable);
 	void (*monodroid_free) (gpointer ptr);
 	void (*_monodroid_detect_cpu_and_architecture) (gushort*, gushort*, guchar*);
-	gint (*_monodroid_getifaddrs) (struct _monodroid_ifaddrs**);
-	void (*_monodroid_freeifaddrs) (struct _monodroid_ifaddrs*);
 	gint (*_monodroid_get_dns_servers) (gpointer *dns_servers_array);
 	MonoBoolean (*_monodroid_get_network_interface_up_state) (const gchar *ifname, MonoBoolean *is_up);
 	MonoBoolean (*_monodroid_get_network_interface_supports_multicast) (const gchar *ifname, MonoBoolean *supports_multicast);
@@ -479,8 +473,6 @@ monodroid_load (const gchar *libmonodroid_path)
 	LOAD_SYMBOL (monodroid_typemap_managed_to_java);
 	LOAD_SYMBOL (monodroid_free);
 	LOAD_SYMBOL (_monodroid_detect_cpu_and_architecture);
-	LOAD_SYMBOL (_monodroid_getifaddrs);
-	LOAD_SYMBOL (_monodroid_freeifaddrs);
 	LOAD_SYMBOL (_monodroid_get_dns_servers);
 	LOAD_SYMBOL (_monodroid_get_network_interface_up_state);
 	LOAD_SYMBOL (_monodroid_get_network_interface_supports_multicast);
@@ -511,18 +503,6 @@ void
 _monodroid_detect_cpu_and_architecture (gushort *built_for_cpu, gushort *running_on_cpu, guchar *is64bit)
 {
 	monodroid._monodroid_detect_cpu_and_architecture (built_for_cpu, running_on_cpu, is64bit);
-}
-
-gint
-_monodroid_getifaddrs (struct _monodroid_ifaddrs **ifap)
-{
-	return monodroid._monodroid_getifaddrs (ifap);
-}
-
-void
-_monodroid_freeifaddrs (struct _monodroid_ifaddrs *ifa)
-{
-	monodroid._monodroid_freeifaddrs (ifa);
 }
 
 void
