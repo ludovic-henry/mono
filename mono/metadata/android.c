@@ -86,9 +86,6 @@ _monodroid_gref_log_new (jobject curHandle, gchar curType, jobject newHandle, gc
 MONO_API void
 _monodroid_gref_log_delete (jobject handle, gchar type, const gchar *threadName, gint32 threadId, gchar *from, gint32 from_writable);
 
-MONO_API gint
-_monodroid_get_dns_servers (gpointer *dns_servers_array);
-
 MONO_API MonoBoolean
 _monodroid_get_network_interface_up_state (const gchar *ifname, MonoBoolean *is_up);
 
@@ -139,7 +136,6 @@ static struct {
 	gint32 (*_monodroid_gref_log_new) (jobject curHandle, gchar curType, jobject newHandle, gchar newType, const gchar *threadName, gint32 threadId, gchar *from, gint32 from_writable);
 	void (*_monodroid_gref_log_delete) (jobject handle, gchar type, const gchar *threadName, gint32 threadId, gchar *from, gint32 from_writable);
 	void (*monodroid_free) (gpointer ptr);
-	gint (*_monodroid_get_dns_servers) (gpointer *dns_servers_array);
 	MonoBoolean (*_monodroid_get_network_interface_up_state) (const gchar *ifname, MonoBoolean *is_up);
 	MonoBoolean (*_monodroid_get_network_interface_supports_multicast) (const gchar *ifname, MonoBoolean *supports_multicast);
 
@@ -481,7 +477,6 @@ monodroid_load (const gchar *libmonodroid_path)
 	LOAD_SYMBOL (monodroid_typemap_java_to_managed);
 	LOAD_SYMBOL (monodroid_typemap_managed_to_java);
 	LOAD_SYMBOL (monodroid_free);
-	LOAD_SYMBOL (_monodroid_get_dns_servers);
 	LOAD_SYMBOL (_monodroid_get_network_interface_up_state);
 	LOAD_SYMBOL (_monodroid_get_network_interface_supports_multicast);
 
@@ -583,12 +578,6 @@ const gchar *
 monodroid_typemap_managed_to_java (const gchar *managed)
 {
 	return monodroid.monodroid_typemap_managed_to_java (managed);
-}
-
-gint
-_monodroid_get_dns_servers (gpointer *dns_servers_array)
-{
-	return monodroid._monodroid_get_dns_servers (dns_servers_array);
 }
 
 MonoBoolean
@@ -988,4 +977,41 @@ gint32
 ves_icall_System_TimezoneInfo_AndroidTimeZones_GetSystemProperty (const gchar *name, gchar **value)
 {
 	return monodroid_get_system_property (name, value);
+}
+
+gint32
+ves_icall_System_Net_NetworkInformation_UnixIPInterfaceProperties_GetDNSServers (gpointer *dns_servers_array)
+{
+	g_assert (dns_servers_array);
+	*dns_servers_array = NULL;
+
+	gsize  len;
+	gchar *dns;
+	gchar *dns_servers [8];
+	gint   count = 0;
+	gchar  prop_name[] = "net.dnsX";
+	for (gint i = 0; i < 8; i++) {
+		prop_name [7] = (char)(i + 0x31);
+		len = monodroid_get_system_property (prop_name, &dns);
+		if (len <= 0) {
+			dns_servers [i] = NULL;
+			continue;
+		}
+		dns_servers [i] = g_strndup (dns, len);
+		count++;
+	}
+
+	if (count <= 0)
+		return 0;
+
+	gchar **ret = g_new (gchar*, count);
+	gchar **p = ret;
+	for (gint i = 0; i < 8; i++) {
+		if (!dns_servers [i])
+			continue;
+		*p++ = dns_servers [i];
+	}
+
+	*dns_servers_array = (gpointer)ret;
+	return count;
 }
