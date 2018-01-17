@@ -37,6 +37,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
 using System.Runtime.ConstrainedExecution;
+using System.Text;
 
 namespace System.Diagnostics {
 
@@ -126,8 +127,8 @@ namespace System.Diagnostics {
 		}
 
 		[MethodImplAttribute (MethodImplOptions.InternalCall)]
-		static extern IntPtr GetImpl (string category, string counter,
-				string instance, string machine, out PerformanceCounterType ctype, out bool custom);
+		static unsafe extern IntPtr GetImpl (byte* category, byte* counter,
+				byte* instance, byte* machine, out PerformanceCounterType ctype, out bool custom);
 
 		[MethodImplAttribute (MethodImplOptions.InternalCall)]
 		static extern bool GetSample (IntPtr impl, bool only_value, out CounterSample sample);
@@ -146,7 +147,14 @@ namespace System.Diagnostics {
 			// need to free the previous info
 			if (impl != IntPtr.Zero)
 				Close ();
-			impl = GetImpl (categoryName, counterName, instanceName, machineName, out type, out is_custom);
+			unsafe {
+				fixed (byte* categoryName_b = Encoding.UTF8.GetBytes (categoryName + '\0'))
+				fixed (byte* counterName_b = Encoding.UTF8.GetBytes (counterName + '\0'))
+				fixed (byte* instanceName_b = Encoding.UTF8.GetBytes (instanceName + '\0'))
+				fixed (byte* machineName_b = Encoding.UTF8.GetBytes (machineName + '\0')) {
+					impl = GetImpl (categoryName_b, counterName_b, instanceName_b, machineName_b, out type, out is_custom);
+				}
+			}
 			// system counters are always readonly
 			if (!is_custom)
 				readOnly = true;

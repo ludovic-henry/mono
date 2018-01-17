@@ -30,6 +30,7 @@
 
 using System.Security.Permissions;
 using System.Runtime.CompilerServices;
+using System.Text;
 
 namespace System.Diagnostics 
 {
@@ -41,30 +42,30 @@ namespace System.Diagnostics
 		private PerformanceCounterCategoryType type = PerformanceCounterCategoryType.Unknown;
 
 		[MethodImplAttribute (MethodImplOptions.InternalCall)]
-		static extern bool CategoryDelete (string name);
+		static unsafe extern bool CategoryDelete (byte* name);
 
 		[MethodImplAttribute (MethodImplOptions.InternalCall)]
-		static extern string CategoryHelpInternal (string category, string machine);
+		static unsafe extern string CategoryHelpInternal (byte* category, byte* machine);
 
 		/* this icall allows a null counter and it will just search for the category */
 		[MethodImplAttribute (MethodImplOptions.InternalCall)]
-		static extern bool CounterCategoryExists (string counter, string category, string machine);
+		static unsafe extern bool CounterCategoryExists (byte* counter, byte* category, byte* machine);
 
 		[MethodImplAttribute (MethodImplOptions.InternalCall)]
-		static extern bool Create (string categoryName, string categoryHelp,
+		static unsafe extern bool Create (byte* categoryName, byte* categoryHelp,
 			PerformanceCounterCategoryType categoryType, CounterCreationData[] items);
 
 		[MethodImplAttribute (MethodImplOptions.InternalCall)]
-		static extern int InstanceExistsInternal (string instance, string category, string machine);
+		static unsafe extern bool InstanceExistsInternal (byte* instance, byte* category, byte* machine);
 
 		[MethodImplAttribute (MethodImplOptions.InternalCall)]
-		static extern string[] GetCategoryNames (string machine);
+		static unsafe extern string[] GetCategoryNames (byte* machine);
 
 		[MethodImplAttribute (MethodImplOptions.InternalCall)]
-		static extern string[] GetCounterNames (string category, string machine);
+		static unsafe extern string[] GetCounterNames (byte* category, byte* machine);
 
 		[MethodImplAttribute (MethodImplOptions.InternalCall)]
-		static extern string[] GetInstanceNames (string category, string machine);
+		static unsafe extern string[] GetInstanceNames (byte* category, byte* machine);
 
 		static void CheckCategory (string categoryName) {
 			if (categoryName == null)
@@ -98,10 +99,15 @@ namespace System.Diagnostics
 		// may throw InvalidOperationException, Win32Exception
 		public string CategoryHelp {
 			get {
-				string res = CategoryHelpInternal (categoryName, machineName);
-				if (res != null)
-					return res;
-				throw new InvalidOperationException ();
+				unsafe {
+					fixed (byte* categoryName_b = Encoding.UTF8.GetBytes (categoryName + '\0'))
+					fixed (byte* machineName_b = Encoding.UTF8.GetBytes (machineName + '\0')) {
+						string res = CategoryHelpInternal (categoryName_b, machineName_b);
+						if (res == null)
+							throw new InvalidOperationException ();
+						return res;
+					}
+				}
 			}
 		}
 
@@ -154,7 +160,13 @@ namespace System.Diagnostics
 			CheckCategory (categoryName);
 			if (machineName == null)
 				throw new ArgumentNullException ("machineName");
-			return CounterCategoryExists (counterName, categoryName, machineName);
+			unsafe {
+				fixed (byte* counterName_b = Encoding.UTF8.GetBytes (counterName + '\0'))
+				fixed (byte* categoryName_b = Encoding.UTF8.GetBytes (categoryName + '\0'))
+				fixed (byte* machineName_b = Encoding.UTF8.GetBytes (machineName + '\0')) {
+					return CounterCategoryExists (counterName_b, categoryName_b, machineName_b);
+				}
+			}
 		}
 
 		[Obsolete ("Use another overload that uses PerformanceCounterCategoryType instead")]
@@ -191,8 +203,13 @@ namespace System.Diagnostics
 				throw new ArgumentException ("counterData");
 			CounterCreationData[] items = new CounterCreationData [counterData.Count];
 			counterData.CopyTo (items, 0);
-			if (!Create (categoryName, categoryHelp, categoryType, items))
-				throw new InvalidOperationException ();
+			unsafe {
+				fixed (byte* categoryName_b = Encoding.UTF8.GetBytes (categoryName + '\0'))
+				fixed (byte* categoryHelp_b = Encoding.UTF8.GetBytes (categoryHelp + '\0')) {
+					if (!Create (categoryName_b, categoryHelp_b, categoryType, items))
+						throw new InvalidOperationException ();
+				}
+			}
 			return new PerformanceCounterCategory (categoryName, categoryHelp);
 		}
 
@@ -207,16 +224,25 @@ namespace System.Diagnostics
 			CounterCreationData[] items = new CounterCreationData [1];
 			// we use PerformanceCounterType.NumberOfItems32 as the default type
 			items [0] = new CounterCreationData (counterName, counterHelp, PerformanceCounterType.NumberOfItems32);
-			if (!Create (categoryName, categoryHelp, categoryType, items))
-				throw new InvalidOperationException ();
+			unsafe {
+				fixed (byte* categoryName_b = Encoding.UTF8.GetBytes (categoryName + '\0'))
+				fixed (byte* categoryHelp_b = Encoding.UTF8.GetBytes (categoryHelp + '\0')) {
+					if (!Create (categoryName_b, categoryHelp_b, categoryType, items))
+						throw new InvalidOperationException ();
+				}
+			}
 			return new PerformanceCounterCategory (categoryName, categoryHelp);
 		}
 
 		public static void Delete (string categoryName)
 		{
 			CheckCategory (categoryName);
-			if (!CategoryDelete (categoryName))
-				throw new InvalidOperationException ();
+			unsafe {
+				fixed (byte* categoryName_b = Encoding.UTF8.GetBytes (categoryName + '\0')) {
+					if (!CategoryDelete (categoryName_b))
+						throw new InvalidOperationException ();
+				}
+			}
 		}
 
 		public static bool Exists (string categoryName)
@@ -227,7 +253,12 @@ namespace System.Diagnostics
 		public static bool Exists (string categoryName, string machineName)
 		{
 			CheckCategory (categoryName);
-			return CounterCategoryExists (null, categoryName, machineName);
+			unsafe {
+				fixed (byte* categoryName_b = Encoding.UTF8.GetBytes (categoryName + '\0'))
+				fixed (byte* machineName_b = Encoding.UTF8.GetBytes (machineName + '\0')) {
+					return CounterCategoryExists ((byte*) IntPtr.Zero, categoryName_b, machineName_b);
+				}
+			}
 		}
 
 		public static PerformanceCounterCategory[] GetCategories ()
@@ -239,7 +270,12 @@ namespace System.Diagnostics
 		{
 			if (machineName == null)
 				throw new ArgumentNullException ("machineName");
-			string[] catnames = GetCategoryNames (machineName);
+			string[] catnames;
+			unsafe {
+				fixed (byte* machineName_b = Encoding.UTF8.GetBytes (machineName + '\0')) {
+					catnames = GetCategoryNames (machineName_b);
+				}
+			}
 			PerformanceCounterCategory[] cats = new PerformanceCounterCategory [catnames.Length];
 			for (int i = 0; i < catnames.Length; ++i)
 				cats [i] = new PerformanceCounterCategory (catnames [i], machineName);
@@ -253,7 +289,13 @@ namespace System.Diagnostics
 
 		public PerformanceCounter[] GetCounters (string instanceName)
 		{
-			string[] countnames = GetCounterNames (categoryName, machineName);
+			string[] countnames;
+			unsafe {
+				fixed (byte* categoryName_b = Encoding.UTF8.GetBytes (categoryName + '\0'))
+				fixed (byte* machineName_b = Encoding.UTF8.GetBytes (machineName + '\0')) {
+					countnames = GetCounterNames (categoryName_b, machineName_b);
+				}
+			}
 			PerformanceCounter[] counters = new PerformanceCounter [countnames.Length];
 			for (int i = 0; i < countnames.Length; ++i) {
 				counters [i] = new PerformanceCounter (categoryName, countnames [i], instanceName, machineName);
@@ -263,7 +305,12 @@ namespace System.Diagnostics
 
 		public string[] GetInstanceNames ()
 		{
-			return GetInstanceNames (categoryName, machineName);
+			unsafe {
+				fixed (byte* categoryName_b = Encoding.UTF8.GetBytes (categoryName + '\0'))
+				fixed (byte* machineName_b = Encoding.UTF8.GetBytes (machineName + '\0')) {
+					return GetInstanceNames (categoryName_b, machineName_b);
+				}
+			}
 		}
 
 		public bool InstanceExists (string instanceName)
@@ -283,12 +330,13 @@ namespace System.Diagnostics
 			CheckCategory (categoryName);
 			if (machineName == null)
 				throw new ArgumentNullException ("machineName");
-			int val = InstanceExistsInternal (instanceName, categoryName, machineName);
-			if (val == 0)
-				return false;
-			if (val == 1)
-				return true;
-			throw new InvalidOperationException ();
+			unsafe {
+				fixed (byte* instanceName_b = Encoding.UTF8.GetBytes (instanceName + '\0'))
+				fixed (byte* categoryName_b = Encoding.UTF8.GetBytes (categoryName + '\0'))
+				fixed (byte* machineName_b = Encoding.UTF8.GetBytes (machineName + '\0')) {
+					return InstanceExistsInternal (instanceName_b, categoryName_b, machineName_b);
+				}
+			}
 		}
 
 		[MonoTODO]

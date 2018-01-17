@@ -5,59 +5,58 @@
 #ifndef __MONO_PERFCOUNTERS_H__
 #define __MONO_PERFCOUNTERS_H__
 
+#include <config.h>
 #include <glib.h>
+
+#ifndef DISABLE_PERFCOUNTERS
+
 #include <mono/metadata/object.h>
 #include <mono/utils/mono-compiler.h>
-#include <mono/metadata/handle.h>
 
 typedef struct _MonoCounterSample MonoCounterSample;
 
-void* ves_icall_System_Diagnostics_PerformanceCounter_GetImpl (
-		MonoStringHandle category, MonoStringHandle counter, MonoStringHandle instance,
-		MonoStringHandle machine, int *type, MonoBoolean *custom, MonoError *error);
+gpointer
+ves_icall_System_Diagnostics_PerformanceCounter_GetImpl (gchar *category, gchar *counter,
+	gchar *instance, gchar *machine, gint32 *type, MonoBoolean *custom);
 
-MonoBoolean ves_icall_System_Diagnostics_PerformanceCounter_GetSample (void *impl,
-		MonoBoolean only_value, MonoCounterSample *sample, MonoError *error);
+MonoBoolean
+ves_icall_System_Diagnostics_PerformanceCounter_GetSample (gpointer impl, MonoBoolean only_value, MonoCounterSample *sample);
 
-gint64 ves_icall_System_Diagnostics_PerformanceCounter_UpdateValue (
-	void *impl, MonoBoolean do_incr, gint64 value, MonoError *error);
+gint64
+ves_icall_System_Diagnostics_PerformanceCounter_UpdateValue (gpointer impl, MonoBoolean do_incr, gint64 value);
 
-void ves_icall_System_Diagnostics_PerformanceCounter_FreeData (void *impl, MonoError *error);
+void
+ves_icall_System_Diagnostics_PerformanceCounter_FreeData (gpointer impl);
 
 /* Category icalls */
 MonoBoolean
-ves_icall_System_Diagnostics_PerformanceCounterCategory_CategoryDelete (
-	MonoStringHandle name, MonoError *error);
+ves_icall_System_Diagnostics_PerformanceCounterCategory_CategoryDelete (gchar *name);
 
-MonoStringHandle
-ves_icall_System_Diagnostics_PerformanceCounterCategory_CategoryHelpInternal (
-		MonoStringHandle category, MonoStringHandle machine, MonoError *error);
+MonoString*
+ves_icall_System_Diagnostics_PerformanceCounterCategory_CategoryHelpInternal (gchar *category, gchar *machine);
 
 MonoBoolean
-ves_icall_System_Diagnostics_PerformanceCounterCategory_CounterCategoryExists (
-		MonoStringHandle counter, MonoStringHandle category, MonoStringHandle machine, MonoError *error);
+ves_icall_System_Diagnostics_PerformanceCounterCategory_CounterCategoryExists (gchar *counter, gchar *category, gchar *machine);
 
 MonoBoolean
-ves_icall_System_Diagnostics_PerformanceCounterCategory_Create (
-		MonoStringHandle category, MonoStringHandle help, int type, MonoArrayHandle items, MonoError *error);
+ves_icall_System_Diagnostics_PerformanceCounterCategory_Create (gchar *category, gchar *help, gint32 type, MonoArray *items);
 
-int
-ves_icall_System_Diagnostics_PerformanceCounterCategory_InstanceExistsInternal (
-		MonoStringHandle instance, MonoStringHandle category, MonoStringHandle machine, MonoError *error);
-		
-MonoArrayHandle
-ves_icall_System_Diagnostics_PerformanceCounterCategory_GetCategoryNames (MonoStringHandle machine, MonoError *error);
+MonoBoolean
+ves_icall_System_Diagnostics_PerformanceCounterCategory_InstanceExistsInternal (gchar *instance, gchar *category, gchar *machine);
 
-MonoArrayHandle
-ves_icall_System_Diagnostics_PerformanceCounterCategory_GetCounterNames (
-	MonoStringHandle category, MonoStringHandle machine, MonoError *error);
+MonoArray*
+ves_icall_System_Diagnostics_PerformanceCounterCategory_GetCategoryNames (gchar *machine);
 
-MonoArrayHandle
-ves_icall_System_Diagnostics_PerformanceCounterCategory_GetInstanceNames (
-	MonoStringHandle category, MonoStringHandle machine, MonoError *error);
+MonoArray*
+ves_icall_System_Diagnostics_PerformanceCounterCategory_GetCounterNames (gchar *category, gchar *machine);
+
+MonoArray*
+ves_icall_System_Diagnostics_PerformanceCounterCategory_GetInstanceNames (gchar *category, gchar *machine);
 
 typedef gboolean (*PerfCounterEnumCallback) (char *category_name, char *name, unsigned char type, gint64 value, gpointer user_data);
 MONO_API void mono_perfcounter_foreach (PerfCounterEnumCallback cb, gpointer user_data);
+
+#endif /* DISABLE_PERFCOUNTERS */
 
 #endif /* __MONO_PERFCOUNTERS_H__ */
 

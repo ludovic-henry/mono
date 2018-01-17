@@ -222,23 +222,25 @@ ICALL(TRACEL_1, "WriteWindowsDebugString", ves_icall_System_Diagnostics_DefaultT
 ICALL_TYPE(FILEV, "System.Diagnostics.FileVersionInfo", FILEV_1)
 ICALL(FILEV_1, "GetVersionInfo_internal(string)", ves_icall_System_Diagnostics_FileVersionInfo_GetVersionInfo_internal)
 
-#ifndef DISABLE_PROCESS_HANDLING
+#ifndef DISABLE_PERFCOUNTERS
 ICALL_TYPE(PERFCTR, "System.Diagnostics.PerformanceCounter", PERFCTR_1)
-HANDLES(ICALL(PERFCTR_1, "FreeData", ves_icall_System_Diagnostics_PerformanceCounter_FreeData))
-HANDLES(ICALL(PERFCTR_2, "GetImpl", ves_icall_System_Diagnostics_PerformanceCounter_GetImpl))
-HANDLES(ICALL(PERFCTR_3, "GetSample", ves_icall_System_Diagnostics_PerformanceCounter_GetSample))
-HANDLES(ICALL(PERFCTR_4, "UpdateValue", ves_icall_System_Diagnostics_PerformanceCounter_UpdateValue))
+ICALL(PERFCTR_1, "FreeData", ves_icall_System_Diagnostics_PerformanceCounter_FreeData)
+ICALL(PERFCTR_2, "GetImpl", ves_icall_System_Diagnostics_PerformanceCounter_GetImpl)
+ICALL(PERFCTR_3, "GetSample", ves_icall_System_Diagnostics_PerformanceCounter_GetSample)
+ICALL(PERFCTR_4, "UpdateValue", ves_icall_System_Diagnostics_PerformanceCounter_UpdateValue)
 
 ICALL_TYPE(PERFCTRCAT, "System.Diagnostics.PerformanceCounterCategory", PERFCTRCAT_1)
-HANDLES(ICALL(PERFCTRCAT_1, "CategoryDelete", ves_icall_System_Diagnostics_PerformanceCounterCategory_CategoryDelete))
-HANDLES(ICALL(PERFCTRCAT_2, "CategoryHelpInternal", ves_icall_System_Diagnostics_PerformanceCounterCategory_CategoryHelpInternal))
-HANDLES(ICALL(PERFCTRCAT_3, "CounterCategoryExists", ves_icall_System_Diagnostics_PerformanceCounterCategory_CounterCategoryExists))
-HANDLES(ICALL(PERFCTRCAT_4, "Create",         ves_icall_System_Diagnostics_PerformanceCounterCategory_Create))
-HANDLES(ICALL(PERFCTRCAT_5, "GetCategoryNames", ves_icall_System_Diagnostics_PerformanceCounterCategory_GetCategoryNames))
-HANDLES(ICALL(PERFCTRCAT_6, "GetCounterNames", ves_icall_System_Diagnostics_PerformanceCounterCategory_GetCounterNames))
-HANDLES(ICALL(PERFCTRCAT_7, "GetInstanceNames", ves_icall_System_Diagnostics_PerformanceCounterCategory_GetInstanceNames))
-HANDLES(ICALL(PERFCTRCAT_8, "InstanceExistsInternal", ves_icall_System_Diagnostics_PerformanceCounterCategory_InstanceExistsInternal))
+ICALL(PERFCTRCAT_1, "CategoryDelete", ves_icall_System_Diagnostics_PerformanceCounterCategory_CategoryDelete)
+ICALL(PERFCTRCAT_2, "CategoryHelpInternal", ves_icall_System_Diagnostics_PerformanceCounterCategory_CategoryHelpInternal)
+ICALL(PERFCTRCAT_3, "CounterCategoryExists", ves_icall_System_Diagnostics_PerformanceCounterCategory_CounterCategoryExists)
+ICALL(PERFCTRCAT_4, "Create", ves_icall_System_Diagnostics_PerformanceCounterCategory_Create)
+ICALL(PERFCTRCAT_5, "GetCategoryNames", ves_icall_System_Diagnostics_PerformanceCounterCategory_GetCategoryNames)
+ICALL(PERFCTRCAT_6, "GetCounterNames", ves_icall_System_Diagnostics_PerformanceCounterCategory_GetCounterNames)
+ICALL(PERFCTRCAT_7, "GetInstanceNames", ves_icall_System_Diagnostics_PerformanceCounterCategory_GetInstanceNames)
+ICALL(PERFCTRCAT_8, "InstanceExistsInternal", ves_icall_System_Diagnostics_PerformanceCounterCategory_InstanceExistsInternal)
+#endif /* DISABLE_PERFCOUNTERS */
 
+#ifndef DISABLE_PROCESS_HANDLING
 ICALL_TYPE(PROCESS, "System.Diagnostics.Process", PROCESS_1)
 ICALL(PROCESS_1, "CreateProcess_internal", ves_icall_System_Diagnostics_Process_CreateProcess_internal)
 ICALL(PROCESS_4, "GetModules_internal(intptr)", ves_icall_System_Diagnostics_Process_GetModules_internal)
