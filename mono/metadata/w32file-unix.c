@@ -1927,7 +1927,7 @@ mono_w32file_create(const gunichar2 *name, guint32 fileaccess, guint32 sharemode
 	mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_IO_LAYER_FILE, "%s: Opening %s with share 0x%" PRIx32 " and access 0x%" PRIx32, __func__,
 		   filename, sharemode, fileaccess);
 	
-	fd = _wapi_open (filename, flags, perms);
+	fd = _wapi_open (filename, flags | O_CLOEXEC, perms);
     
 	/* If we were trying to open a directory with write permissions
 	 * (e.g. O_WRONLY or O_RDWR), this call will fail with
@@ -2544,6 +2544,18 @@ _wapi_stdhandle_create (gint fd, const gchar *name)
 		mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_IO_LAYER_FILE, "%s: fcntl error on fd %d: %s", __func__, fd, g_strerror(errno));
 
 		mono_w32error_set_last (mono_w32error_unix_to_win32 (errno));
+		return INVALID_HANDLE_VALUE;
+	}
+
+	if (fcntl (fd, F_SETFD, FD_CLOEXEC) == -1) {
+		gint error = mono_w32error_unix_to_win32 (errno);
+		mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_IO_LAYER_FILE, "%s: fcntl(F_SETFD,FD_CLOEXEC) error: %s", __func__, g_strerror(errno));
+		mono_w32error_set_last (error);
+
+		MONO_ENTER_GC_SAFE;
+		close (fd);
+		MONO_EXIT_GC_SAFE;
+
 		return INVALID_HANDLE_VALUE;
 	}
 
@@ -3676,6 +3688,19 @@ mono_w32file_create_pipe (gpointer *readpipe, gpointer *writepipe, guint32 size)
 			__func__, errno, g_strerror (errno));
 
 		_wapi_set_last_error_from_errno ();
+		return FALSE;
+	}
+
+	if (fcntl (filedes[0], F_SETFD, FD_CLOEXEC) == -1 || fcntl (filedes[1], F_SETFD, FD_CLOEXEC) == -1) {
+		gint error = mono_w32error_unix_to_win32 (errno);
+		mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_IO_LAYER_FILE, "%s: fcntl error: %s", __func__, g_strerror(errno));
+		mono_w32error_set_last (error);
+
+		MONO_ENTER_GC_SAFE;
+		close (filedes[0]);
+		close (filedes[1]);
+		MONO_EXIT_GC_SAFE;
+
 		return FALSE;
 	}
 

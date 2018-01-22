@@ -174,6 +174,19 @@ mono_w32socket_accept (SOCKET sock, struct sockaddr *addr, socklen_t *addrlen, g
 		return INVALID_SOCKET;
 	}
 
+	if (fcntl (accepted_fd, F_SETFD, FD_CLOEXEC) == -1) {
+		gint error = mono_w32socket_convert_error (errno);
+		mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_IO_LAYER_SOCKET, "%s: fcntl error: %s", __func__, g_strerror(errno));
+		mono_w32socket_set_last_error (error);
+
+		MONO_ENTER_GC_SAFE;
+		close (accepted_fd);
+		MONO_EXIT_GC_SAFE;
+
+		mono_fdhandle_unref ((MonoFDHandle*) sockethandle);
+		return INVALID_SOCKET;
+	}
+
 	accepted_socket_data = socket_data_create (MONO_FDTYPE_SOCKET, accepted_fd);
 	accepted_socket_data->domain = sockethandle->domain;
 	accepted_socket_data->type = sockethandle->type;
@@ -698,6 +711,18 @@ retry_socket:
 		gint errnum = errno;
 		mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_IO_LAYER_SOCKET, "%s: socket error: %s", __func__, g_strerror (errno));
 		mono_w32socket_set_last_error (mono_w32socket_convert_error (errnum));
+		return INVALID_SOCKET;
+	}
+
+	if (fcntl (fd, F_SETFD, FD_CLOEXEC) == -1) {
+		gint error = mono_w32socket_convert_error (errno);
+		mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_IO_LAYER_SOCKET, "%s: fcntl error: %s", __func__, g_strerror(errno));
+		mono_w32socket_set_last_error (error);
+
+		MONO_ENTER_GC_SAFE;
+		close (fd);
+		MONO_EXIT_GC_SAFE;
+
 		return INVALID_SOCKET;
 	}
 
