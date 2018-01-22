@@ -1985,9 +1985,15 @@ process_create (const gunichar2 *appname, const gunichar2 *cmdline,
 		dup2 (out_fd, 1);
 		dup2 (err_fd, 2);
 
+		gint64 start = mono_100ns_ticks();
+
 		/* Close all file descriptors */
 		for (i = eg_getdtablesize() - 1; i > 2; i--)
 			close (i);
+
+		gint64 end = mono_100ns_ticks();
+
+		fprintf (stderr, "%dus\n", (int)((end - start) / 10));
 
 #ifdef DEBUG_ENABLED
 		mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_IO_LAYER_PROCESS, "%s: exec()ing [%s] in dir [%s]", __func__, cmd,
