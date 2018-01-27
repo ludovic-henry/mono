@@ -255,9 +255,6 @@ endef
 $(eval $(call iOSSimulatorTemplate,sim32,i386))
 $(eval $(call iOSSimulatorTemplate,sim64,x86_64))
 
-$(TOP)/tools/offsets-tool/MonoAotOffsetsDumper.exe: $(wildcard $(TOP)/tools/offsets-tool/*.cs)
-	$(MAKE) -C $(dir $@) MonoAotOffsetsDumper.exe
-
 LLVM_REV=3b82b3c9041eb997f627f881a67d20be37264e9c
 
 # Download a prebuilt llvm
@@ -339,9 +336,6 @@ _ios_$(1)_CONFIGURE_ENVIRONMENT= \
 	mkdir -p $$(TOP)/sdks/builds/ios-$(1)
 	cd $$(TOP)/sdks/builds/ios-$(1) && PATH="$$(PLATFORM_BIN):$$$$PATH" $$(TOP)/configure $$(_ios_$(1)_AC_VARS) $$(_ios_$(1)_CONFIGURE_ENVIRONMENT) $$(_ios_$(1)_CONFIGURE_FLAGS)
 	touch $$@
-
-$$(TOP)/sdks/builds/ios-$(1)/mono/utils/mono-dtrace.h: .stamp-ios-$(1)-configure
-	$$(MAKE) -C $$(dir $$@) $$(notdir $$@)
 
 $$(TOP)/sdks/builds/ios-$(1)/$(2)-apple-darwin10.h: .stamp-ios-$(1)-configure $$(TOP)/sdks/builds/ios-$(1)/mono/utils/mono-dtrace.h $$(TOP)/tools/offsets-tool/MonoAotOffsetsDumper.exe
 	cd $$(TOP)/sdks/builds/ios-$(1) && \

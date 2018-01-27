@@ -23,6 +23,12 @@ all: package
 $(TOP)/configure: $(TOP)/configure.ac $(TOP)/autogen.sh
 	cd $(TOP) && PATH=$(EXTRA_PATH):$$PATH NOCONFIGURE=1 ./autogen.sh
 
+$(TOP)/tools/offsets-tool/MonoAotOffsetsDumper.exe: $(wildcard $(TOP)/tools/offsets-tool/*.cs)
+	$(MAKE) -C $(dir $@) MonoAotOffsetsDumper.exe
+
+$(TOP)/sdks/builds/%/mono/utils/mono-dtrace.h: .stamp-%-configure
+	$(MAKE) -C $(dir $@) $(notdir $@)
+
 TARGETS=
 
 ## MXE targets

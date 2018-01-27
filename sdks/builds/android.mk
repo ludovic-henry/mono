@@ -298,3 +298,102 @@ endef
 
 $(eval $(call AndroidHostMxeTemplate,host-mxe-Win32,i686,Win32))
 $(eval $(call AndroidHostMxeTemplate,host-mxe-Win64,x86_64,Win64))
+
+##
+# Parameters
+#  $(1): target
+#  $(2): arch
+#  $(3): target_abi_name
+#  $(4): llvm
+define AndroidCrossTemplate
+
+_android_$(1)_AR=ar
+_android_$(1)_AS=as
+_android_$(1)_CC=cc
+_android_$(1)_CXX=c++
+_android_$(1)_CXXCPP=cpp
+_android_$(1)_DLLTOOL=dlltool
+_android_$(1)_LD=ld
+_android_$(1)_OBJDUMP=objdump
+_android_$(1)_RANLIB=ranlib
+_android_$(1)_STRIP=strip
+
+_android_$(1)_AC_VARS=
+
+_android_$(1)_CFLAGS= \
+	-ggdb3 -O0 -fno-omit-frame-pointer \
+	-mmacosx-version-min=10.9 \
+	-DXAMARIN_PRODUCT_VERSION=0
+
+_android_$(1)_CXXFLAGS= \
+	-ggdb3 -O0 -fno-omit-frame-pointer \
+	-mmacosx-version-min=10.9 \
+	-stdlib=libc++ \
+	-DXAMARIN_PRODUCT_VERSION=0
+
+_android_$(1)_CONFIGURE_ENVIRONMENT= \
+	AR="$$(_android_$(1)_AR)" \
+	AS="$$(_android_$(1)_AS)" \
+	CC="$$(_android_$(1)_CC)" \
+	CFLAGS="$$(_android_$(1)_CFLAGS)" \
+	CXX="$$(_android_$(1)_CXX)" \
+	CXXCPP="$$(_android_$(1)_CXXCPP)" \
+	CXXFLAGS="$$(_android_$(1)_CXXFLAGS)" \
+	LD="$$(_android_$(1)_LD)" \
+	RANLIB="$$(_android_$(1)_RANLIB)" \
+	STRIP="$$(_android_$(1)_STRIP)"
+
+_android_$(1)_CONFIGURE_FLAGS= \
+	$$(android_$(1)_CONFIGURE_FLAGS) \
+	--cache-file=$$(TOP)/sdks/builds/android-$(1).config.cache \
+	--prefix=$$(TOP)/sdks/out/android-$(1) \
+	--disable-boehm \
+	--disable-mcs-build \
+	--disable-nls \
+	--enable-extension-module \
+	--enable-maintainer-mode \
+	--with-cross-offsets=$(3).h \
+	--with-llvm=$$(TOP)/sdks/out/llvm-$(4) \
+	--with-monodroid \
+	--with-tls=pthread
+
+.stamp-android-$(1)-toolchain:
+	touch $$@
+
+.stamp-android-$(1)-configure: $$(TOP)/configure | package-llvm-$(4)
+	mkdir -p $$(TOP)/sdks/builds/android-$(1)
+	cd $$(TOP)/sdks/builds/android-$(1) && $$< $$(_android_$(1)_AC_VARS) $$(_android_$(1)_CONFIGURE_ENVIRONMENT) $$(_android_$(1)_CONFIGURE_FLAGS)
+	touch $$@
+
+$$(TOP)/sdks/builds/android-$(1)/$(3).h: .stamp-android-$(1)-configure $$(TOP)/sdks/builds/android-$(1)/mono/utils/mono-dtrace.h $$(TOP)/tools/offsets-tool/MonoAotOffsetsDumper.exe
+	cd $$(TOP)/sdks/builds/android-$(1) && \
+		MONO_PATH=$(TOP)/tools/offsets-tool/CppSharp/osx_32 \
+			mono --arch=32 --debug $$(TOP)/tools/offsets-tool/MonoAotOffsetsDumper.exe \
+				--gen-android --android-ndk $$(NDK_DIR) --abi $(3) --out $$(TOP)/sdks/builds/android-$(1)/ --mono $$(TOP) --targetdir $$(TOP)/sdks/builds/android-$(1)
+
+.PHONY: build-android-$(1)
+build-android-$(1): $$(TOP)/sdks/builds/android-$(1)/$(3).h
+
+.PHONY: package-android-$(1)
+package-android-$(1):
+	$$(MAKE) -C $$(TOP)/sdks/builds/android-$(1)/mono install
+
+.PHONY: clean-android-$(1)
+clean-android-$(1):
+	rm -rf .stamp-android-$(1)-toolchain .stamp-android-$(1)-configure $$(TOP)/sdks/builds/android-$(1) $$(TOP)/sdks/builds/android-$(1).config.cache $$(TOP)/sdks/out/android-$(1)
+
+TARGETS += android-$(1)
+
+endef
+
+android_cross-arm_CONFIGURE_FLAGS=--target=armv5-linux-androideabi --host=i386-apple-darwin10
+$(eval $(call AndroidCrossTemplate,cross-arm,armeabi,armv5-none-linux-androideabi,llvm32))
+
+android_cross-arm64_CONFIGURE_FLAGS=--target=aarch64-v8a-linux-androideabi
+$(eval $(call AndroidCrossTemplate,cross-arm64,arm64-v8a,aarch64-v8a-linux-android,llvm64))
+
+android_cross-x86_CONFIGURE_FLAGS=--target=i686-linux-android --host=i386-apple-darwin10
+$(eval $(call AndroidCrossTemplate,cross-x86,x86,i686-none-linux-android,llvm32))
+
+android_cross-x86_64_CONFIGURE_FLAGS=--target=x86_64-linux-android
+$(eval $(call AndroidCrossTemplate,cross-x86_64,x86_64,x86_64-none-linux-android,llvm64))
