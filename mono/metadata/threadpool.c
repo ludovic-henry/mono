@@ -304,6 +304,12 @@ worker_callback (void)
 		counter._.working ++;
 	});
 
+	static gint32 log_working = 0;
+	if ((mono_atomic_inc_i32 (&log_working) % 1000) == 0) {
+		mono_trace(G_LOG_LEVEL_INFO, MONO_TRACE_THREADPOOL, "threadpool: starting: %d, working: %d",
+			counter._.starting, counter._.working);
+	}
+
 	if (mono_runtime_is_shutting_down ()) {
 		COUNTER_ATOMIC (counter, {
 			counter._.working --;
@@ -623,7 +629,9 @@ ves_icall_System_Threading_ThreadPool_GetAvailableThreadsNative (gint32 *worker_
 
 	counter = COUNTER_READ ();
 
-	*worker_threads = MAX (0, mono_threadpool_worker_get_max () - counter._.working);
+	gint32 worker_max = mono_threadpool_worker_get_max ();
+
+	*worker_threads = worker_max == -1 ? -1 : MAX (0, worker_max - counter._.working);
 	*completion_port_threads = threadpool.limit_io_max;
 
 	mono_refcount_dec (&threadpool);

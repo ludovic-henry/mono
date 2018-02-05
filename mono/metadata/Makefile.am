@@ -66,7 +66,7 @@ endif
 if HOST_WASM
 platform_sources += threadpool-worker-wasm.c
 else
-platform_sources += threadpool-worker-default.c
+platform_sources += threadpool-worker-dispatch.c
 endif
 
 

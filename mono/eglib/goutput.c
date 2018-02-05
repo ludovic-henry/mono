@@ -238,13 +238,13 @@ g_log_default_handler (const gchar *log_domain, GLogLevelFlags log_level, const 
 static void
 default_stdout_handler (const gchar *string)
 {
-	fprintf (stdout, "%s", string);
+	fprintf (stdout, "%s\n", string);
 }
 
 static void
 default_stderr_handler (const gchar *string)
 {
-	fprintf (stderr, "%s", string);
+	fprintf (stderr, "%s\n", string);
 }
 
 #endif
