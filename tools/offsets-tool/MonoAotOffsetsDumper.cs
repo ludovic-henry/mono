@@ -224,7 +224,6 @@ namespace CppSharp
                 var driver = new Driver(options);
 
                 Setup(driver, target);
-                driver.Setup();
 
                 BuildParseOptions(driver, target);
                 if (!driver.ParseCode())
@@ -314,12 +313,19 @@ namespace CppSharp
             parserOptions.AddDefines("CPPSHARP");
             parserOptions.AddDefines("MONO_GENERATING_OFFSETS");
 
+            // Debug
+            parserOptions.Verbose = true;
+            parserOptions.NoStandardIncludes = true;
+            parserOptions.NoBuiltinIncludes = true;
+
             foreach (var define in target.Defines)
                 parserOptions.AddDefines(define);
 
             SetupToolchainPaths(driver, target);
 
             SetupMono(driver, target);
+
+            driver.Setup();
         }
 
         static void SetupMono(Driver driver, Target target)

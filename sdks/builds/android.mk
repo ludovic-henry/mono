@@ -367,7 +367,7 @@ _android_$(1)_CONFIGURE_FLAGS= \
 
 $$(TOP)/sdks/builds/android-$(1)/$(3).h: .stamp-android-$(1)-configure $$(TOP)/sdks/builds/android-$(1)/mono/utils/mono-dtrace.h $$(TOP)/tools/offsets-tool/MonoAotOffsetsDumper.exe
 	cd $$(TOP)/sdks/builds/android-$(1) && \
-		MONO_PATH=$(TOP)/tools/offsets-tool/CppSharp/osx_32 \
+		MONO_PATH="$$(TOP)/tools/offsets-tool/CppSharp/osx_32" \
 			mono --arch=32 --debug $$(TOP)/tools/offsets-tool/MonoAotOffsetsDumper.exe \
 				--gen-android --android-ndk $$(NDK_DIR) --abi $(3) --out $$(TOP)/sdks/builds/android-$(1)/ --mono $$(TOP) --targetdir $$(TOP)/sdks/builds/android-$(1)
 
