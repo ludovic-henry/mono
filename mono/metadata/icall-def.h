@@ -408,9 +408,11 @@ ICALL(MONOIO_33, "get_VolumeSeparatorChar", ves_icall_System_IO_MonoIO_get_Volum
 ICALL_TYPE(IOPATH, "System.IO.Path", IOPATH_1)
 HANDLES(ICALL(IOPATH_1, "get_temp_path", ves_icall_System_IO_get_temp_path))
 
+#ifndef DISABLE_SOCKETS
 ICALL_TYPE(IOSELECTOR, "System.IOSelector", IOSELECTOR_1)
 ICALL(IOSELECTOR_1, "Add", ves_icall_System_IOSelector_Add)
 ICALL(IOSELECTOR_2, "Remove", ves_icall_System_IOSelector_Remove)
+#endif /* DISABLE_SOCKETS */
 
 ICALL_TYPE(MATH, "System.Math", MATH_19)
 ICALL(MATH_19, "Abs(double)", ves_icall_System_Math_Abs_double)

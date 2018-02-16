@@ -8,6 +8,8 @@
 #include <config.h>
 #include <glib.h>
 
+#ifndef DISABLE_SOCKETS
+
 #include <mono/metadata/object-internals.h>
 
 typedef struct _MonoIOSelectorJob MonoIOSelectorJob;
@@ -24,5 +26,7 @@ void
 mono_threadpool_io_remove_domain_jobs (MonoDomain *domain);
 void
 mono_threadpool_io_cleanup (void);
+
+#endif /* DISABLE_SOCKETS */
 
 #endif /* _MONO_METADATA_THREADPOOL_IO_H_ */
