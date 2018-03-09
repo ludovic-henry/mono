@@ -47,7 +47,7 @@ static MonoW32HandleSlot *handle_slots_last;
 static MonoCoopMutex global_signal_mutex;
 static MonoCoopCond global_signal_cond;
 
-static MonoCoopMutex scan_mutex;
+static MonoCoopMutex new_mutex;
 
 static gboolean shutting_down = FALSE;
 
@@ -172,7 +172,7 @@ mono_w32handle_init (void)
 	if (initialized)
 		return;
 
-	mono_coop_mutex_init (&scan_mutex);
+	mono_coop_mutex_init (&new_mutex);
 
 	mono_coop_cond_init (&global_signal_cond);
 	mono_coop_mutex_init (&global_signal_mutex);
@@ -205,7 +205,7 @@ mono_w32handle_ops_typesize (MonoW32Type type);
  *
  * Search for a free handle and initialize it. Return the handle on
  * success and 0 on failure.  This is only called from
- * mono_w32handle_new, and scan_mutex must be held.
+ * mono_w32handle_new, and new_mutex must be held.
  */
 static MonoW32Handle*
 mono_w32handle_new_internal (MonoW32Type type, gpointer handle_specific)
@@ -245,7 +245,6 @@ retry:
 
 				g_assert (handle_data->ref == 0);
 
-				handle_data->type = type;
 				handle_data->signalled = FALSE;
 				handle_data->ref = 1;
 
@@ -254,6 +253,11 @@ retry:
 
 				if (handle_specific)
 					handle_data->specific = g_memdup (handle_specific, mono_w32handle_ops_typesize (type));
+
+				mono_memory_write_barrier ();
+
+				/* We synchronize with `mono_w32handle_foreach` */
+				handle_data->type = type;
 
 				return handle_data;
 			}
@@ -280,12 +284,12 @@ mono_w32handle_new (MonoW32Type type, gpointer handle_specific)
 
 	g_assert (!shutting_down);
 
-	mono_coop_mutex_lock (&scan_mutex);
+	mono_coop_mutex_lock (&new_mutex);
 
 	handle_data = mono_w32handle_new_internal (type, handle_specific);
 	g_assert (handle_data);
 
-	mono_coop_mutex_unlock (&scan_mutex);
+	mono_coop_mutex_unlock (&new_mutex);
 
 	mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_IO_LAYER_HANDLE, "%s: create %s handle %p", __func__, mono_w32handle_ops_typename (type), handle_data);
 
@@ -297,9 +301,6 @@ mono_w32handle_ref_core (MonoW32Handle *handle_data);
 
 static gboolean
 mono_w32handle_unref_core (MonoW32Handle *handle_data);
-
-static void
-w32handle_destroy (MonoW32Handle *handle_data);
 
 gpointer
 mono_w32handle_duplicate (MonoW32Handle *handle_data)
@@ -314,7 +315,6 @@ gboolean
 mono_w32handle_close (gpointer handle)
 {
 	MonoW32Handle *handle_data;
-	gboolean destroy;
 
 	if (handle == INVALID_HANDLE_VALUE)
 		return FALSE;
@@ -324,9 +324,7 @@ mono_w32handle_close (gpointer handle)
 	if (handle_data->type == MONO_W32TYPE_UNUSED)
 		return FALSE;
 
-	destroy = mono_w32handle_unref_core (handle_data);
-	if (destroy)
-		w32handle_destroy (handle_data);
+	mono_w32handle_unref (handle_data);;
 
 	return TRUE;
 }
@@ -356,17 +354,12 @@ void
 mono_w32handle_foreach (gboolean (*on_each)(MonoW32Handle *handle_data, gpointer user_data), gpointer user_data)
 {
 	MonoW32HandleSlot *slot;
-	GPtrArray *handles_to_destroy;
 	guint32 i;
-
-	handles_to_destroy = NULL;
-
-	mono_coop_mutex_lock (&scan_mutex);
 
 	for (slot = handle_slots_first; slot; slot = slot->next) {
 		for (i = 0; i < HANDLES_PER_SLOT; i++) {
 			MonoW32Handle *handle_data;
-			gboolean destroy, finished;
+			gboolean finished;
 
 			handle_data = &slot->handles [i];
 			if (handle_data->type == MONO_W32TYPE_UNUSED)
@@ -383,30 +376,11 @@ mono_w32handle_foreach (gboolean (*on_each)(MonoW32Handle *handle_data, gpointer
 
 			/* we might have to destroy the handle here, as
 			 * it could have been unrefed in another thread */
-			destroy = mono_w32handle_unref_core (handle_data);
-			if (destroy) {
-				/* we do not destroy it while holding the scan_mutex
-				 * lock, because w32handle_destroy also needs to take
-				 * the lock, and it calls user code which might lead
-				 * to a deadlock */
-				if (!handles_to_destroy)
-					handles_to_destroy = g_ptr_array_sized_new (4);
-				g_ptr_array_add (handles_to_destroy, (gpointer) handle_data);
-			}
+			mono_w32handle_unref (handle_data);
 
 			if (finished)
-				goto done;
+				return;
 		}
-	}
-
-done:
-	mono_coop_mutex_unlock (&scan_mutex);
-
-	if (handles_to_destroy) {
-		for (i = 0; i < handles_to_destroy->len; ++i)
-			w32handle_destroy ((MonoW32Handle*) handles_to_destroy->pdata [i]);
-
-		g_ptr_array_free (handles_to_destroy, TRUE);
 	}
 }
 
@@ -474,16 +448,16 @@ w32handle_destroy (MonoW32Handle *handle_data)
 	type = handle_data->type;
 	handle_specific = handle_data->specific;
 
-	mono_coop_mutex_lock (&scan_mutex);
-
 	mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_IO_LAYER_HANDLE, "%s: destroy %s handle %p", __func__, mono_w32handle_ops_typename (type), handle_data);
 
 	mono_coop_mutex_destroy (&handle_data->signal_mutex);
 	mono_coop_cond_destroy (&handle_data->signal_cond);
 
-	memset (handle_data, 0, sizeof (MonoW32Handle));
+	mono_memory_write_barrier ();
 
-	mono_coop_mutex_unlock (&scan_mutex);
+	handle_data->type = MONO_W32TYPE_UNUSED;
+
+	/* We cannot access `handle_data` after this point, as it may be reused on another thread */
 
 	close_func = _wapi_handle_ops_get_close_func (type);
 	if (close_func != NULL) {
