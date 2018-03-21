@@ -1,16 +1,6 @@
 
 node('debian-9-amd64') {
     timestamps {
-        stage ('Checkout') {
-            git branch: "${sha}", url: 'git://github.com/mono/mono.git'
-
-            sh "git reset --hard ${sha}"
-            sh "git clean -xffd"
-
-            sh "git submodule update --recursive --init"
-            sh "git submodule foreach --recursive git reset --hard HEAD"
-            sh "git submodule foreach --recursive git clean -xffd"
-        }
         stage ('Run') {
             chroot chrootName: 'debian-9-amd64-stable', command: 'scripts/ci/run-jenkins.sh', additionalPackages: 'xvfb xauth mono-devel git python wget bc build-essential libtool autoconf automake gettext iputils-ping cmake lsof'
         }
