@@ -233,6 +233,7 @@ set_context (ThreadContext *context)
 	mono_native_tls_set_value (thread_context_id, context);
 	jit_tls = mono_tls_get_jit_tls ();
 	if (jit_tls)
+		/* jit_tls assumes ownership of 'context' */
 		jit_tls->interp_context = context;
 }
 
@@ -1500,12 +1501,11 @@ static MonoObject*
 interp_runtime_invoke (MonoMethod *method, void *obj, void **params, MonoObject **exc, MonoError *error)
 {
 	InterpFrame frame, *old_frame;
-	ThreadContext * volatile context = mono_native_tls_get_value (thread_context_id);
+	ThreadContext *context = mono_native_tls_get_value (thread_context_id);
 	MonoMethodSignature *sig = mono_method_signature (method);
 	MonoClass *klass = mono_class_from_mono_type (sig->ret);
 	stackval result;
 	stackval *args;
-	ThreadContext context_struct;
 	MonoMethod *target_method = method;
 
 	error_init (error);
@@ -1515,12 +1515,10 @@ interp_runtime_invoke (MonoMethod *method, void *obj, void **params, MonoObject 
 	frame.ex = NULL;
 
 	if (context == NULL) {
-		context = &context_struct;
-		memset (context, 0, sizeof (ThreadContext));
+		context = g_new0 (ThreadContext, 1);
 		set_context (context);
-	} else {
-		old_frame = context->current_frame;
 	}
+	old_frame = context->current_frame;
 
 	MonoDomain *domain = mono_domain_get ();
 
@@ -1548,10 +1546,7 @@ interp_runtime_invoke (MonoMethod *method, void *obj, void **params, MonoObject 
 
 	interp_exec_method (&frame, context);
 
-	if (context == &context_struct)
-		set_context (NULL);
-	else
-		context->current_frame = old_frame;
+	context->current_frame = old_frame;
 
 	if (frame.ex) {
 		if (exc) {
@@ -1579,7 +1574,6 @@ interp_entry (InterpEntryData *data)
 	InterpFrame frame;
 	InterpMethod *rmethod = data->rmethod;
 	ThreadContext *context = mono_native_tls_get_value (thread_context_id);
-	ThreadContext context_struct;
 	InterpFrame *old_frame;
 	stackval result;
 	stackval *args;
@@ -1597,12 +1591,10 @@ interp_entry (InterpEntryData *data)
 
 	frame.ex = NULL;
 	if (context == NULL) {
-		context = &context_struct;
-		memset (context, 0, sizeof (ThreadContext));
+		context = g_new0 (ThreadContext, 1);
 		set_context (context);
-	} else {
-		old_frame = context->current_frame;
 	}
+	old_frame = context->current_frame;
 
 	args = alloca (sizeof (stackval) * (sig->param_count + (sig->hasthis ? 1 : 0)));
 	if (sig->hasthis)
@@ -1652,10 +1644,7 @@ interp_entry (InterpEntryData *data)
 	}
 
 	interp_exec_method (&frame, context);
-	if (context == &context_struct)
-		set_context (NULL);
-	else
-		context->current_frame = old_frame;
+	context->current_frame = old_frame;
 
 	// FIXME:
 	g_assert (frame.ex == NULL);
@@ -3694,7 +3683,6 @@ array_constructed:
 			MINT_IN_BREAK;
 
 		MINT_IN_CASE(MINT_LDRMFLD) {
-			gpointer tmp;
 			MonoClassField *field;
 			char *addr;
 
@@ -3705,6 +3693,7 @@ array_constructed:
 			ip += 2;
 #ifndef DISABLE_REMOTING
 			if (mono_object_is_transparent_proxy (o)) {
+				gpointer tmp;
 				MonoClass *klass = ((MonoTransparentProxy*)o)->remote_class->proxy_class;
 
 				addr = mono_load_remote_field_checked (o, klass, field, &tmp, error);
@@ -3720,7 +3709,6 @@ array_constructed:
 		MINT_IN_CASE(MINT_LDRMFLD_VT) {
 			MonoClassField *field;
 			char *addr;
-			gpointer tmp;
 
 			o = sp [-1].data.p;
 			if (!o)
@@ -3733,6 +3721,7 @@ array_constructed:
 			ip += 2;
 #ifndef DISABLE_REMOTING
 			if (mono_object_is_transparent_proxy (o)) {
+				gpointer tmp;
 				MonoClass *klass = ((MonoTransparentProxy*)o)->remote_class->proxy_class;
 				addr = mono_load_remote_field_checked (o, klass, field, &tmp, error);
 				mono_error_cleanup (error); /* FIXME: don't swallow the error */
