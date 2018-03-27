@@ -276,6 +276,12 @@ mono_hazard_pointer_clear_all (MonoThreadHazardPointers *hp, int retain)
 		mono_hazard_pointer_clear (hp, 2);
 }
 
+MonoLinkedListSet*
+mono_thread_info_list_head (void)
+{
+	return &thread_list;
+}
+
 /*
 If return non null Hazard Pointer 1 holds the return value.
 */
@@ -585,12 +591,6 @@ mono_thread_info_get_small_id (void)
 		return -1;
 	return GPOINTER_TO_INT (val) - 1;
 #endif
-}
-
-MonoLinkedListSet*
-mono_thread_info_list_head (void)
-{
-	return &thread_list;
 }
 
 MonoThreadInfo *
