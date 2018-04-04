@@ -40,7 +40,7 @@ MONO_VERSION_BUILD=`echo $VERSION | cut -d . -f 3`
 # This can be reset to 0 when Mono's version number is bumped
 # since it's part of the corlib version (the prefix '1' in the full
 # version number is to ensure the number isn't treated as octal in C)
-MONO_CORLIB_COUNTER=3
+MONO_CORLIB_COUNTER=4
 MONO_CORLIB_VERSION=`printf "1%02d%02d%02d%03d" $MONO_VERSION_MAJOR $MONO_VERSION_MINOR 0 $MONO_CORLIB_COUNTER`
 
 AC_DEFINE_UNQUOTED(MONO_CORLIB_VERSION,$MONO_CORLIB_VERSION,[Version of the corlib-runtime interface])
@@ -426,6 +426,10 @@ if test x$host_darwin = xyes; then
    AC_DEFINE(HOST_DARWIN, 1, [Host Platform is Darwin])
 fi
 
+if test x$platform_ios = xyes; then
+	AC_DEFINE(HOST_IOS, 1, [Host Platform is iOS])
+fi
+
 # Defined for all targets/platforms using classic Windows API support.
 AC_DEFINE(HAVE_CLASSIC_WINAPI_SUPPORT, 1, [Use classic Windows API support])
 AC_DEFINE(HAVE_UWP_WINAPI_SUPPORT, 0, [Don't use UWP Windows API support])
@@ -738,9 +742,9 @@ else
 		;;
 	esac
 fi
-CFLAGS="$CFLAGS -g $WARN"
+CFLAGS="$WARN $CFLAGS -g"
 CFLAGS_FOR_LIBGC="$CFLAGS_FOR_LIBGC -g"
-CPPFLAGS="$CPPFLAGS -g $WARN"
+CPPFLAGS="$WARN $CPPFLAGS -g"
 
 # Where's the 'mcs' source tree?
 if test -d $srcdir/mcs; then
