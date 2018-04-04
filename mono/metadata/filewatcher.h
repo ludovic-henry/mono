@@ -36,8 +36,6 @@ int ves_icall_System_IO_KqueueMonitor_kevent_notimeout (int *kq, gpointer change
 
 #if defined(__APPLE__)
 void ves_icall_CoreFX_Interop_RunLoop_CFRunLoopRun (void);
-MONO_API char* SystemNative_RealPath(const char* path);
-MONO_API void SystemNative_Sync (void);
 #endif
 
 G_END_DECLS
