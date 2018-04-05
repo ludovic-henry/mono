@@ -83,20 +83,36 @@ fi
 if [[ ${CI_TAGS} == *'product-sdks-ios'* ]];
    then
 	   echo "DISABLE_ANDROID=1" > sdks/Make.config
+	   echo "DISABLE_WASM=1" >> sdks/Make.config
+	   export device_test_suites="Mono.Runtime.Tests System.Core"
 	   ${TESTCMD} --label=runtimes --timeout=60m --fatal make -j4 -C sdks/builds package-ios-sim64 package-ios-target64
 	   ${TESTCMD} --label=cross --timeout=60m --fatal make -j4 -C sdks/builds package-ios-cross64 package-ios-cross32
 	   ${TESTCMD} --label=bcl --timeout=60m --fatal make -j4 -C sdks/builds package-bcl
 	   ${TESTCMD} --label=build-tests --timeout=10m --fatal make -C sdks/ios compile-tests
 	   ${TESTCMD} --label=run-sim --timeout=20m make -C sdks/ios run-ios-sim-all
 	   ${TESTCMD} --label=build-ios-dev --timeout=60m make -C sdks/ios build-ios-dev-all
+	   if [[ ${CI_TAGS} == *'run-device-tests'* ]]; then
+		   for suite in ${device_test_suites}; do ${TESTCMD} --label=run-ios-dev-${suite} --timeout=10m make -C sdks/ios run-ios-dev-${suite}; done
+	   fi
 	   ${TESTCMD} --label=build-ios-dev-llvm --timeout=60m make -C sdks/ios build-ios-dev-llvm-all
-	   ${TESTCMD} --label=package --timeout=60m tar cvzf mono-product-sdk-$GIT_COMMIT.tar.gz -C sdks/out/ bcl ios-llvm64 ios-llvm32 ios-cross32 ios-cross64
+	   if [[ ${CI_TAGS} == *'run-device-tests'* ]]; then
+		   for suite in ${device_test_suites}; do ${TESTCMD} --label=run-ios-dev-llvm-${suite} --timeout=10m make -C sdks/ios run-ios-dev-${suite}; done
+	   fi
+	   ${TESTCMD} --label=package --timeout=60m tar cvzf mono-product-sdk-$GIT_COMMIT.tar.gz -C sdks/out/ bcl ios-llvm64 ios-llvm32 ios-cross32-release ios-cross64-release
 	   exit 0
 fi
 
 if [[ ${CI_TAGS} == *'product-sdks-android'* ]];
    then
-        ${TESTCMD} --label=runtimes --timeout=120m --fatal make -j4 -C sdks/builds package-android-{armeabi,armeabi-v7a,arme64-v8a,x86,x86_64} package-android-host-{Darwin,Linux,mxe-{Win32,Win64}} package-bcl
+        echo "ANDROID_TOOLCHAIN_DIR=$HOME/android-toolchain" > sdks/Make.config
+        echo "ANDROID_TOOLCHAIN_CACHE_DIR=$HOME/android-archives" >> sdks/Make.config
+        echo "MXE_PREFIX_DIR=$HOME/android-toolchain" >> sdks/Make.config
+        echo "IGNORE_PROVISION_ANDROID=1" >> sdks/Make.config
+        echo "IGNORE_PROVISION_MXE=1" >> sdks/Make.config
+        echo "DISABLE_CCACHE=1" >> sdks/Make.config
+        ${TESTCMD} --label=provision-android --timeout=120m --fatal make -j4 -C sdks/builds provision-android
+        ${TESTCMD} --label=provision-mxe --timeout=240m --fatal make -j4 -C sdks/builds provision-mxe
+        ${TESTCMD} --label=runtimes --timeout=120m --fatal make -j4 -C sdks/builds package-android-{armeabi,armeabi-v7a,arm64-v8a,x86,x86_64} package-android-host-{Darwin,mxe-Win64}
         exit 0
 fi
 
@@ -144,9 +160,12 @@ if [[ ${CI_TAGS} == *'monolite'* ]]; then make get-monolite-latest; fi
 make_parallelism=-j4
 if [[ ${CI_TAGS} == *'linux-ppc64el'* ]]; then make_parallelism=-j1; fi
 
+make_continue=
+if [[ ${CI_TAGS} == *'checked-all'* ]]; then make_continue=-k; fi
+
 if [[ ${CI_TAGS} != *'mac-sdk'* ]]; # Mac SDK builds Mono itself
 	then
-	${TESTCMD} --label=make --timeout=${make_timeout} --fatal make ${make_parallelism} -w V=1
+	${TESTCMD} --label=make --timeout=${make_timeout} --fatal make ${make_parallelism} ${make_continue} -w V=1
 fi
 
 if [[ ${CI_TAGS} == *'checked-coop'* ]]; then export MONO_CHECK_MODE=gc,thread; fi

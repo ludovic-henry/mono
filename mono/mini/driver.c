@@ -74,6 +74,7 @@
 static FILE *mini_stats_fd;
 
 static void mini_usage (void);
+static void mono_runtime_set_execution_mode (MonoEEMode mode);
 
 #ifdef HOST_WIN32
 /* Need this to determine whether to detach console */
@@ -617,7 +618,7 @@ interp_regression_step (MonoImage *image, int verbose, int *total_run, int *tota
 						continue;
 
 					MonoClass *klass = centry->ctor->klass;
-					if (strcmp (klass->name, "CategoryAttribute"))
+					if (strcmp (m_class_get_name (klass), "CategoryAttribute"))
 						continue;
 
 					MonoObject *obj = mono_custom_attrs_get_attr_checked (ainfo, klass, error);
@@ -1753,7 +1754,7 @@ apply_root_domain_configuration_file_bindings (MonoDomain *domain, char *root_do
 static void
 mono_enable_interp (const char *opts)
 {
-	mono_use_interpreter = TRUE;
+	mono_runtime_set_execution_mode (MONO_EE_MODE_INTERP);
 	if (opts)
 		mono_interp_opts_string = opts;
 
@@ -2557,6 +2558,56 @@ mono_jit_set_aot_only (gboolean val)
 	mono_aot_only = val;
 }
 
+static void
+mono_runtime_set_execution_mode (MonoEEMode mode)
+{
+	memset (&mono_ee_features, 0, sizeof (mono_ee_features));
+
+	switch (mode) {
+	case MONO_AOT_MODE_LLVMONLY:
+		mono_aot_only = TRUE;
+		mono_llvm_only = TRUE;
+
+		mono_ee_features.use_aot_trampolines = TRUE;
+		break;
+
+	case MONO_AOT_MODE_FULL:
+		mono_aot_only = TRUE;
+
+		mono_ee_features.use_aot_trampolines = TRUE;
+		break;
+
+	case MONO_AOT_MODE_HYBRID:
+		mono_set_generic_sharing_vt_supported (TRUE);
+		mono_set_partial_sharing_supported (TRUE);
+		break;
+
+	case MONO_AOT_MODE_INTERP:
+		mono_aot_only = TRUE;
+		mono_use_interpreter = TRUE;
+
+		mono_ee_features.use_aot_trampolines = TRUE;
+		break;
+
+	case MONO_AOT_MODE_INTERP_LLVMONLY:
+		mono_aot_only = TRUE;
+		mono_use_interpreter = TRUE;
+		mono_llvm_only = TRUE;
+
+		mono_ee_features.force_use_interpreter = TRUE;
+		break;
+
+	case MONO_EE_MODE_INTERP:
+		mono_use_interpreter = TRUE;
+
+		mono_ee_features.force_use_interpreter = TRUE;
+		break;
+
+	default:
+		g_error ("Unknown execution-mode %d", mode);
+	}
+}
+
 /**
  * mono_jit_set_aot_mode:
  */
@@ -2566,27 +2617,9 @@ mono_jit_set_aot_mode (MonoAotMode mode)
 	/* we don't want to set mono_aot_mode twice */
 	g_assert (mono_aot_mode == MONO_AOT_MODE_NONE);
 	mono_aot_mode = mode;
+	
+	mono_runtime_set_execution_mode ((MonoEEMode)mode);
 
-	if (mono_aot_mode == MONO_AOT_MODE_LLVMONLY) {
-		mono_aot_only = TRUE;
-		mono_llvm_only = TRUE;
-	}
-	if (mono_aot_mode == MONO_AOT_MODE_FULL) {
-		mono_aot_only = TRUE;
-	}
-	if (mono_aot_mode == MONO_AOT_MODE_HYBRID) {
-		mono_set_generic_sharing_vt_supported (TRUE);
-		mono_set_partial_sharing_supported (TRUE);
-	}
-	if (mono_aot_mode == MONO_AOT_MODE_INTERP) {
-		mono_aot_only = TRUE;
-		mono_use_interpreter = TRUE;
-	}
-	if (mono_aot_mode == MONO_AOT_MODE_INTERP_LLVMONLY) {
-		mono_aot_only = TRUE;
-		mono_use_interpreter = TRUE;
-		mono_llvm_only = TRUE;
-	}
 }
 
 mono_bool

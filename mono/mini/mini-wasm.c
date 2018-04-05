@@ -722,6 +722,12 @@ mono_wasm_set_breakpoint (const char *assembly_name, int method_token, int il_of
 //trampoline
 
 void
+mono_sdb_single_step_trampoline (void)
+{
+	g_error ("mono_sdb_single_step_trampoline");
+}
+
+void
 mono_wasm_breakpoint_hit (void)
 {
 	mono_wasm_fire_bp ();
@@ -804,7 +810,7 @@ list_frames (MonoStackFrameInfo *info, MonoContext *ctx, gpointer data)
 	while (method->is_inflated)
 		method = ((MonoMethodInflated*)method)->declaring;
 
-	char *assembly_name = g_strdup (method->klass->image->module_name);
+	char *assembly_name = g_strdup (m_class_get_image (method->klass)->module_name);
 	inplace_tolower (assembly_name);
 
 	if (method->wrapper_type == MONO_WRAPPER_NONE) {

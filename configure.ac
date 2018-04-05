@@ -1,7 +1,7 @@
 # Process this file with autoconf to produce a configure script.
 #AC_PREREQ([2.62])
 
-AC_INIT(mono, [5.13.0],
+AC_INIT(mono, [5.15.0],
         [https://github.com/mono/mono/issues/new])
 
 AC_CONFIG_SRCDIR([README.md])
@@ -518,8 +518,6 @@ AC_SUBST(export_ldflags)
 # Test whenever ld supports -version-script
 AC_PROG_LD
 AC_PROG_LD_GNU
-
-AM_ICONV()
 
 AC_CHECK_HEADERS(sys/filio.h sys/sockio.h netdb.h utime.h sys/utime.h semaphore.h sys/un.h linux/rtc.h sys/syscall.h sys/mkdev.h sys/uio.h sys/param.h sys/sysctl.h libproc.h sys/prctl.h)
 AC_CHECK_HEADERS(sys/param.h sys/socket.h sys/ipc.h sys/utsname.h alloca.h ucontext.h pwd.h sys/select.h netinet/tcp.h netinet/in.h unistd.h sys/types.h link.h asm/sigcontext.h sys/inotify.h arpa/inet.h complex.h unwind.h)
@@ -1660,6 +1658,33 @@ if test x$platform_android = xyes; then
 fi
 
 if test x$host_win32 = xno; then
+	dnl *************************************
+	dnl *** Checks for time capabilities ***
+	dnl *************************************
+
+	AC_MSG_CHECKING(for CLOCK_MONOTONIC)
+	AC_TRY_COMPILE([#include <time.h>], [
+		const int foo = CLOCK_MONOTONIC;
+	],[
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_CLOCK_MONOTONIC, 1, [CLOCK_MONOTONIC])
+	], [
+		AC_MSG_RESULT(no)
+	])
+
+	AC_MSG_CHECKING(for CLOCK_MONOTONIC_COARSE)
+	AC_TRY_COMPILE([#include <time.h>], [
+		const int foo = CLOCK_MONOTONIC_COARSE;
+	],[
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_CLOCK_MONOTONIC_COARSE, 1, [CLOCK_MONOTONIC_COARSE])
+	], [
+		AC_MSG_RESULT(no)
+	])
+
+	AC_CHECK_FUNC(mach_absolute_time, [AC_DEFINE(HAVE_MACH_ABSOLUTE_TIME, 1, [mach_absolute_time])])
+	AC_CHECK_FUNC(gethrtime, [AC_DEFINE(HAVE_GETHRTIME, 1, [gethrtime])])
+	AC_CHECK_FUNC(read_real_time, [AC_DEFINE(HAVE_READ_REAL_TIME, 1, [read_real_time])])
 
 	dnl hires monotonic clock support
 	AC_SEARCH_LIBS(clock_gettime, rt)
@@ -2611,6 +2636,21 @@ if test x$host_win32 = xno; then
 	], [
 		AC_MSG_RESULT(no)
 	])
+	dnl **********************************
+	dnl *** Check for access ***
+	dnl **********************************
+	AC_MSG_CHECKING(for access)
+		AC_TRY_LINK([
+		#include <unistd.h>
+	], [
+		access(NULL,0);
+	], [
+		# Yes, we have it...
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_ACCESS, 1, [Have access])
+	], [
+		AC_MSG_RESULT(no)
+	])
 			
 	dnl **********************************
 	dnl *** Checks for proclib         ***
@@ -3523,6 +3563,8 @@ case "$host" in
 		TARGET=S390X;
 		arch_target=s390x;
 		ACCESS_UNALIGNED="yes"
+		BTLS_SUPPORTED=yes
+		BTLS_PLATFORM=s390x
 		CFLAGS="$CFLAGS -mbackchain -D__USE_STRING_INLINES"
 		;;
 esac
@@ -4037,7 +4079,7 @@ AC_CHECK_FUNCS(strndup getpwuid_r)
 fi
 
 AM_CONDITIONAL(NEED_VASPRINTF, test x$ac_cv_func_vasprintf = xno || test x$with_overridable_allocators = xyes)
-AM_ICONV()
+
 AC_SEARCH_LIBS(sqrtf, m)
 
 # nanosleep may not be part of libc, also search it in other libraries
@@ -4509,9 +4551,14 @@ dnl ***  Btls  ***
 dnl **************
 
 AC_ARG_ENABLE(btls, [  --disable-btls             Disable the BoringTls provider], enable_btls=$enableval, enable_btls=$BTLS_SUPPORTED)
+AC_ARG_ENABLE(btls-lib, [  --disable-btls-lib             Disable building the BTLS native library], enable_btls_lib=$enableval, enable_btls_lib=$BTLS_SUPPORTED)
 AC_ARG_WITH(btls_android_ndk, [  --with-btls-android-ndk        Android NDK for BoringTls])
 
-AM_CONDITIONAL(BTLS, test x$enable_btls = xyes)
+if test "x$enable_btls" = "xno"; then
+   enable_btls_lib=no
+fi
+
+AM_CONDITIONAL(BTLS, test x$enable_btls_lib = xyes)
 
 btls_android=no
 if test "x$enable_btls" = "xyes"; then
@@ -4548,6 +4595,9 @@ if test "x$enable_btls" = "xyes"; then
 		;;
 	aarch64)
 		btls_arch=aarch64
+		;;
+	s390x)
+		btls_arch=s390x
 		;;
 	powerpc)
 		btls_arch=powerpc
@@ -4663,7 +4713,7 @@ AC_SUBST(mono_build_root)
 mono_runtime=mono/mini/mono
 AC_SUBST(mono_runtime)
 
-CSC_LOCATION=`cd $srcdir && pwd`/external/roslyn-binaries/Microsoft.Net.Compilers/Microsoft.Net.Compilers.2.6.0/tools/csc.exe
+CSC_LOCATION=`cd $srcdir && pwd`/external/roslyn-binaries/Microsoft.Net.Compilers/Microsoft.Net.Compilers.2.7.0/tools/csc.exe
 
 if test $csc_compiler = mcs; then
   CSC=$mcs_topdir/class/lib/build/mcs.exe

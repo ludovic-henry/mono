@@ -131,7 +131,6 @@ enum {
 	STATE_ASYNC_SUSPENDED			= 0x03,
 	STATE_SELF_SUSPENDED			= 0x04,
 	STATE_ASYNC_SUSPEND_REQUESTED	= 0x05,
-	STATE_SELF_SUSPEND_REQUESTED 	= 0x06,
 	STATE_BLOCKING					= 0x07,
 	STATE_BLOCKING_AND_SUSPENDED	= 0x8,
 
@@ -173,7 +172,7 @@ typedef enum {
 typedef struct {
 	MonoLinkedListSetNode node;
 	guint32 small_id; /*Used by hazard pointers */
-	MonoNativeThreadHandle native_handle; /* Valid on mach and android */
+	MonoNativeThreadHandle native_handle; /* Valid on mach, android and Windows */
 	int thread_state;
 
 	/*
@@ -480,7 +479,7 @@ gboolean
 mono_thread_info_is_live (THREAD_INFO_TYPE *info);
 
 int
-mono_threads_get_max_stack_size (void);
+ves_icall_System_Threading_Thread_SystemMaxStackSize (MonoError *error);
 
 MonoThreadHandle*
 mono_threads_open_thread_handle (MonoThreadHandle *handle);

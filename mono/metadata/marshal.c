@@ -88,10 +88,6 @@ static gboolean use_aot_wrappers;
 
 static int class_marshal_info_count;
 
-static void ftnptr_eh_callback_default (guint32 gchandle);
-
-static MonoFtnPtrEHCallback ftnptr_eh_callback = ftnptr_eh_callback_default;
-
 static MonoMarshalCallbacks *
 get_marshal_cb (void);
 
@@ -267,9 +263,7 @@ mono_marshal_init (void)
 		register_icall (mono_delegate_end_invoke, "mono_delegate_end_invoke", "object object ptr", FALSE);
 		register_icall (mono_gc_wbarrier_generic_nostore, "wb_generic", "void ptr", FALSE);
 		register_icall (mono_gchandle_get_target, "mono_gchandle_get_target", "object int32", TRUE);
-		register_icall (mono_gchandle_new, "mono_gchandle_new", "uint32 object bool", TRUE);
 		register_icall (mono_marshal_isinst_with_cache, "mono_marshal_isinst_with_cache", "object object ptr ptr", FALSE);
-		register_icall (mono_marshal_ftnptr_eh_callback, "mono_marshal_ftnptr_eh_callback", "void uint32", TRUE);
 		register_icall (mono_threads_enter_gc_safe_region_unbalanced, "mono_threads_enter_gc_safe_region_unbalanced", "ptr ptr", TRUE);
 		register_icall (mono_threads_exit_gc_safe_region_unbalanced, "mono_threads_exit_gc_safe_region_unbalanced", "void ptr ptr", TRUE);
 		register_icall (mono_threads_enter_gc_unsafe_region_unbalanced, "mono_threads_enter_gc_unsafe_region_unbalanced", "ptr ptr", TRUE);
@@ -595,7 +589,9 @@ mono_delegate_free_ftnptr (MonoDelegate *delegate)
 		MonoMethod *method;
 
 		ji = mono_jit_info_table_find (mono_domain_get (), mono_get_addr_from_ftnptr (ptr));
-		g_assert (ji);
+		/* FIXME we leak wrapper with the interpreter */
+		if (!ji)
+			return;
 
 		method = mono_jit_info_get_method (ji);
 		method_data = (void **)((MonoMethodWrapper*)method)->method_data;
@@ -3061,7 +3057,7 @@ emit_marshal_array_noilgen (EmitMarshalContext *m, int argnum, MonoType *t,
 }
 
 MonoType*
-marshal_boolean_conv_in_get_local_type (MonoMarshalSpec *spec, guint8 *ldc_op /*out*/)
+mono_marshal_boolean_conv_in_get_local_type (MonoMarshalSpec *spec, guint8 *ldc_op /*out*/)
 {
 	if (spec == NULL) {
 		return m_class_get_byval_arg (mono_defaults.int32_class);
@@ -3083,7 +3079,7 @@ marshal_boolean_conv_in_get_local_type (MonoMarshalSpec *spec, guint8 *ldc_op /*
 }
 
 MonoClass*
-marshal_boolean_managed_conv_in_get_conv_arg_class (MonoMarshalSpec *spec, guint8 *ldop/*out*/)
+mono_marshal_boolean_managed_conv_in_get_conv_arg_class (MonoMarshalSpec *spec, guint8 *ldop/*out*/)
 {
 	MonoClass* conv_arg_class = mono_defaults.int32_class;
 	if (spec) {
@@ -3118,11 +3114,11 @@ emit_marshal_boolean_noilgen (EmitMarshalContext *m, int argnum, MonoType *t,
 		if (t->byref)
 			*conv_arg_type = int_type;
 		else
-			*conv_arg_type = marshal_boolean_conv_in_get_local_type (spec, NULL);
+			*conv_arg_type = mono_marshal_boolean_conv_in_get_local_type (spec, NULL);
 		break;
 
 	case MARSHAL_ACTION_MANAGED_CONV_IN: {
-		MonoClass* conv_arg_class = marshal_boolean_managed_conv_in_get_conv_arg_class (spec, NULL);
+		MonoClass* conv_arg_class = mono_marshal_boolean_managed_conv_in_get_conv_arg_class (spec, NULL);
 		if (t->byref)
 			*conv_arg_type = m_class_get_this_arg (conv_arg_class);
 		else
@@ -6190,43 +6186,6 @@ mono_marshal_free_dynamic_wrappers (MonoMethod *method)
 
 	if (marshal_mutex_initialized)
 		mono_marshal_unlock ();
-}
-
-void
-mono_marshal_ftnptr_eh_callback (guint32 gchandle)
-{
-	g_assert (ftnptr_eh_callback);
-	ftnptr_eh_callback (gchandle);
-}
-
-static void
-ftnptr_eh_callback_default (guint32 gchandle)
-{
-	MonoException *exc;
-	gpointer stackdata;
-
-	mono_threads_enter_gc_unsafe_region_unbalanced (&stackdata);
-
-	exc = (MonoException*) mono_gchandle_get_target (gchandle);
-
-	mono_gchandle_free (gchandle);
-
-	mono_reraise_exception_deprecated (exc);
-}
-
-/*
- * mono_install_ftnptr_eh_callback:
- *
- *   Install a callback that should be called when there is a managed exception
- *   in a native-to-managed wrapper. This is mainly used by iOS to convert a
- *   managed exception to a native exception, to properly unwind the native
- *   stack; this native exception will then be converted back to a managed
- *   exception in their managed-to-native wrapper.
- */
-void
-mono_install_ftnptr_eh_callback (MonoFtnPtrEHCallback callback)
-{
-	ftnptr_eh_callback = callback;
 }
 
 MonoThreadInfo*

@@ -14,7 +14,7 @@
 #include <config.h>
 #include <glib.h>
 
-#ifdef HOST_DARWIN
+#ifdef TARGET_OSX
 
 /**
  * Unregister the MERP-based handler
@@ -28,7 +28,7 @@ void mono_merp_disable (void);
  * See MERP documentation for information on the bundle ID, signature, and version fields
  */
 void
-mono_merp_enable (char *appBundleID, char *appSignature, char *appVersion, char *merpGUIPath);
+mono_merp_enable (const char *appBundleID, const char *appSignature, const char *appVersion, const char *merpGUIPath);
 
 /**
  * Whether the MERP-based handler is registered
@@ -48,6 +48,6 @@ gboolean mono_merp_enabled (void);
 void mono_merp_invoke (pid_t crashed_pid, intptr_t thread_pointer, const char *signal);
 
 
-#endif // HOST_DARWIN
+#endif // TARGET_OSX
 
 #endif // MONO_UTILS_MERP
