@@ -1431,7 +1431,7 @@ mono_compile_get_interface_var (MonoCompile *cfg, int slot, MonoInst *ins)
 	MonoType *type;
 
 	if (ins->type == STACK_R4)
-		type = &mono_defaults.double_class->byval_arg;
+		type = m_class_get_byval_arg (mono_defaults.double_class);
 	else
 		type = type_from_stack_type (ins);
 
@@ -2316,7 +2316,7 @@ mono_emit_call_args (MonoCompile *cfg, MonoMethodSignature *sig,
 			if (i >= sig->hasthis)
 				t = sig->params [i - sig->hasthis];
 			else
-				t = &mono_defaults.int_class->byval_arg;
+				t = m_class_get_byval_arg (mono_defaults.int_class);
 			t = mono_type_get_underlying_type (t);
 
 			if (!t->byref && t->type == MONO_TYPE_R4) {
@@ -9692,7 +9692,7 @@ mono_method_to_ir (MonoCompile *cfg, MonoMethod *method, MonoBasicBlock *start_b
 			}
 
 			if (*ip == CEE_STIND_R4 && sp [1]->type == STACK_R8)
-				sp [1] = convert_value (cfg, &mono_defaults.single_class->byval_arg, sp [1]);
+				sp [1] = convert_value (cfg, m_class_get_byval_arg (mono_defaults.single_class), sp [1]);
 			NEW_STORE_MEMBASE (cfg, ins, stind_to_store_membase (*ip), sp [0]->dreg, 0, sp [1]->dreg);
 			ins->flags |= ins_flag;
 			ins_flag = 0;
@@ -10327,7 +10327,7 @@ mono_method_to_ir (MonoCompile *cfg, MonoMethod *method, MonoBasicBlock *start_b
 				break;
 			}
 
-			val = convert_value (cfg, &klass->byval_arg, val);
+			val = convert_value (cfg, m_class_get_byval_arg (klass), val);
 
 			if (klass == mono_defaults.void_class)
 				UNVERIFIED;
@@ -10474,7 +10474,7 @@ mono_method_to_ir (MonoCompile *cfg, MonoMethod *method, MonoBasicBlock *start_b
 				MonoInst *val;
 
 				val = handle_unbox_nullable (cfg, *sp, klass, context_used);
-				EMIT_NEW_VARLOADA (cfg, ins, get_vreg_to_inst (cfg, val->dreg), &val->klass->byval_arg);
+				EMIT_NEW_VARLOADA (cfg, ins, get_vreg_to_inst (cfg, val->dreg), m_class_get_byval_arg (val->klass));
 
 				*sp++= ins;
 			} else {
@@ -11314,7 +11314,7 @@ mono_method_to_ir (MonoCompile *cfg, MonoMethod *method, MonoBasicBlock *start_b
 			if (sp [0]->type != STACK_OBJ)
 				UNVERIFIED;
 
-			sp [2] = convert_value (cfg, &klass->byval_arg, sp [2]);
+			sp [2] = convert_value (cfg, m_class_get_byval_arg (klass), sp [2]);
 
 			emit_array_store (cfg, klass, sp, TRUE);
 
@@ -11335,7 +11335,7 @@ mono_method_to_ir (MonoCompile *cfg, MonoMethod *method, MonoBasicBlock *start_b
 				iargs [0] = sp [0];
 				*sp++ = mono_emit_jit_icall (cfg, mono_ckfinite, iargs);
 			} else  {
-				sp [0] = convert_value (cfg, &mono_defaults.double_class->byval_arg, sp [0]);
+				sp [0] = convert_value (cfg, m_class_get_byval_arg (mono_defaults.double_class), sp [0]);
 				MONO_INST_NEW (cfg, ins, OP_CKFINITE);
 				ins->sreg1 = sp [0]->dreg;
 				ins->dreg = alloc_freg (cfg);
@@ -13558,7 +13558,7 @@ mono_handle_global_vregs (MonoCompile *cfg)
 					 * to determine when it needs to be global. So be conservative.
 					 */
 					if (!get_vreg_to_inst (cfg, vreg)) {
-						mono_compile_create_var_for_vreg (cfg, &mono_defaults.int64_class->byval_arg, OP_LOCAL, vreg);
+						mono_compile_create_var_for_vreg (cfg, m_class_get_byval_arg (mono_defaults.int64_class), OP_LOCAL, vreg);
 
 						if (cfg->verbose_level > 2)
 							printf ("LONG VREG R%d made global.\n", vreg);
