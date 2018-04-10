@@ -69,6 +69,15 @@ ICALL_TYPE(CLR_INTEROP, "Interop/RunLoop", CLR_INTEROP_1)
 ICALL(CLR_INTEROP_1, "CFRunLoopRun", ves_icall_CoreFX_Interop_RunLoop_CFRunLoopRun)
 #endif
 
+#if !defined(HOST_WIN32) && !defined(HOST_ANDROID) && !defined(HOST_IOS) && !defined(HOST_WASM)
+ICALL_TYPE(SYSNAT, "Interop/Sys", SYSNAT_1)
+ICALL(SYSNAT_1, "ConvertErrorPalToPlatform", SystemNative_ConvertErrorPalToPlatform)
+ICALL(SYSNAT_2, "ConvertErrorPlatformToPal", SystemNative_ConvertErrorPlatformToPal)
+ICALL(SYSNAT_3, "RealPath", SystemNative_RealPath)
+ICALL(SYSNAT_4, "StrErrorR", SystemNative_StrErrorR)
+ICALL(SYSNAT_5, "Sync", SystemNative_Sync)
+#endif
+
 ICALL_TYPE(NATIVEMETHODS, "Microsoft.Win32.NativeMethods", NATIVEMETHODS_1)
 ICALL(NATIVEMETHODS_1, "CloseProcess", ves_icall_Microsoft_Win32_NativeMethods_CloseProcess)
 ICALL(NATIVEMETHODS_2, "GetCurrentProcess", ves_icall_Microsoft_Win32_NativeMethods_GetCurrentProcess)
@@ -107,8 +116,9 @@ ICALL_TYPE(RTMARSHAL, "Mono.RuntimeMarshal", RTMARSHAL_1)
 ICALL(RTMARSHAL_1, "FreeAssemblyName", ves_icall_Mono_RuntimeMarshal_FreeAssemblyName)
 
 ICALL_TYPE(SAFESTRMARSHAL, "Mono.SafeStringMarshal", SAFESTRMARSHAL_1)
-ICALL(SAFESTRMARSHAL_1, "GFree", ves_icall_Mono_SafeStringMarshal_GFree)
-ICALL(SAFESTRMARSHAL_2, "StringToUtf8", ves_icall_Mono_SafeStringMarshal_StringToUtf8)
+HANDLES(ICALL(SAFESTRMARSHAL_1, "GFree", ves_icall_Mono_SafeStringMarshal_GFree))
+HANDLES(ICALL(SAFESTRMARSHAL_2, "StringToUtf8", ves_icall_Mono_SafeStringMarshal_StringToUtf8))
+HANDLES(ICALL(SAFESTRMARSHAL_3, "Utf8ToString", ves_icall_Mono_SafeStringMarshal_Utf8ToString))
 
 #ifndef PLATFORM_RO_FS
 ICALL_TYPE(KPAIR, "Mono.Security.Cryptography.KeyPairPersistence", KPAIR_1)

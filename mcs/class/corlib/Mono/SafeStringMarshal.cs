@@ -21,6 +21,9 @@ namespace Mono  {
 		public extern static IntPtr StringToUtf8 (string str);
 
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]
+		public extern static string Utf8ToString (IntPtr utf8);
+
+		[MethodImplAttribute(MethodImplOptions.InternalCall)]
 		public extern static void GFree (IntPtr ptr);
 
 		public SafeStringMarshal (string str) {
