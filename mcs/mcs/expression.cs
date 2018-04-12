@@ -2051,7 +2051,11 @@ namespace Mono.CSharp
 
 						if (d.BuiltinType == BuiltinTypeSpec.Type.Dynamic)
 							return this;
-						
+
+						// TODO: Requires custom optimized version with variable store
+						if (Variable != null)
+							return this;
+
 						//
 						// Turn is check into simple null check for implicitly convertible reference types
 						//
@@ -2754,6 +2758,12 @@ namespace Mono.CSharp
 		public override bool IsSideEffectFree {
 			get {
 				return true;
+			}
+		}
+
+		public override bool IsNull {
+			get {
+				return TypeSpec.IsReferenceType (type);
 			}
 		}
 
@@ -11901,10 +11911,15 @@ namespace Mono.CSharp
 			if (!TypeManager.VerifyUnmanaged (ec.Module, otype, loc))
 				return null;
 
-			type = PointerContainer.MakeType (ec.Module, otype);
+			ResolveExpressionType (ec, otype);
 			eclass = ExprClass.Value;
 
 			return this;
+		}
+
+		protected virtual void ResolveExpressionType (ResolveContext rc, TypeSpec elementType)
+		{
+			type = PointerContainer.MakeType (rc.Module, elementType);
 		}
 
 		public override void Emit (EmitContext ec)
@@ -11960,6 +11975,24 @@ namespace Mono.CSharp
 			
 			this.type = spanType;
 			return true;
+		}
+	}
+
+	class SpanStackAlloc : StackAlloc
+	{
+		public SpanStackAlloc (Expression type, Expression count, Location l)
+			: base (type, count, l)
+		{
+		}
+
+		protected override void ResolveExpressionType (ResolveContext rc, TypeSpec elementType)
+		{
+			var span = rc.Module.PredefinedTypes.SpanGeneric;
+			if (!span.Define ())
+				return;
+
+			type = span.TypeSpec.MakeGenericType (rc, new [] { elementType });
+			ResolveSpanConversion (rc, type);
 		}
 	}
 

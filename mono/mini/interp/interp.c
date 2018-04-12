@@ -209,6 +209,7 @@ set_resume_state (ThreadContext *context, InterpFrame *frame)
 	frame->ex = NULL;
 	context->has_resume_state = 0;
 	context->handler_frame = NULL;
+	context->handler_ei = NULL;
 }
 
 /* Set the current execution state to the resume state in context */
@@ -221,6 +222,11 @@ set_resume_state (ThreadContext *context, InterpFrame *frame)
 		sp->data.p = frame->ex;											\
 		++sp;															\
 		} \
+		/* We have thrown an exception from a finally block. Some of the leave targets were unwinded already */ \
+		while (finally_ips && \
+				finally_ips->data >= (context)->handler_ei->try_start && \
+				finally_ips->data < (context)->handler_ei->try_end) \
+			finally_ips = g_slist_remove (finally_ips, finally_ips->data); \
 		set_resume_state ((context), (frame));							\
 		goto main_loop;													\
 	} while (0)
@@ -2332,6 +2338,7 @@ interp_exec_method_full (InterpFrame *frame, ThreadContext *context, guint16 *st
 	0 };
 #endif
 
+
 	frame->ex = NULL;
 	frame->ex_handler = NULL;
 	frame->ip = NULL;
@@ -2407,7 +2414,7 @@ interp_exec_method_full (InterpFrame *frame, ThreadContext *context, guint16 *st
 			MINT_IN_BREAK;
 		MINT_IN_CASE(MINT_BREAK)
 			++ip;
-			do_debugger_tramp (mono_debugger_agent_user_break, frame);
+			do_debugger_tramp (mini_get_dbg_callbacks ()->user_break, frame);
 			MINT_IN_BREAK;
 		MINT_IN_CASE(MINT_LDNULL) 
 			sp->data.p = NULL;
@@ -5251,6 +5258,7 @@ interp_set_resume_state (MonoJitTlsData *jit_tls, MonoException *ex, MonoJitExce
 
 	context->has_resume_state = TRUE;
 	context->handler_frame = interp_frame;
+	context->handler_ei = ei;
 	/* This is on the stack, so it doesn't need a wbarrier */
 	context->handler_frame->ex = ex;
 	/* Ditto */
