@@ -1,57 +1,33 @@
 
-LLVM_SRC?=$(TOP)/sdks/builds/toolchains/llvm
-
-$(TOP)/sdks/builds/toolchains/llvm:
-	git clone -b master https://github.com/mono/llvm.git $@
-	cd $@ && git checkout $(LLVM_HASH)
-
-$(LLVM_SRC)/configure: | $(LLVM_SRC)
-
 ##
 # Parameters
 #  $(1): target
 #  $(2): arch
 define LLVMTemplate
 
-_llvm_$(1)_CXXFLAGS= \
-	$$(if $$(filter $$(UNAME),Darwin),-mmacosx-version-min=10.9 -stdlib=libc++)
-
-_llvm_$(1)_LDFLAGS= \
-	$$(if $$(filter $$(UNAME),Darwin),-mmacosx-version-min=10.9)
-
-_llvm_$(1)_CONFIGURE_ENVIRONMENT= \
-	CXXFLAGS="$$(_llvm_$(1)_CXXFLAGS)" \
-	LDFLAGS="$$(_llvm_$(1)_LDFLAGS)"
-
-_llvm_$(1)_CONFIGURE_FLAGS= \
-	--build=$$(if $$(filter $$(UNAME),Darwin),$(2)-apple-darwin10,$$(if $$(filter $$(UNAME),Linux),x86_64-linux-gnu,$$(error "Unknown UNAME='$$(UNAME)'"))) \
-	--cache-file=$$(TOP)/sdks/builds/llvm-$(1).config.cache \
-	--prefix=$$(TOP)/sdks/out/llvm-$(1) \
-	--enable-assertions=no \
-	--enable-optimized \
-	--enable-targets="arm,aarch64,x86" \
-	$$(if $$(filter $$(UNAME),Darwin),--enable-libcpp)
-
-.stamp-llvm-$(1)-toolchain: | $$(LLVM_SRC)
+.stamp-llvm-$(1)-toolchain:
 	touch $$@
 
-.stamp-llvm-$(1)-configure: $$(LLVM_SRC)/configure
-	mkdir -p $$(TOP)/sdks/builds/llvm-$(1)
-	cd $$(TOP)/sdks/builds/llvm-$(1) && $$< $$(_llvm_$(1)_CONFIGURE_ENVIRONMENT) $$(_llvm_$(1)_CONFIGURE_FLAGS)
+.stamp-llvm-$(1)-configure:
 	touch $$@
 
 .PHONY: package-llvm-$(1)
 package-llvm-$(1):
-	$$(MAKE) -C $$(TOP)/sdks/builds/llvm-$(1) install
+	$$(MAKE) -C $$(TOP)/llvm -f Makefile.am install-llvm \
+		LLVM_PATH="$(LLVM_SRC)" \
+		LLVM_BUILD="$$(TOP)/sdks/builds/llvm-$(1)" \
+		LLVM_PREFIX="$$(TOP)/sdks/out/llvm-$(1)" \
+		$$(if $$(llvm-$(1)_CMAKE_ARGS),LLVM_CMAKE_ARGS="$$(llvm-$(1)_CMAKE_ARGS)")
 
 .PHONY: clean-llvm-$(1)
 clean-llvm-$(1):
-	rm -rf .stamp-llvm-$(1)-toolchain .stamp-llvm-$(1)-configure $$(TOP)/sdks/builds/llvm-$(1) $$(TOP)/sdks/builds/llvm-$(1).config.cache $$(TOP)/sdks/out/llvm-$(1)
+	rm -rf .stamp-llvm-$(1)-toolchain .stamp-llvm-$(1)-configure && $$(MAKE) clean -C $$(TOP)/llvm
 
 TARGETS += llvm-$(1)
 
 endef
 
+llvm-llvm32_CMAKE_ARGS=-DLLVM_BUILD_32_BITS=On
 $(eval $(call LLVMTemplate,llvm32,i386))
 $(eval $(call LLVMTemplate,llvm64,x86_64))
 
