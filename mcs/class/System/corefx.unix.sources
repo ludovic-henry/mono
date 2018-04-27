@@ -1,1 +1,16 @@
 ../../../external/corefx/src/Common/src/Interop/Unix/*.cs
+
+../../../external/corefx/src/Common/src/Interop/Unix/System.Native/Interop.Close.cs
+../../../external/corefx/src/Common/src/Interop/Unix/System.Native/Interop.EnumerateInterfaceAddresses.cs
+../../../external/corefx/src/Common/src/Interop/Unix/System.Native/Interop.FLock.cs
+../../../external/corefx/src/Common/src/Interop/Unix/System.Native/Interop.GetDomainName.cs
+../../../external/corefx/src/Common/src/Interop/Unix/System.Native/Interop.GetHostName.cs
+../../../external/corefx/src/Common/src/Interop/Unix/System.Native/Interop.MapTcpState.cs
+../../../external/corefx/src/Common/src/Interop/Unix/System.Native/Interop.Open.cs
+../../../external/corefx/src/Common/src/Interop/Unix/System.Native/Interop.OpenFlags.cs
+../../../external/corefx/src/Common/src/Interop/Unix/System.Native/Interop.Poll.cs
+../../../external/corefx/src/Common/src/Interop/Unix/System.Native/Interop.Read.cs
+../../../external/corefx/src/Common/src/Interop/Unix/System.Native/Interop.ReadDir.cs
+../../../external/corefx/src/Common/src/Interop/Unix/System.Native/Interop.RealPath.cs
+../../../external/corefx/src/Common/src/Interop/Unix/System.Native/Interop.Stat.cs
+../../../external/corefx/src/Common/src/Interop/Unix/System.Native/Interop.Sync.cs

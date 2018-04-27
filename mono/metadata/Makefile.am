@@ -167,6 +167,8 @@ libmono_system_native_la_SOURCES = \
 	../../external/corefx/src/Native/Unix/Common/pal_utilities.h \
 	../../external/corefx/src/Native/Unix/System.Native/pal_errno.c \
 	../../external/corefx/src/Native/Unix/System.Native/pal_errno.h \
+	../../external/corefx/src/Native/Unix/System.Native/pal_interfaceaddresses.c \
+	../../external/corefx/src/Native/Unix/System.Native/pal_interfaceaddresses.h \
 	../../external/corefx/src/Native/Unix/System.Native/pal_io.c \
 	../../external/corefx/src/Native/Unix/System.Native/pal_io.h \
 	../../external/corefx/src/Native/Unix/System.Native/pal_maphardwaretype.c \

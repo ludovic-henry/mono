@@ -117,11 +117,17 @@ namespace MonoTests.System.Net.NetworkInformation
 			if (Environment.OSVersion.Platform == PlatformID.Win32NT)
 				Assert.Ignore ("IsDnsEnabled is not nessasarily enabled for all interfaces on windows.");
 
+			try {
+
 			NetworkInterface[] adapters = NetworkInterface.GetAllNetworkInterfaces ();
 			foreach (NetworkInterface adapter in adapters)
 			{
 				IPInterfaceProperties adapterProperties = adapter.GetIPProperties ();
 				Assert.IsTrue (adapterProperties.IsDnsEnabled);
+			}
+
+			} catch (PlatformNotSupportedException e) {
+				Assert.Inconclusive (e.ToString ());
 			}
 		}
 	

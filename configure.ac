@@ -3298,7 +3298,7 @@ if test x$host_win32 = xno; then
 		#include <sys/types.h>
 		#include <net/route.h>
 	], [
-		struct rt_msghdr;
+		struct rt_msghdr m;
 	],[
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_RT_MSGHDR, 1, [struct rt_msghdr])
