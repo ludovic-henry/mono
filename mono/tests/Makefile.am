@@ -1,3 +1,5 @@
+include $(top_srcdir)/mk/common.mk
+
 SUBDIRS = gc-descriptors . testing_gac
 
 check-local:
@@ -268,6 +270,12 @@ TESTS_CS_SRC=		\
 	array-init.cs		\
 	arraylist.cs		\
 	assembly-load-remap.cs	\
+	assembly-load-bytes.cs	\
+	assembly-loadfile.cs	\
+	assembly-loadfrom.cs	\
+	assembly-load-bytes-bindingredirect.cs	\
+	assembly-loadfile-bindingredirect.cs	\
+	assembly-loadfrom-bindingredirect.cs	\
 	assemblyresolve_event.cs	\
 	assemblyresolve_event3.cs	\
 	assemblyresolve_event4.cs	\
@@ -306,6 +314,7 @@ TESTS_CS_SRC=		\
 	exception17.cs		\
 	exception18.cs		\
 	exception19.cs		\
+	exception20.cs		\
 	typeload-unaligned.cs	\
 	struct.cs		\
 	valuetype-gettype.cs	\
@@ -707,6 +716,9 @@ endif
 endif
 
 TESTS_IL_SRC=			\
+	tailcall/2.il	     \
+	tailcall/3.il	     \
+	tailcall/4.il	     \
 	tailcall/fsharp-deeptail.il	     \
 	tailcall/fsharp-shallowtail.il	 \
 	tailcall/fsharp-shallownotail.il \
@@ -804,6 +816,7 @@ TESTS_IL_SRC=			\
 	dim-valuetypes.il \
 	tailcall-generic-cast-conservestack-il.il \
 	tailcall-generic-cast-nocrash-il.il \
+	ldfldvt.il \
 	newobj-abstract.il
 
 TESTS_GSHARED_SRC = \
@@ -914,6 +927,10 @@ PLATFORM_DISABLED_TESTS += async-exc-compilation.exe finally_guard.exe finally_b
 endif
 
 PLATFORM_DISABLED_TESTS += tailcall-interface-conservestack.exe
+PLATFORM_DISABLED_TESTS += tailcall/2.exe
+PLATFORM_DISABLED_TESTS += tailcall/3.exe
+PLATFORM_DISABLED_TESTS += tailcall/4.exe
+PLATFORM_DISABLED_TESTS += tailcall/8273.exe
 
 endif
 
@@ -924,6 +941,10 @@ PLATFORM_DISABLED_TESTS += tailcall-generic-cast-conservestack-il.exe
 PLATFORM_DISABLED_TESTS += tailcall-mrgctx.exe # MONO_ARCH_HAVE_VOLATILE_NON_PARAM_REGISTER 0
 PLATFORM_DISABLED_TESTS += tailcall-rgctxa.exe # MONO_ARCH_HAVE_VOLATILE_NON_PARAM_REGISTER 0
 PLATFORM_DISABLED_TESTS += tailcall-virt.exe
+PLATFORM_DISABLED_TESTS += tailcall/2.exe
+PLATFORM_DISABLED_TESTS += tailcall/3.exe
+PLATFORM_DISABLED_TESTS += tailcall/4.exe
+PLATFORM_DISABLED_TESTS += tailcall/8273.exe
 PLATFORM_DISABLED_TESTS += tailcall/fsharp-deeptail.exe
 PLATFORM_DISABLED_TESTS += tailcall-interface-conservestack.exe
 PLATFORM_DISABLED_TESTS += ivtail1.exe
@@ -940,6 +961,10 @@ PLATFORM_DISABLED_TESTS += tailcall-generic-cast-conservestack-il.exe
 PLATFORM_DISABLED_TESTS += tailcall-mrgctx.exe # MONO_ARCH_HAVE_VOLATILE_NON_PARAM_REGISTER 0
 PLATFORM_DISABLED_TESTS += tailcall-rgctxa.exe # MONO_ARCH_HAVE_VOLATILE_NON_PARAM_REGISTER 0
 PLATFORM_DISABLED_TESTS += tailcall-virt.exe
+PLATFORM_DISABLED_TESTS += tailcall/2.exe
+PLATFORM_DISABLED_TESTS += tailcall/3.exe
+PLATFORM_DISABLED_TESTS += tailcall/4.exe
+PLATFORM_DISABLED_TESTS += tailcall/8273.exe
 PLATFORM_DISABLED_TESTS += tailcall/fsharp-deeptail.exe
 PLATFORM_DISABLED_TESTS += tailcall-interface-conservestack.exe
 PLATFORM_DISABLED_TESTS += ivtail1.exe
@@ -958,6 +983,10 @@ PLATFORM_DISABLED_TESTS += tailcall-generic-cast-conservestack-il.exe
 PLATFORM_DISABLED_TESTS += tailcall-mrgctx.exe # MONO_ARCH_HAVE_VOLATILE_NON_PARAM_REGISTER 0
 PLATFORM_DISABLED_TESTS += tailcall-rgctxa.exe # MONO_ARCH_HAVE_VOLATILE_NON_PARAM_REGISTER 0
 PLATFORM_DISABLED_TESTS += tailcall-virt.exe
+PLATFORM_DISABLED_TESTS += tailcall/2.exe
+PLATFORM_DISABLED_TESTS += tailcall/3.exe
+PLATFORM_DISABLED_TESTS += tailcall/4.exe
+PLATFORM_DISABLED_TESTS += tailcall/8273.exe
 PLATFORM_DISABLED_TESTS += tailcall/fsharp-deeptail.exe
 PLATFORM_DISABLED_TESTS += tailcall-interface-conservestack.exe
 PLATFORM_DISABLED_TESTS += ivtail1.exe
@@ -995,6 +1024,10 @@ PLATFORM_DISABLED_TESTS += tailcall-generic-cast-conservestack-il.exe
 PLATFORM_DISABLED_TESTS += tailcall-mrgctx.exe # MONO_ARCH_HAVE_VOLATILE_NON_PARAM_REGISTER 0
 PLATFORM_DISABLED_TESTS += tailcall-rgctxa.exe # MONO_ARCH_HAVE_VOLATILE_NON_PARAM_REGISTER 0
 PLATFORM_DISABLED_TESTS += tailcall-virt.exe
+PLATFORM_DISABLED_TESTS += tailcall/2.exe
+PLATFORM_DISABLED_TESTS += tailcall/3.exe
+PLATFORM_DISABLED_TESTS += tailcall/4.exe
+PLATFORM_DISABLED_TESTS += tailcall/8273.exe
 PLATFORM_DISABLED_TESTS += tailcall/fsharp-deeptail.exe
 PLATFORM_DISABLED_TESTS += tailcall-interface-conservestack.exe
 PLATFORM_DISABLED_TESTS += ivtail1.exe
@@ -1013,6 +1046,10 @@ PLATFORM_DISABLED_TESTS += tailcall-generic-cast-conservestack-il.exe
 PLATFORM_DISABLED_TESTS += tailcall-mrgctx.exe # MONO_ARCH_HAVE_VOLATILE_NON_PARAM_REGISTER 0
 PLATFORM_DISABLED_TESTS += tailcall-rgctxa.exe # MONO_ARCH_HAVE_VOLATILE_NON_PARAM_REGISTER 0
 PLATFORM_DISABLED_TESTS += tailcall-virt.exe
+PLATFORM_DISABLED_TESTS += tailcall/2.exe
+PLATFORM_DISABLED_TESTS += tailcall/3.exe
+PLATFORM_DISABLED_TESTS += tailcall/4.exe
+PLATFORM_DISABLED_TESTS += tailcall/8273.exe
 PLATFORM_DISABLED_TESTS += tailcall/fsharp-deeptail.exe
 PLATFORM_DISABLED_TESTS += tailcall-interface-conservestack.exe
 PLATFORM_DISABLED_TESTS += ivtail1.exe
@@ -1159,6 +1196,11 @@ PROFILE_DISABLED_TESTS += \
 PROFILE_DISABLED_TESTS += \
 	reference-loader.exe
 
+# Tests which have no way of finding AOT images because they use Assembly.Load(byte[])
+PROFILE_DISABLED_TESTS += \
+	assembly-load-bytes.exe \
+	assembly-load-bytes-bindingredirect.exe
+
 # constraints-load.il: 
 # Failed to load method 0x6000007 from '..../mono/tests/constraints-load.exe' due to 
 # Could not resolve type with token 01000002 assembly:mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089 type:System.BrokenIComparable`1 member:<none>.
@@ -1201,7 +1243,6 @@ endif
 AOT_DISABLED_TESTS= \
 	constraints-load.exe
 
-# tailcall/fsharp AOT hangs
 # tailcall/fsharp FullAOT stack overflow in CI but not locally.
 AOT_DISABLED_TESTS += tailcall/fsharp-deeptail.exe
 
@@ -1274,17 +1315,30 @@ DISABLED_TESTS = \
 	$(if $(LLVM),$(LLVM_DISABLED_TESTS))
 
 # Interpreter does not currently implement tailcall.
-# Disable all tailcall tests that are not otherwise disabled.
+# Disable all tailcall tests.
 INTERP_DISABLED_TESTS = $(DISABLED_TESTS) \
+	gptail1.exe \
 	itail1.exe \
-	sitail1.exe \
+	itaili1.exe \
 	ivtail1.exe \
+	sitail1.exe \
+	sirtail1.exe \
+	srtail1.exe \
+	stail1.exe \
+	tail1.exe \
+	taili1.exe \
+	vtail1.exe \
+	tailcall-generic-cast-conservestack-il.exe \
 	tailcall-interface-conservestack.exe \
 	tailcall-mrgctx.exe \
-	tailcall-virt.exe   \
 	tailcall-rgctxa.exe \
-	tailcall-generic-cast-conservestack-il.exe \
+	tailcall-rgctxb.exe \
+	tailcall-virt.exe \
 	tailcall/fsharp-deeptail.exe \
+	tailcall/2.exe \
+	tailcall/3.exe \
+	tailcall/4.exe \
+	tailcall/8273.exe \
 	bug-60843.exe
 
 # bug-48015.exe: be careful when re-enabling, it happens that it returns with exit code 0, but doesn't actually execute the test.
@@ -2278,6 +2332,38 @@ MidAssembly.dll: appdomain-marshalbyref-assemblyload-MidAssembly.cs LeafAssembly
 
 appdomain-marshalbyref-assemblyload.exe: appdomain-marshalbyref-assemblyload.cs MidAssembly.dll LeafAssembly.dll appdomain-marshalbyref-assemblyload2/LeafAssembly.dll
 	$(MCS) -out:$@ $< -r:MidAssembly.dll -r:LeafAssembly.dll
+
+assembly-load-dir1/Lib.dll: assembly-load-dir1/Lib.cs
+	$(MCS) -target:library -out:$@ $<
+assembly-load-dir2/Lib.dll: assembly-load-dir2/Lib.cs
+	$(MCS) -target:library -out:$@ $<
+
+assembly-load-dir1/LibStrongName.dll: assembly-load-dir1/LibStrongName.cs testing_gac/testkey.snk
+	$(MCS) -target:library -out:$@ $<
+
+assembly-load-dir2/LibStrongName.dll: assembly-load-dir2/LibStrongName.cs testing_gac/testkey.snk
+	$(MCS) -target:library -out:$@ $<
+
+EXTRA_DIST += assembly-load-dir1/Lib.cs assembly-load-dir2/Lib.cs \
+	assembly-load-dir1/LibStrongName.cs assembly-load-dir2/LibStrongName.cs
+
+assembly-load-bytes.exe: assembly-load-dir1/Lib.dll assembly-load-dir2/Lib.dll
+
+assembly-loadfrom.exe$(PLATFORM_AOT_SUFFIX): assembly-load-dir1/Lib.dll$(PLATFORM_AOT_SUFFIX) assembly-load-dir2/Lib.dll$(PLATFORM_AOT_SUFFIX)
+assembly-loadfrom.exe: assembly-load-dir1/Lib.dll assembly-load-dir2/Lib.dll
+
+assembly-loadfile.exe$(PLATFORM_AOT_SUFFIX): assembly-load-dir1/Lib.dll$(PLATFORM_AOT_SUFFIX) assembly-load-dir2/Lib.dll$(PLATFORM_AOT_SUFFIX)
+assembly-loadfile.exe: assembly-load-dir1/Lib.dll assembly-load-dir2/Lib.dll
+
+assembly-loadfrom-bindingredirect.exe$(PLATFORM_AOT_SUFFIX): assembly-load-dir1/LibStrongName.dll$(PLATFORM_AOT_SUFFIX) assembly-load-dir2/LibStrongName.dll$(PLATFORM_AOT_SUFFIX) assembly-loadfrom-bindingredirect.exe.config
+assembly-loadfrom-bindingredirect.exe: assembly-load-dir1/LibStrongName.dll assembly-load-dir2/LibStrongName.dll assembly-loadfrom-bindingredirect.exe.config
+
+assembly-loadfile-bindingredirect.exe$(PLATFORM_AOT_SUFFIX): assembly-load-dir1/LibStrongName.dll$(PLATFORM_AOT_SUFFIX) assembly-load-dir2/LibStrongName.dll$(PLATFORM_AOT_SUFFIX) assembly-loadfile-bindingredirect.exe.config
+assembly-loadfile-bindingredirect.exe: assembly-load-dir1/LibStrongName.dll assembly-load-dir2/LibStrongName.dll assembly-loadfile-bindingredirect.exe.config
+
+assembly-load-bytes-bindingredirect.exe: assembly-load-dir1/LibStrongName.dll assembly-load-dir2/LibStrongName.dll assembly-load-bytes-bindingredirect.exe.config
+
+EXTRA_DIST += assembly-loadfrom-bindingredirect.exe.config assembly-loadfile-bindingredirect.exe.config assembly-load-bytes-bindingredirect.exe.config
 
 gshared:
 	$(MAKE) test-generic-sharing

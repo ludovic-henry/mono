@@ -723,6 +723,7 @@ mono_get_exception_argument_out_of_range (const char *arg)
  * \param msg the message to present to the user
  * \returns a new instance of the \c System.Threading.ThreadStateException
  */
+MONO_RT_EXTERNAL_ONLY
 MonoException *
 mono_get_exception_thread_state (const char *msg)
 {
