@@ -1309,7 +1309,7 @@ summarize_offset_free_hash (intptr_t accum, MonoFrameSummary *frame)
 		return accum;
 
 	// See: mono_ptrarray_hash
-	intptr_t hash_accum = 0;;
+	intptr_t hash_accum = accum;
 
 	// The assembly and the method token, no offsets
 	hash_accum += mono_metadata_str_hash (frame->str_descr);
@@ -1322,9 +1322,9 @@ static intptr_t
 summarize_offset_rich_hash (intptr_t accum, MonoFrameSummary *frame)
 {
 	// See: mono_ptrarray_hash
-	intptr_t hash_accum = 0;;
+	intptr_t hash_accum = accum;
 
-	if (frame->is_managed) {
+	if (!frame->is_managed) {
 		hash_accum += frame->unmanaged_data.ip;
 	} else {
 		hash_accum += mono_metadata_str_hash (frame->str_descr);
