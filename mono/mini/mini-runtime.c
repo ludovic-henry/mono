@@ -30,6 +30,7 @@
 #include <mono/utils/memcheck.h>
 
 #include <mono/metadata/assembly.h>
+#include <mono/metadata/assembly-internals.h>
 #include <mono/metadata/loader.h>
 #include <mono/metadata/tabledefs.h>
 #include <mono/metadata/class.h>
@@ -4874,7 +4875,7 @@ static void
 mono_precompile_assembly (MonoAssembly *ass, void *user_data)
 {
 	GHashTable *assemblies = (GHashTable*)user_data;
-	MonoImage *image = mono_assembly_get_image (ass);
+	MonoImage *image = mono_assembly_get_image_internal (ass);
 	MonoMethod *method, *invoke;
 	int i, count = 0;
 
