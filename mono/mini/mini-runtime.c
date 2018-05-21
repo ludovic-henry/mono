@@ -3670,10 +3670,14 @@ mono_get_delegate_virtual_invoke_impl (MonoMethodSignature *sig, MonoMethod *met
 gboolean
 mini_parse_debug_option (const char *option)
 {
+	gboolean result = FALSE;
+	MONO_ENTER_GC_UNSAFE;
 	// Empty string is ok as consequence of appending ",foo"
 	// without first checking for empty.
-	if (*option == 0)
-		return TRUE;
+	if (*option == 0) {
+		result = TRUE;
+		goto done;
+	}
 
 	if (!strcmp (option, "handle-sigint"))
 		mini_debug_options.handle_sigint = TRUE;
@@ -3741,9 +3745,12 @@ mini_parse_debug_option (const char *option)
 	else if (!strncmp (option, "thread-dump-dir=", 16))
 		mono_set_thread_dump_dir(g_strdup(option + 16));
 	else
-		return FALSE;
+		goto done;
 
-	return TRUE;
+	result = TRUE;
+done:
+	MONO_EXIT_GC_UNSAFE;
+	return result;
 }
 
 static void
