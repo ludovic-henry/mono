@@ -3735,132 +3735,78 @@ if test "x$enable_llvm" = "xdefault"; then
    enable_llvm=$enable_llvm_default
 fi
 
+internal_llvm="no"
 if test "x$enable_llvm" = "xyes"; then
-   if test "x$with_llvm" != "x"; then
-   	  LLVM_CONFIG=$with_llvm/bin/llvm-config
-   	  if test x$host_win32 = xyes; then
-   	  	LLVM_CONFIG=$LLVM_CONFIG.exe
-   	  fi
-	  if test ! -x $LLVM_CONFIG; then
-	  	 AC_MSG_ERROR([LLVM executable $LLVM_CONFIG not found.])
-      fi
-   else
-      AC_PATH_PROG(LLVM_CONFIG, llvm-config, no)
-      if test "x$LLVM_CONFIG" = "xno"; then
-   	     AC_MSG_ERROR([llvm-config not found.])
-      fi
-   fi
+	# llvm config options
+	if test "x$host_win32" != "xyes"; then
+		AC_PATH_PROG(EXTERNAL_LLVM_CONFIG, llvm-config, no)
+	if test "x$EXTERNAL_LLVM_CONFIG" = "xno"; then
+		internal_llvm="yes"
+	fi
 
-   llvm_codegen="x86codegen"
-   LLVM_ARCH_LIBS="-lLLVMX86Disassembler -lLLVMX86CodeGen -lLLVMX86AsmParser -lLLVMX86Desc -lLLVMX86Info -lLLVMX86AsmPrinter -lLLVMX86Utils"
-   case "$target" in
-   arm*)
+	llvm_codegen="x86codegen"
+	case "$target" in
+	arm*)
 		llvm_codegen="armcodegen"
-		LLVM_ARCH_LIBS="-lLLVMARMDisassembler -lLLVMARMCodeGen -lLLVMARMAsmParser -lLLVMARMDesc -lLLVMARMInfo -lLLVMARMAsmPrinter"
 		;;
-   aarch64*)
+	aarch64*)
 		llvm_codegen="aarch64codegen"
+		;;
+	powerpc*)
+		llvm_codegen="powerpccodegen"
+		;;
+	esac
+
+	LLVM_CODEGEN_LIBS="$llvm_codegen"
+	if test "x$host" != "x$target"; then
+		# No need for jit libs
+		LLVM_CODEGEN_LIBS=""
+	fi
+	AC_SUBST(LLVM_CODEGEN_LIBS)
+	# Rest of the options are filled out in mono/mini/Makefile.am.in
+else # is win32
+	LLVM_ARCH_LIBS="-lLLVMX86Disassembler -lLLVMX86CodeGen -lLLVMX86AsmParser -lLLVMX86Desc -lLLVMX86Info -lLLVMX86AsmPrinter -lLLVMX86Utils"
+	case "$target" in
+	arm*)
 		LLVM_ARCH_LIBS="-lLLVMARMDisassembler -lLLVMARMCodeGen -lLLVMARMAsmParser -lLLVMARMDesc -lLLVMARMInfo -lLLVMARMAsmPrinter"
 		;;
-   powerpc*)
-		llvm_codegen="powerpccodegen"
+	aarch64*)
+		LLVM_ARCH_LIBS="-lLLVMARMDisassembler -lLLVMARMCodeGen -lLLVMARMAsmParser -lLLVMARMDesc -lLLVMARMInfo -lLLVMARMAsmPrinter"
+		;;
+	powerpc*)
 		LLVM_ARCH_LIBS="-lLLVMPowerPCDisassembler -lLLVMPowerPCCodeGen -lLLVMPowerPCAsmParser -lLLVMPowerPCDesc -lLLVMPowerPCInfo -lLLVMPowerPCAsmPrinter"
 		;;
-   esac
+	esac
 
-   if test "x$host_win32" = "xno"; then
+	LLVM_CFLAGS_EXTERNAL="-I$with_llvm/include -DNDEBUG -D__NO_CTYPE_INLINE -D_GNU_SOURCE -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS"
+	LLVM_CXXFLAGS_EXTERNAL="$LLVM_CFLAGS -std=gnu++11 -fvisibility-inlines-hidden -fno-rtti -Woverloaded-virtual -Wcast-qual"
+	LLVM_LDFLAGS_EXTERNAL="-L$with_llvm/lib"
+	LLVM_SYSTEM_LIBS="-lshell32 -lpsapi -limagehlp -ldbghelp -lm"
+	LLVM_LIBS_EXTERNAL="-lLLVMLTO -lLLVMObjCARCOpts -lLLVMLinker -lLLVMipo -lLLVMVectorize -lLLVMBitWriter \
+	-lLLVMTableGen -lLLVMDebugInfo -lLLVMOption -lLLVMSelectionDAG -lLLVMAsmPrinter \
+	-lLLVMMCDisassembler -lLLVMJIT -lLLVMAnalysis -lLLVMTarget \
+	-lLLVMIRReader -lLLVMAsmParser -lLLVMLineEditor -lLLVMMCAnalysis -lLLVMInstrumentation \
+	-lLLVMInterpreter -lLLVMCodeGen -lLLVMScalarOpts -lLLVMInstCombine -lLLVMTransformUtils \
+	-lLLVMipa -lLLVMAnalysis -lLLVMProfileData -lLLVMMCJIT -lLLVMTarget -lLLVMRuntimeDyld \
+	-lLLVMObject -lLLVMMCParser -lLLVMBitReader -lLLVMExecutionEngine -lLLVMMC -lLLVMCore \
+	-lLLVMSupport -lstdc++"
+	LLVM_LIBS_EXTERNAL="$LLVM_LIBS $LLVM_ARCH_LIBS $LLVM_SYSTEM_LIBS"
 
-   # Should be something like '2.6' or '2.7svn'
-   llvm_version=`$LLVM_CONFIG --version`
-   llvm_api_version=`$LLVM_CONFIG --mono-api-version 2>/dev/null`
-   AC_MSG_CHECKING(LLVM version)
-   AC_MSG_RESULT($llvm_version $llvm_api_version)
-   if echo $llvm_version | grep -q 'mono'; then
-	  if test "x$enable_llvm_version_check" = "xyes"; then
-	  	 if test "$llvm_version" != "$expected_llvm_version"; then
-		 	AC_MSG_ERROR([Expected llvm version $expected_llvm_version, but llvm-config --version returned $llvm_version"])
-	  	 fi
-	  fi
-   else
-	  AC_MSG_ERROR([Compiling with stock LLVM is not supported, please use the Mono LLVM repo at https://github.com/mono/llvm, with the GIT branch which matches this version of mono, i.e. 'mono-2-10' for Mono 2.10.])
-   fi
+	AC_SUBST(LLVM_CFLAGS_EXTERNAL)
+	AC_SUBST(LLVM_CXXFLAGS_EXTERNAL)
+	AC_SUBST(LLVM_LIBS_EXTERNAL)
+	AC_SUBST(LLVM_LDFLAGS_EXTERNAL)
+fi # win32
 
-   # The output of --cflags seems to include optimizations flags too
-   if test $llvm_api_version -gt 100; then
-   	  # The --cflags argument includes all kinds of warnings -pendantic etc.
-	  LLVM_CFLAGS="-I$with_llvm/include -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS"
-	  LLVM_CXXFLAGS="-I$with_llvm/include -std=c++11 -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS"
-   else
-	  LLVM_CFLAGS=`$LLVM_CONFIG --cflags | sed -e 's/-O2//g' | sed -e 's/-O0//g' | sed -e 's/-fomit-frame-pointer//g' | sed -e 's/-fPIC//g'`
-      LLVM_CXXFLAGS=`$LLVM_CONFIG --cxxflags | sed -e 's/-O2//g' | sed -e 's/-O0//g' | sed -e 's/-fomit-frame-pointer//g' | sed -e 's/-fPIC//g'`
-   fi
-   # LLVM is compiled with -fno-rtti, so we need this too, since our classes inherit
-   # from LLVM classes.
-   LLVM_CXXFLAGS="$LLVM_CXXFLAGS -fno-rtti -fexceptions"
-   LLVM_LDFLAGS=`$LLVM_CONFIG --ldflags`
-   # This might include empty lines
-   LLVM_SYSTEM_LIBS=`$LLVM_CONFIG --system-libs 2>/dev/null | grep -- -`
-   llvm_jit_supported=yes
-   llvm_jit_libs="jit mcjit $llvm_codegen"
-   if test "x$host" != "x$target"; then
-      # No need for jit libs
-	  llvm_jit_supported=no
-      llvm_jit_libs=""
-   elif test $llvm_api_version -gt 100; then
-      llvm_jit_libs="orcjit $llvm_codegen"
-   fi
-   LLVM_LIBS=`$LLVM_CONFIG --libs analysis core bitwriter $llvm_jit_libs`
-   if test "x$LLVM_LIBS" = "x"; then
-   	  echo "$LLVM_CONFIG --libs failed."
-	  exit 1
-   fi
-   LLVM_LIBS="$LLVM_LIBS $LLVM_LDFLAGS $LLVM_SYSTEM_LIBS"
-   # The c++ standard library used by llvm doesn't show up in $LLVM_SYSTEM_LIBS so add it manually
-   if echo $LLVM_CXXFLAGS | grep -q -- '-stdlib=libc++'; then
-      LLVM_LIBS="$LLVM_LIBS -lc++"
-   else
-      LLVM_LIBS="$LLVM_LIBS -lstdc++"
-   fi
-
-   expected_llvm_version="3.4svn-mono-mono/e656cac"
-
-   else
-       LLVM_CFLAGS="-I$with_llvm/include -DNDEBUG -D__NO_CTYPE_INLINE -D_GNU_SOURCE -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS"
-       LLVM_CXXFLAGS="$LLVM_CFLAGS -std=gnu++11 -fvisibility-inlines-hidden -fno-rtti -Woverloaded-virtual -Wcast-qual"
-       LLVM_LDFLAGS="-L$with_llvm/lib"
-       LLVM_SYSTEM_LIBS="-lshell32 -lpsapi -limagehlp -ldbghelp -lm"
-       LLVM_LIBS="-lLLVMLTO -lLLVMObjCARCOpts -lLLVMLinker -lLLVMipo -lLLVMVectorize -lLLVMBitWriter \
-         -lLLVMTableGen -lLLVMDebugInfo -lLLVMOption -lLLVMSelectionDAG -lLLVMAsmPrinter \
-         -lLLVMMCDisassembler -lLLVMJIT -lLLVMAnalysis -lLLVMTarget \
-         -lLLVMIRReader -lLLVMAsmParser -lLLVMLineEditor -lLLVMMCAnalysis -lLLVMInstrumentation \
-         -lLLVMInterpreter -lLLVMCodeGen -lLLVMScalarOpts -lLLVMInstCombine -lLLVMTransformUtils \
-         -lLLVMipa -lLLVMAnalysis -lLLVMProfileData -lLLVMMCJIT -lLLVMTarget -lLLVMRuntimeDyld \
-         -lLLVMObject -lLLVMMCParser -lLLVMBitReader -lLLVMExecutionEngine -lLLVMMC -lLLVMCore \
-         -lLLVMSupport -lstdc++"
-       LLVM_LIBS="$LLVM_LIBS $LLVM_ARCH_LIBS $LLVM_SYSTEM_LIBS"
-
-       llvm_config_path=$with_llvm/include/llvm/Config/llvm-config.h
-       llvm_api_version=`awk '/MONO_API_VERSION/ { print $3 }' $llvm_config_path`
-   fi  
-
-   if test "x$llvm_api_version" = "x"; then
-	  LLVM_CFLAGS="$LLVM_CFLAGS -DLLVM_API_VERSION=0"
-	  LLVM_CXXFLAGS="$LLVM_CXXFLAGS -DLLVM_API_VERSION=0"
-   else
-	  LLVM_CFLAGS="$LLVM_CFLAGS -DLLVM_API_VERSION=$llvm_api_version"
-	  LLVM_CXXFLAGS="$LLVM_CXXFLAGS -DLLVM_API_VERSION=$llvm_api_version"
-   fi   
-
-   AC_DEFINE_UNQUOTED(LLVM_VERSION, "$llvm_version", [Full version of LLVM libraries])
-
-   AC_SUBST(LLVM_CFLAGS)
-   AC_SUBST(LLVM_CXXFLAGS)
-   AC_SUBST(LLVM_LIBS)
-   AC_SUBST(LLVM_LDFLAGS)
-   AC_DEFINE(ENABLE_LLVM, 1, [Enable the LLVM back end])
+AC_DEFINE(ENABLE_LLVM, 1, [Enable the LLVM back end])
+ENABLE_LLVM=1
+AC_SUBST(ENABLE_LLVM)
 fi
 
+AM_CONDITIONAL(INTERNAL_LLVM, [test "x$internal_llvm" != "xno"])
+
 AM_CONDITIONAL(ENABLE_LLVM, [test x$enable_llvm = xyes])
+
 if test "x$enable_loadedllvm" = "xyes"; then
    AC_DEFINE(MONO_LLVM_LOADED, 1, [The LLVM back end is dynamically loaded])
 fi
@@ -5733,7 +5679,7 @@ echo "
 	Engine:        $jit_status
 	BigArrays:     $enable_big_arrays
 	DTrace:        $enable_dtrace
-	LLVM Back End: $enable_llvm (dynamically loaded: $enable_loadedllvm)
+	LLVM Back End: $enable_llvm (dynamically loaded: $enable_loadedllvm, built in-tree: $internal_llvm)
 	Spectre:       $spectre_mitigation_status
 
    Libraries:
