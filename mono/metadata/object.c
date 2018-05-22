@@ -3390,7 +3390,7 @@ mono_field_get_addr (MonoObject *obj, MonoVTable *vt, MonoClassField *field)
 void
 mono_field_get_value (MonoObject *obj, MonoClassField *field, void *value)
 {
-	MONO_REQ_GC_UNSAFE_MODE;
+	MONO_ENTER_GC_UNSAFE;
 
 	void *src;
 
@@ -3400,6 +3400,7 @@ mono_field_get_value (MonoObject *obj, MonoClassField *field, void *value)
 
 	src = (char*)obj + field->offset;
 	mono_copy_value (field->type, value, src, TRUE);
+	MONO_EXIT_GC_UNSAFE;
 }
 
 /**
