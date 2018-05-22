@@ -3281,7 +3281,7 @@ handle_enum:
 void
 mono_field_set_value (MonoObject *obj, MonoClassField *field, void *value)
 {
-	MONO_REQ_GC_UNSAFE_MODE;
+	MONO_ENTER_GC_UNSAFE;
 
 	void *dest;
 
@@ -3289,6 +3289,7 @@ mono_field_set_value (MonoObject *obj, MonoClassField *field, void *value)
 
 	dest = (char*)obj + field->offset;
 	mono_copy_value (field->type, dest, value, FALSE);
+	MONO_EXIT_GC_UNSAFE;
 }
 
 /**
