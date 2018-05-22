@@ -4865,10 +4865,14 @@ mono_set_verbose_level (guint32 level)
 char*
 mono_get_runtime_build_info (void)
 {
+	char *result;
+	MONO_ENTER_GC_UNSAFE;
 	if (mono_build_date)
-		return g_strdup_printf ("%s (%s %s)", VERSION, FULL_VERSION, mono_build_date);
+		result = g_strdup_printf ("%s (%s %s)", VERSION, FULL_VERSION, mono_build_date);
 	else
-		return g_strdup_printf ("%s (%s)", VERSION, FULL_VERSION);
+		result = g_strdup_printf ("%s (%s)", VERSION, FULL_VERSION);
+	MONO_EXIT_GC_UNSAFE;
+	return result;
 }
 
 static void
