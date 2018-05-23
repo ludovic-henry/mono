@@ -3303,7 +3303,7 @@ mono_field_set_value (MonoObject *obj, MonoClassField *field, void *value)
 void
 mono_field_static_set_value (MonoVTable *vt, MonoClassField *field, void *value)
 {
-	MONO_REQ_GC_UNSAFE_MODE;
+	MONO_ENTER_GC_UNSAFE;
 
 	void *dest;
 
@@ -3323,6 +3323,7 @@ mono_field_static_set_value (MonoVTable *vt, MonoClassField *field, void *value)
 		dest = (char*)mono_vtable_get_static_field_data (vt) + field->offset;
 	}
 	mono_copy_value (field->type, dest, value, FALSE);
+	MONO_EXIT_GC_UNSAFE;
 }
 
 /**
