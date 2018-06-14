@@ -3738,70 +3738,75 @@ fi
 
 internal_llvm="no"
 if test "x$enable_llvm" = "xyes"; then
-	# llvm config options
-	if test "x$host_win32" != "xyes"; then
-		AC_PATH_PROG(EXTERNAL_LLVM_CONFIG, llvm-config, no)
-		if test "x$EXTERNAL_LLVM_CONFIG" = "xno"; then
-			internal_llvm="yes"
+	if test "x$with_llvm" != "x"; then
+		LLVM_CONFIG=$with_llvm/bin/llvm-config
+		if test x$host_win32 = xyes; then
+			LLVM_CONFIG=$LLVM_CONFIG.exe
 		fi
+		if test ! -x $LLVM_CONFIG; then
+			internal_llvm=yes
+		fi
+	else
+		AC_PATH_PROG(LLVM_CONFIG, llvm-config, no)
+		if test "x$LLVM_CONFIG" = "xno"; then
+			internal_llvm=yes
+		fi
+	fi
 
-		llvm_codegen="x86codegen"
+	if test "x$host_win32" != "xyes"; then
+		LLVM_CODEGEN_LIBS="x86codegen"
 		case "$target" in
 		arm*)
-			llvm_codegen="armcodegen"
+			LLVM_CODEGEN_LIBS="armcodegen"
 			;;
 		aarch64*)
-			llvm_codegen="aarch64codegen"
+			LLVM_CODEGEN_LIBS="aarch64codegen"
 			;;
 		powerpc*)
-			llvm_codegen="powerpccodegen"
+			LLVM_CODEGEN_LIBS="powerpccodegen"
 			;;
 		esac
 
-		LLVM_CODEGEN_LIBS="$llvm_codegen"
 		if test "x$host" != "x$target"; then
 			# No need for jit libs
-			LLVM_CODEGEN_LIBS=""
+			LLVM_CODEGEN_LIBS=
 		fi
+
 		AC_SUBST(LLVM_CODEGEN_LIBS)
-		# Rest of the options are filled out in mono/mini/Makefile.am.in
 	else # is win32
-		LLVM_ARCH_LIBS="-lLLVMX86Disassembler -lLLVMX86CodeGen -lLLVMX86AsmParser -lLLVMX86Desc -lLLVMX86Info -lLLVMX86AsmPrinter -lLLVMX86Utils"
+		LLVM_LIBS_EXTERNAL="-lLLVMX86Disassembler -lLLVMX86CodeGen -lLLVMX86AsmParser -lLLVMX86Desc -lLLVMX86Info -lLLVMX86AsmPrinter -lLLVMX86Utils"
 		case "$target" in
 		arm*)
-			LLVM_ARCH_LIBS="-lLLVMARMDisassembler -lLLVMARMCodeGen -lLLVMARMAsmParser -lLLVMARMDesc -lLLVMARMInfo -lLLVMARMAsmPrinter"
+			LLVM_LIBS_EXTERNAL="-lLLVMARMDisassembler -lLLVMARMCodeGen -lLLVMARMAsmParser -lLLVMARMDesc -lLLVMARMInfo -lLLVMARMAsmPrinter"
 			;;
 		aarch64*)
-			LLVM_ARCH_LIBS="-lLLVMARMDisassembler -lLLVMARMCodeGen -lLLVMARMAsmParser -lLLVMARMDesc -lLLVMARMInfo -lLLVMARMAsmPrinter"
+			LLVM_LIBS_EXTERNAL="-lLLVMARMDisassembler -lLLVMARMCodeGen -lLLVMARMAsmParser -lLLVMARMDesc -lLLVMARMInfo -lLLVMARMAsmPrinter"
 			;;
 		powerpc*)
-			LLVM_ARCH_LIBS="-lLLVMPowerPCDisassembler -lLLVMPowerPCCodeGen -lLLVMPowerPCAsmParser -lLLVMPowerPCDesc -lLLVMPowerPCInfo -lLLVMPowerPCAsmPrinter"
+			LLVM_LIBS_EXTERNAL="-lLLVMPowerPCDisassembler -lLLVMPowerPCCodeGen -lLLVMPowerPCAsmParser -lLLVMPowerPCDesc -lLLVMPowerPCInfo -lLLVMPowerPCAsmPrinter"
 			;;
 		esac
 
 		LLVM_CFLAGS_EXTERNAL="-I$with_llvm/include -DNDEBUG -D__NO_CTYPE_INLINE -D_GNU_SOURCE -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS"
 		LLVM_CXXFLAGS_EXTERNAL="$LLVM_CFLAGS -std=gnu++11 -fvisibility-inlines-hidden -fno-rtti -Woverloaded-virtual -Wcast-qual"
 		LLVM_LDFLAGS_EXTERNAL="-L$with_llvm/lib"
-		LLVM_SYSTEM_LIBS="-lshell32 -lpsapi -limagehlp -ldbghelp -lm"
-		LLVM_LIBS_EXTERNAL="-lLLVMLTO -lLLVMObjCARCOpts -lLLVMLinker -lLLVMipo -lLLVMVectorize -lLLVMBitWriter \
-		-lLLVMTableGen -lLLVMDebugInfo -lLLVMOption -lLLVMSelectionDAG -lLLVMAsmPrinter \
-		-lLLVMMCDisassembler -lLLVMJIT -lLLVMAnalysis -lLLVMTarget \
-		-lLLVMIRReader -lLLVMAsmParser -lLLVMLineEditor -lLLVMMCAnalysis -lLLVMInstrumentation \
-		-lLLVMInterpreter -lLLVMCodeGen -lLLVMScalarOpts -lLLVMInstCombine -lLLVMTransformUtils \
-		-lLLVMipa -lLLVMAnalysis -lLLVMProfileData -lLLVMMCJIT -lLLVMTarget -lLLVMRuntimeDyld \
-		-lLLVMObject -lLLVMMCParser -lLLVMBitReader -lLLVMExecutionEngine -lLLVMMC -lLLVMCore \
-		-lLLVMSupport -lstdc++"
-		LLVM_LIBS_EXTERNAL="$LLVM_LIBS $LLVM_ARCH_LIBS $LLVM_SYSTEM_LIBS"
+		LLVM_LIBS_EXTERNAL="$LLVM_LIBS_EXTERNAL -lshell32 -lpsapi -limagehlp -ldbghelp -lm -lstdc++ \
+			-lLLVMLTO -lLLVMObjCARCOpts -lLLVMLinker -lLLVMipo -lLLVMVectorize -lLLVMBitWriter \
+			-lLLVMTableGen -lLLVMDebugInfo -lLLVMOption -lLLVMSelectionDAG -lLLVMAsmPrinter \
+			-lLLVMMCDisassembler -lLLVMJIT -lLLVMAnalysis -lLLVMTarget \
+			-lLLVMIRReader -lLLVMAsmParser -lLLVMLineEditor -lLLVMMCAnalysis -lLLVMInstrumentation \
+			-lLLVMInterpreter -lLLVMCodeGen -lLLVMScalarOpts -lLLVMInstCombine -lLLVMTransformUtils \
+			-lLLVMipa -lLLVMAnalysis -lLLVMProfileData -lLLVMMCJIT -lLLVMTarget -lLLVMRuntimeDyld \
+			-lLLVMObject -lLLVMMCParser -lLLVMBitReader -lLLVMExecutionEngine -lLLVMMC -lLLVMCore \
+			-lLLVMSupport"
 
 		AC_SUBST(LLVM_CFLAGS_EXTERNAL)
 		AC_SUBST(LLVM_CXXFLAGS_EXTERNAL)
-		AC_SUBST(LLVM_LIBS_EXTERNAL)
 		AC_SUBST(LLVM_LDFLAGS_EXTERNAL)
+		AC_SUBST(LLVM_LIBS_EXTERNAL)
 	fi # win32
 
 	AC_DEFINE(ENABLE_LLVM, 1, [Enable the LLVM back end])
-	ENABLE_LLVM=1
-	AC_SUBST(ENABLE_LLVM)
 fi
 
 AM_CONDITIONAL(INTERNAL_LLVM, [test "x$internal_llvm" != "xno"])
