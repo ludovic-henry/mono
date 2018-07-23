@@ -282,6 +282,7 @@ package-helix:
 	cp -R -L $(top_builddir)/mono/mini/mono helix-payload
 	cp -R -L $(top_builddir)/mono/metadata/.libs/libmono-system-native$(libsuffix) helix-payload
 	cp -R -L $(top_builddir)/mono/btls/build-shared/libmono-btls-shared$(libsuffix) helix-payload
+	cp -R -L $(top_builddir)/mono/profiler/.libs/libmono-profiler-log$(libsuffix) helix-payload
 	cp -R -L $(top_builddir)/support/.libs/libMonoPosixHelper$(libsuffix) helix-payload
 	cp -R -L $(top_builddir)/runtime/etc helix-payload/runtime
 	sed 's,$$mono_libdir/,,' $(top_builddir)/data/config > helix-payload/runtime/etc/mono/config
