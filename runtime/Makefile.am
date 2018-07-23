@@ -279,15 +279,20 @@ package-helix:
 	rm -rf helix-payload
 	mkdir -p helix-payload/runtime
 	cp -R -L $(mcs_topdir)/class/lib/net_4_x/. helix-payload
-	cp -L $(top_builddir)/mono/mini/mono helix-payload
+	cp -R -L $(top_builddir)/mono/mini/mono helix-payload
+	cp -R -L $(top_builddir)/mono/metadata/.libs/libmono-system-native$(libsuffix) helix-payload
+	cp -R -L $(top_builddir)/mono/btls/build-shared/libmono-btls-shared$(libsuffix) helix-payload
+	cp -R -L $(top_builddir)/support/.libs/libMonoPosixHelper$(libsuffix) helix-payload
 	cp -R -L $(top_builddir)/runtime/etc helix-payload/runtime
-	cp -L $(top_builddir)/runtime/mono-helix-wrapper.sh helix-payload
+	sed 's,$$mono_libdir/,,' $(top_builddir)/data/config > helix-payload/runtime/etc/mono/config
+	cp -R -L $(top_builddir)/runtime/mono-helix-wrapper.sh helix-payload
 	cp -R -L $(top_srcdir)/external/xunit-binaries/*.dll $(top_srcdir)/external/xunit-binaries/*.exe $(top_srcdir)/external/xunit-binaries/*.config $(top_srcdir)/external/xunit-binaries/*.xslt helix-payload
 	cp -R -L $(top_srcdir)/external/xunit-binaries/xunit.execution.desktop.dll helix-payload/tests
 	find helix-payload -empty -print0 | xargs -0 rm -rf  # FIXME: helix doesn't seem to like empty files/folders
-	find helix-payload -name "*.dylib" -print0 | xargs -0 rm -rf
-	find helix-payload -name "*.dSYM" -print0 | xargs -0 rm -rf
-	find helix-payload -name "*.so" -print0 | xargs -0 rm -rf
+# TODO: find out if we can keep the AOT images
+#	find helix-payload -name "*.dylib" -print0 | xargs -0 rm -rf
+#	find helix-payload -name "*.dSYM" -print0 | xargs -0 rm -rf
+#	find helix-payload -name "*.so" -print0 | xargs -0 rm -rf
 
 # the 'cygnus' option also disables the default 'distdir:' target, which we _do_ want
 MYDISTFILES = $(DIST_COMMON)
