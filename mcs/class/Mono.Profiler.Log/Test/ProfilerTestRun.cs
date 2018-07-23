@@ -46,7 +46,14 @@ namespace MonoTests.Mono.Profiler.Log {
 			_currentProcess = Process.GetCurrentProcess();
 			Name = name;
 			Options = options;
-			_output = $"test-{_id++}.mlpd";
+			var tempDir = Path.Combine (Path.GetTempPath(), $"MonoTests.Mono.Profiler.Log.{_currentProcess.Id}");
+			Directory.CreateDirectory (tempDir);
+			_output = Path.Combine (tempDir, $"test-{_id++}.mlpd");
+		}
+
+		~ProfilerTestRun()
+		{
+			File.Delete (_output);
 		}
 
 		public void Run (Action<IReadOnlyList<LogEvent>> action)
