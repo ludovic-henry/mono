@@ -255,6 +255,7 @@ elif [[ ${CI_TAGS} == *'stress-tests'* ]];             then ${MONO_REPO_ROOT}/sc
 elif [[ ${CI_TAGS} == *'interpreter'* ]];              then ${MONO_REPO_ROOT}/scripts/ci/run-test-interpreter.sh;
 elif [[ ${CI_TAGS} == *'mcs-compiler'* ]];             then ${MONO_REPO_ROOT}/scripts/ci/run-test-mcs.sh;
 elif [[ ${CI_TAGS} == *'mac-sdk'* ]];                  then ${MONO_REPO_ROOT}/scripts/ci/run-test-mac-sdk.sh;
+elif [[ ${CI_TAGS} == *'helix-tests'* ]];              then ${MONO_REPO_ROOT}/scripts/ci/run-test-helix.sh;
 elif [[ ${CI_TAGS} == *'no-tests'* ]];                 then exit 0;
 else make check-ci;
 fi
