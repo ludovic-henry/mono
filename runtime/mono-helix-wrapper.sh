@@ -50,3 +50,15 @@ if [ "$1" = "run-verify" ]; then
         exit 0
     fi
 fi
+
+if [ "$1" = "run-compiler" ]; then
+    cd tests/compiler
+    MONO_PATH=".:$MONO_PATH" "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" --verify-all compiler-tester.exe -mode:pos -files:v4 -compiler:"$r/mcs.exe" -issues:known-issues-net_4_x -log:net_4_x.log -il:ver-il-net_4_x.xml -compiler-options:"-d:NET_4_0;NET_4_5 -debug"
+    if [ $? -eq 0 ]; then
+        echo "<?xml version='1.0' encoding='utf-8'?><assemblies><assembly name='compiler' environment='Mono' test-framework='custom' run-date='$(date +%F)' run-time='$(date +%T)' total='1' passed='1' failed='0' skipped='0' errors='0' time='0'><collection total='1' passed='1' failed='0' skipped='0' name='Test collection for compiler' time='0'><test name='compiler.all' type='verify' method='all' time='0' result='Pass'></test></collection></assembly></assemblies>" > testResults.xml;
+        exit 0
+    else
+        echo "<?xml version='1.0' encoding='utf-8'?><assemblies><assembly name='compiler' environment='Mono' test-framework='custom' run-date='$(date +%F)' run-time='$(date +%T)' total='1' passed='0' failed='1' skipped='0' errors='0' time='0'><collection total='1' passed='0' failed='1' skipped='0' name='Test collection for compiler' time='0'><test name='compiler.all' type='verify' method='all' time='0' result='Fail'><failure exception-type='CompilerException'></failure><message><![CDATA[Compiler tests failed. Check the log for more details.]]></message></test></collection></assembly></assemblies>" > testResults.xml;
+        exit 1
+    fi
+fi

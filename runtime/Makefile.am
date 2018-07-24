@@ -277,19 +277,30 @@ test-support-files: $(TEST_SUPPORT_FILES)
 
 package-helix:
 	rm -rf helix-payload
-	mkdir -p helix-payload/runtime
-	cp -R -L $(mcs_topdir)/class/lib/net_4_x/. helix-payload
-	cp -R -L $(top_builddir)/mono/mini/mono-sgen helix-payload
-	chmod +x helix-payload/mono-sgen
-	cp -R -L $(top_builddir)/mono/metadata/.libs/libmono-system-native$(libsuffix) helix-payload
-	cp -R -L $(top_builddir)/mono/btls/build-shared/libmono-btls-shared$(libsuffix) helix-payload
-	cp -R -L $(top_builddir)/mono/profiler/.libs/libmono-profiler-log$(libsuffix) helix-payload
-	cp -R -L $(top_builddir)/support/.libs/libMonoPosixHelper$(libsuffix) helix-payload
-	cp -R -L $(top_builddir)/runtime/etc helix-payload/runtime
-	sed 's,$$mono_libdir/,,' $(top_builddir)/data/config > helix-payload/runtime/etc/mono/config
-	cp -R -L $(top_builddir)/runtime/mono-helix-wrapper.sh helix-payload
-	cp -R -L $(top_srcdir)/external/xunit-binaries/*.dll $(top_srcdir)/external/xunit-binaries/*.exe $(top_srcdir)/external/xunit-binaries/*.config $(top_srcdir)/external/xunit-binaries/*.xslt helix-payload
-	cp -R -L $(top_srcdir)/external/xunit-binaries/xunit.execution.desktop.dll helix-payload/tests
+	mkdir -p helix-payload/net_4_x/runtime
+	mkdir -p helix-payload/net_4_x/tests/compiler
+	cp -R -L $(mcs_topdir)/class/lib/net_4_x helix-payload/
+	mv helix-payload/net_4_x/compiler-tester.* helix-payload/net_4_x/tests/compiler/
+	cp -R -L $(mcs_topdir)/tests/known-issues-net_4_x helix-payload/net_4_x/tests/compiler/known-issues-net_4_x
+	cp -R -L $(mcs_topdir)/tests/ver-il-net_4_x.xml helix-payload/net_4_x/tests/compiler/ver-il-net_4_x.xml
+	cp -R -L $(mcs_topdir)/tests/dlls helix-payload/net_4_x/tests/compiler/
+	cp -R -L $(mcs_topdir)/tests/*.cs helix-payload/net_4_x/tests/compiler/
+	for i in helix-payload/net_4_x/tests/compiler/*.cs; do sed -i '' 's,../class/lib/net_4_x,../..,g' $$i; done
+	cp -R -L $(mcs_topdir)/tests/*.xml helix-payload/net_4_x/tests/compiler/
+	cp -R -L $(mcs_topdir)/tests/*.inc helix-payload/net_4_x/tests/compiler/
+	cp -R -L $(mcs_topdir)/tests/*.dll helix-payload/net_4_x/tests/compiler/
+	cp -R -L $(mcs_topdir)/tests/*.snk helix-payload/net_4_x/tests/compiler/
+	cp -R -L $(top_builddir)/mono/mini/mono-sgen helix-payload/net_4_x/
+	chmod +x helix-payload/net_4_x/mono-sgen
+	cp -R -L $(top_builddir)/mono/metadata/.libs/libmono-system-native$(libsuffix) helix-payload/net_4_x/
+	cp -R -L $(top_builddir)/mono/btls/build-shared/libmono-btls-shared$(libsuffix) helix-payload/net_4_x/
+	cp -R -L $(top_builddir)/mono/profiler/.libs/libmono-profiler-log$(libsuffix) helix-payload/net_4_x/
+	cp -R -L $(top_builddir)/support/.libs/libMonoPosixHelper$(libsuffix) helix-payload/net_4_x/
+	cp -R -L $(top_builddir)/runtime/etc helix-payload/net_4_x/runtime/
+	sed 's,$$mono_libdir/,,g' $(top_builddir)/data/config > helix-payload/net_4_x/runtime/etc/mono/config
+	cp -R -L $(top_builddir)/runtime/mono-helix-wrapper.sh helix-payload/net_4_x/
+	cp -R -L $(top_srcdir)/external/xunit-binaries/*.dll $(top_srcdir)/external/xunit-binaries/*.exe $(top_srcdir)/external/xunit-binaries/*.config $(top_srcdir)/external/xunit-binaries/*.xslt helix-payload/net_4_x/
+	cp -R -L $(top_srcdir)/external/xunit-binaries/xunit.execution.desktop.dll helix-payload/net_4_x/tests/
 	find helix-payload -empty -print0 | xargs -0 rm -rf  # FIXME: helix doesn't seem to like empty files/folders
 # TODO: find out if we can keep the AOT images
 #	find helix-payload -name "*.dylib" -print0 | xargs -0 rm -rf

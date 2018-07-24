@@ -1,6 +1,7 @@
 #!/bin/bash -e
 
 ${TESTCMD} --label=compile-bcl-tests --timeout=40m make -i -w -C runtime -j4 test xunit-test
+${TESTCMD} --label=compile-compiler-tests --timeout=40m make -w -C mcs/tests -j4 compile-all setup
 ${TESTCMD} --label=package-for-helix --timeout=5m --fatal make -w -C runtime package-helix
 rm -rf helix-tasks.zip helix-tasks
 # TODO: reupload Microsoft.DotNet.Build.CloudTest to xamjenkinsarticats and package in .tar to avoid unzip dependency
@@ -131,16 +132,18 @@ tee <<'EOF' helix.proj
         <PayloadFile>helix-tests.zip</PayloadFile>
         <TimeoutInSeconds>300</TimeoutInSeconds>
       </HelixWorkItem>
-    </ItemGroup>
-    <ItemGroup>
       <HelixWorkItem Include="%(MonoNUnitTestAssemblies.Identity)">
         <WorkItemId>%(MonoNUnitTestAssemblies.Identity)</WorkItemId>
         <Command>mono-helix-wrapper.sh run-bcl-tests nunit %(MonoNUnitTestAssemblies.Identity)</Command>
         <PayloadFile>helix-tests.zip</PayloadFile>
         <TimeoutInSeconds>300</TimeoutInSeconds>
       </HelixWorkItem>
-    </ItemGroup>
-    <ItemGroup>
+      <HelixWorkItem Include="compiler">
+        <WorkItemId>compiler</WorkItemId>
+        <Command>mono-helix-wrapper.sh run-compiler</Command>
+        <PayloadFile>helix-tests.zip</PayloadFile>
+        <TimeoutInSeconds>300</TimeoutInSeconds>
+      </HelixWorkItem>
       <HelixWorkItem Include="verify">
         <WorkItemId>verify</WorkItemId>
         <Command>mono-helix-wrapper.sh run-verify</Command>
