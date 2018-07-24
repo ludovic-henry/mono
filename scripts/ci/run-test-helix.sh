@@ -143,7 +143,7 @@ tee <<'EOF' helix.proj
     <ItemGroup>
       <HelixWorkItem Include="verify">
         <WorkItemId>verify</WorkItemId>
-        <Command>mono-helix-wrapper.sh verify</Command>
+        <Command>mono-helix-wrapper.sh run-verify</Command>
         <PayloadFile>helix-tests.zip</PayloadFile>
         <TimeoutInSeconds>300</TimeoutInSeconds>
       </HelixWorkItem>
