@@ -279,8 +279,8 @@ package-helix:
 	rm -rf helix-payload
 	mkdir -p helix-payload/runtime
 	cp -R -L $(mcs_topdir)/class/lib/net_4_x/. helix-payload
-	cp -R -L $(top_builddir)/mono/mini/mono helix-payload
-	chmod +x helix-payload/mono
+	cp -R -L $(top_builddir)/mono/mini/mono-sgen helix-payload
+	chmod +x helix-payload/mono-sgen
 	cp -R -L $(top_builddir)/mono/metadata/.libs/libmono-system-native$(libsuffix) helix-payload
 	cp -R -L $(top_builddir)/mono/btls/build-shared/libmono-btls-shared$(libsuffix) helix-payload
 	cp -R -L $(top_builddir)/mono/profiler/.libs/libmono-profiler-log$(libsuffix) helix-payload

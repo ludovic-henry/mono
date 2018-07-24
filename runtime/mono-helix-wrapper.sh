@@ -2,7 +2,7 @@
 r="$(pwd)"
 MONO_CFG_DIR="$r/runtime/etc"
 PATH="$r/runtime/_tmpinst/bin:$PATH"
-MONO_EXECUTABLE=${MONO_EXECUTABLE:-"$r/mono"}
+MONO_EXECUTABLE=${MONO_EXECUTABLE:-"$r/mono-sgen"}
 MONO_PATH="$r:$r/tests"
 export MONO_CFG_DIR MONO_PATH PATH
 chmod +x "${MONO_EXECUTABLE}"
