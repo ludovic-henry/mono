@@ -140,6 +140,14 @@ tee <<'EOF' helix.proj
         <TimeoutInSeconds>300</TimeoutInSeconds>
       </HelixWorkItem>
     </ItemGroup>
+    <ItemGroup>
+      <HelixWorkItem Include="verify">
+        <WorkItemId>verify</WorkItemId>
+        <Command>mono-helix-wrapper.sh verify</Command>
+        <PayloadFile>helix-tests.zip</PayloadFile>
+        <TimeoutInSeconds>300</TimeoutInSeconds>
+      </HelixWorkItem>
+    </ItemGroup>
   </Target>
 
   <Import Project="helix-tasks\build\CloudTest.Helix.targets" />
