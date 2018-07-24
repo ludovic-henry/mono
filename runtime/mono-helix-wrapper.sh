@@ -7,6 +7,10 @@ MONO_PATH="$r:$r/tests"
 export MONO_CFG_DIR MONO_PATH PATH
 chmod +x "${MONO_EXECUTABLE}"
 
+sudo dpkg --add-architecture i386
+sudo apt update
+sudo apt install -y libc6-i386 lib32gcc1
+
 if [ "$1" = "run-bcl-tests" ]; then
     if [ "$2" = "xunit" ]; then
         export REMOTE_EXECUTOR="$r/RemoteExecutorConsoleApp.exe"
