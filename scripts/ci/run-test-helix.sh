@@ -151,7 +151,9 @@ tee <<'EOF' helix.proj
 
 </Project>
 EOF
-    ${TESTCMD} --label=upload-to-helix --timeout=5m --fatal msbuild helix.proj -t:RunCloudTest -p:HelixApiAccessKey=${MONO_HELIX_API_KEY} -p:CloudDropAccountKey=${MONO_HELIX_CLOUDDROUP_ACCOUNTKEY} -p:TargetQueues=debian.9.amd64.open -p:BuildMoniker=${sha1} -p:HelixArchLabel=$(uname -m) -p:HelixConfigLabel=Mainline
+    if [[ ${CI_TAGS} == *'-i386'*  ]]; then helix_arch_label=x86; fi
+    if [[ ${CI_TAGS} == *'-amd64'* ]]; then helix_arch_label=x64; fi
+    ${TESTCMD} --label=upload-to-helix --timeout=5m --fatal msbuild helix.proj -t:RunCloudTest -p:HelixApiAccessKey=${MONO_HELIX_API_KEY} -p:CloudDropAccountKey=${MONO_HELIX_CLOUDDROUP_ACCOUNTKEY} -p:TargetQueues=debian.9.amd64.open -p:BuildMoniker=${sha1} -p:HelixArchLabel=${helix_arch_label} -p:HelixConfigLabel=Mainline
     HELIX_CORRELATION_ID=$(grep -Eo '[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}' SubmittedHelixRuns.txt) # TODO: improve
     tee <<EOF wait-helix-done.sh
 #!/bin/sh
