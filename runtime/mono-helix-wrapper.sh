@@ -5,6 +5,7 @@ PATH="$r/runtime/_tmpinst/bin:$PATH"
 MONO_EXECUTABLE=${MONO_EXECUTABLE:-"$r/mono"}
 MONO_PATH="$r:$r/tests"
 export MONO_CFG_DIR MONO_PATH PATH
+chmod +x "${MONO_EXECUTABLE}"
 
 if [ "$1" = "run-bcl-tests" ]; then
     if [ "$2" = "xunit" ]; then
