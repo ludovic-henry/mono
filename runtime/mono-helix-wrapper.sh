@@ -7,9 +7,13 @@ MONO_PATH="$r:$r/tests"
 export MONO_CFG_DIR MONO_PATH PATH
 chmod +x "${MONO_EXECUTABLE}"
 
-sudo dpkg --add-architecture i386
-sudo apt update
-sudo apt install -y libc6-i386 lib32gcc1
+"${MONO_EXECUTABLE}" --version
+
+if [ $? -ne 0 ]; then  # this can happen when running the i386 binary on amd64 and the i386 packages aren't installed
+    sudo dpkg --add-architecture i386
+    sudo apt update
+    sudo apt install -y libc6-i386 lib32gcc1
+fi
 
 if [ "$1" = "run-bcl-tests" ]; then
     if [ "$2" = "xunit" ]; then
