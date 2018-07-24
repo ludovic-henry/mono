@@ -279,17 +279,25 @@ package-helix:
 	rm -rf helix-payload
 	mkdir -p helix-payload/net_4_x/runtime
 	mkdir -p helix-payload/net_4_x/tests/compiler
+	mkdir -p helix-payload/net_4_x/tests/compiler-errors
 	cp -R -L $(mcs_topdir)/class/lib/net_4_x helix-payload/
-	mv helix-payload/net_4_x/compiler-tester.* helix-payload/net_4_x/tests/compiler/
+	cp -R -L helix-payload/net_4_x/compiler-tester.* helix-payload/net_4_x/tests/compiler/
+	cp -R -L helix-payload/net_4_x/compiler-tester.* helix-payload/net_4_x/tests/compiler-errors/
 	cp -R -L $(mcs_topdir)/tests/known-issues-net_4_x helix-payload/net_4_x/tests/compiler/known-issues-net_4_x
 	cp -R -L $(mcs_topdir)/tests/ver-il-net_4_x.xml helix-payload/net_4_x/tests/compiler/ver-il-net_4_x.xml
 	cp -R -L $(mcs_topdir)/tests/dlls helix-payload/net_4_x/tests/compiler/
 	cp -R -L $(mcs_topdir)/tests/*.cs helix-payload/net_4_x/tests/compiler/
-	for i in helix-payload/net_4_x/tests/compiler/*.cs; do sed -i '' 's,../class/lib/net_4_x,../..,g' $$i; done
 	cp -R -L $(mcs_topdir)/tests/*.xml helix-payload/net_4_x/tests/compiler/
 	cp -R -L $(mcs_topdir)/tests/*.inc helix-payload/net_4_x/tests/compiler/
 	cp -R -L $(mcs_topdir)/tests/*.dll helix-payload/net_4_x/tests/compiler/
 	cp -R -L $(mcs_topdir)/tests/*.snk helix-payload/net_4_x/tests/compiler/
+	cp -R -L $(mcs_topdir)/errors/known-issues-net_4_x helix-payload/net_4_x/tests/compiler-errors/known-issues-net_4_x
+	cp -R -L $(mcs_topdir)/errors/dlls helix-payload/net_4_x/tests/compiler-errors/
+	cp -R -L $(mcs_topdir)/errors/*.cs helix-payload/net_4_x/tests/compiler-errors/
+	cp -R -L $(mcs_topdir)/errors/*.inc helix-payload/net_4_x/tests/compiler-errors/
+	cp -R -L $(mcs_topdir)/errors/*.dll helix-payload/net_4_x/tests/compiler-errors/
+	cp -R -L $(mcs_topdir)/errors/*.snk helix-payload/net_4_x/tests/compiler-errors/
+	cp -R -L $(mcs_topdir)/errors/*.pub helix-payload/net_4_x/tests/compiler-errors/
 	cp -R -L $(top_builddir)/mono/mini/mono-sgen helix-payload/net_4_x/
 	chmod +x helix-payload/net_4_x/mono-sgen
 	cp -R -L $(top_builddir)/mono/metadata/.libs/libmono-system-native$(libsuffix) helix-payload/net_4_x/
