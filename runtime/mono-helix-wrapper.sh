@@ -1,4 +1,7 @@
 #! /bin/sh
+
+cd net_4_x    # TODO: get rid of this, currently required because the compiler-tester tries to find the profile dir by looking for "net_4_x"
+
 r="$(pwd)"
 MONO_CFG_DIR="$r/runtime/etc"
 PATH="$r/runtime/_tmpinst/bin:$PATH"

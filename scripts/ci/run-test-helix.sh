@@ -129,31 +129,31 @@ tee <<'EOF' helix.proj
     <ItemGroup>
       <HelixWorkItem Include="%(MonoXunitTestAssemblies.Identity)">
         <WorkItemId>%(MonoXunitTestAssemblies.Identity)</WorkItemId>
-        <Command>net_4_x/mono-helix-wrapper.sh run-bcl-tests xunit %(MonoXunitTestAssemblies.Identity)</Command>
+        <Command>mono-helix-wrapper.sh run-bcl-tests xunit %(MonoXunitTestAssemblies.Identity)</Command>
         <PayloadFile>helix-tests.zip</PayloadFile>
         <TimeoutInSeconds>300</TimeoutInSeconds>
       </HelixWorkItem>
       <HelixWorkItem Include="%(MonoNUnitTestAssemblies.Identity)">
         <WorkItemId>%(MonoNUnitTestAssemblies.Identity)</WorkItemId>
-        <Command>net_4_x/mono-helix-wrapper.sh run-bcl-tests nunit %(MonoNUnitTestAssemblies.Identity)</Command>
+        <Command>mono-helix-wrapper.sh run-bcl-tests nunit %(MonoNUnitTestAssemblies.Identity)</Command>
         <PayloadFile>helix-tests.zip</PayloadFile>
         <TimeoutInSeconds>300</TimeoutInSeconds>
       </HelixWorkItem>
       <HelixWorkItem Include="compiler">
         <WorkItemId>compiler</WorkItemId>
-        <Command>net_4_x/mono-helix-wrapper.sh run-compiler</Command>
+        <Command>mono-helix-wrapper.sh run-compiler</Command>
         <PayloadFile>helix-tests.zip</PayloadFile>
         <TimeoutInSeconds>300</TimeoutInSeconds>
       </HelixWorkItem>
       <HelixWorkItem Include="compiler-errors">
         <WorkItemId>compiler-errors</WorkItemId>
-        <Command>net_4_x/mono-helix-wrapper.sh run-compiler-errors</Command>
+        <Command>mono-helix-wrapper.sh run-compiler-errors</Command>
         <PayloadFile>helix-tests.zip</PayloadFile>
         <TimeoutInSeconds>300</TimeoutInSeconds>
       </HelixWorkItem>
       <HelixWorkItem Include="verify">
         <WorkItemId>verify</WorkItemId>
-        <Command>net_4_x/mono-helix-wrapper.sh run-verify</Command>
+        <Command>mono-helix-wrapper.sh run-verify</Command>
         <PayloadFile>helix-tests.zip</PayloadFile>
         <TimeoutInSeconds>300</TimeoutInSeconds>
       </HelixWorkItem>
