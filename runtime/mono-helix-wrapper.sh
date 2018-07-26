@@ -56,26 +56,26 @@ if [ "$1" = "run-verify" ]; then
     fi
 fi
 
-if [ "$1" = "run-compiler" ]; then
-    cd tests/compiler
+if [ "$1" = "run-mcs" ]; then
+    cd tests/mcs
     MONO_PATH=".:$MONO_PATH" "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" --verify-all compiler-tester.exe -mode:pos -files:v4 -compiler:"$r/mcs.exe" -issues:known-issues-net_4_x -log:net_4_x.log -il:ver-il-net_4_x.xml -compiler-options:"-d:NET_4_0;NET_4_5 -debug"
     if [ $? -eq 0 ]; then
-        echo "<?xml version='1.0' encoding='utf-8'?><assemblies><assembly name='compiler' environment='Mono' test-framework='custom' run-date='$(date +%F)' run-time='$(date +%T)' total='1' passed='1' failed='0' skipped='0' errors='0' time='0'><collection total='1' passed='1' failed='0' skipped='0' name='Test collection for compiler' time='0'><test name='compiler.all' type='compiler' method='all' time='0' result='Pass'></test></collection></assembly></assemblies>" > "${helix_root}/testResults.xml";
+        echo "<?xml version='1.0' encoding='utf-8'?><assemblies><assembly name='mcs' environment='Mono' test-framework='custom' run-date='$(date +%F)' run-time='$(date +%T)' total='1' passed='1' failed='0' skipped='0' errors='0' time='0'><collection total='1' passed='1' failed='0' skipped='0' name='Test collection for mcs' time='0'><test name='mcs.all' type='mcs' method='all' time='0' result='Pass'></test></collection></assembly></assemblies>" > "${helix_root}/testResults.xml";
         exit 0
     else
-        echo "<?xml version='1.0' encoding='utf-8'?><assemblies><assembly name='compiler' environment='Mono' test-framework='custom' run-date='$(date +%F)' run-time='$(date +%T)' total='1' passed='0' failed='1' skipped='0' errors='0' time='0'><collection total='1' passed='0' failed='1' skipped='0' name='Test collection for compiler' time='0'><test name='compiler.all' type='compiler' method='all' time='0' result='Fail'><failure exception-type='CompilerException'><message><![CDATA[Compiler tests failed. Check the log for more details.]]></message></failure></test></collection></assembly></assemblies>" > "${helix_root}/testResults.xml";
+        echo "<?xml version='1.0' encoding='utf-8'?><assemblies><assembly name='mcs' environment='Mono' test-framework='custom' run-date='$(date +%F)' run-time='$(date +%T)' total='1' passed='0' failed='1' skipped='0' errors='0' time='0'><collection total='1' passed='0' failed='1' skipped='0' name='Test collection for mcs' time='0'><test name='mcs.all' type='mcs' method='all' time='0' result='Fail'><failure exception-type='McsException'><message><![CDATA[mcs tests failed. Check the log for more details.]]></message></failure></test></collection></assembly></assemblies>" > "${helix_root}/testResults.xml";
         exit 1
     fi
 fi
 
-if [ "$1" = "run-compiler-errors" ]; then
-    cd tests/compiler-errors
+if [ "$1" = "run-mcs-errors" ]; then
+    cd tests/mcs-errors
     MONO_PATH=".:$MONO_PATH" "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" compiler-tester.exe -mode:neg -files:v4 -compiler:"$r/mcs.exe" -issues:known-issues-net_4_x -log:net_4_x.log -compiler-options:"-v --break-on-ice -d:NET_4_0;NET_4_5"
     if [ $? -eq 0 ]; then
-        echo "<?xml version='1.0' encoding='utf-8'?><assemblies><assembly name='compiler-errors' environment='Mono' test-framework='custom' run-date='$(date +%F)' run-time='$(date +%T)' total='1' passed='1' failed='0' skipped='0' errors='0' time='0'><collection total='1' passed='1' failed='0' skipped='0' name='Test collection for compiler-errors' time='0'><test name='compiler-errors.all' type='compiler-errors' method='all' time='0' result='Pass'></test></collection></assembly></assemblies>" > "${helix_root}/testResults.xml";
+        echo "<?xml version='1.0' encoding='utf-8'?><assemblies><assembly name='mcs-errors' environment='Mono' test-framework='custom' run-date='$(date +%F)' run-time='$(date +%T)' total='1' passed='1' failed='0' skipped='0' errors='0' time='0'><collection total='1' passed='1' failed='0' skipped='0' name='Test collection for mcs-errors' time='0'><test name='mcs-errors.all' type='mcs-errors' method='all' time='0' result='Pass'></test></collection></assembly></assemblies>" > "${helix_root}/testResults.xml";
         exit 0
     else
-        echo "<?xml version='1.0' encoding='utf-8'?><assemblies><assembly name='compiler-errors' environment='Mono' test-framework='custom' run-date='$(date +%F)' run-time='$(date +%T)' total='1' passed='0' failed='1' skipped='0' errors='0' time='0'><collection total='1' passed='0' failed='1' skipped='0' name='Test collection for compiler-errors' time='0'><test name='compiler-errors.all' type='compiler-errors' method='all' time='0' result='Fail'><failure exception-type='CompilerErrorsException'><message><![CDATA[Compiler error tests failed. Check the log for more details.]]></message></failure></test></collection></assembly></assemblies>" > "${helix_root}/testResults.xml";
+        echo "<?xml version='1.0' encoding='utf-8'?><assemblies><assembly name='mcs-errors' environment='Mono' test-framework='custom' run-date='$(date +%F)' run-time='$(date +%T)' total='1' passed='0' failed='1' skipped='0' errors='0' time='0'><collection total='1' passed='0' failed='1' skipped='0' name='Test collection for mcs-errors' time='0'><test name='mcs-errors.all' type='mcs-errors' method='all' time='0' result='Fail'><failure exception-type='McsErrorsException'><message><![CDATA[mcs error tests failed. Check the log for more details.]]></message></failure></test></collection></assembly></assemblies>" > "${helix_root}/testResults.xml";
         exit 1
     fi
 fi
