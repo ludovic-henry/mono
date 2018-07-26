@@ -1,9 +1,9 @@
 #!/bin/bash -e
 
-${TESTCMD} --label=compile-bcl-tests --timeout=40m make -i -w -C runtime -j4 test xunit-test
-${TESTCMD} --label=compile-mcs-tests --timeout=40m make -w -C mcs/tests -j4 compile-all setup
-${TESTCMD} --label=compile-mcs-error-tests --timeout=40m make -w -C mcs/errors -j4 compile-all
-${TESTCMD} --label=package-for-helix --timeout=5m --fatal make -w -C runtime package-helix
+${TESTCMD} --label=compile-bcl-tests --timeout=40m --fatal make -i -w -C runtime -j4 test xunit-test
+${TESTCMD} --label=compile-mcs-tests --timeout=40m --fatal make -w -C mcs/tests -j4 compile-all setup
+${TESTCMD} --label=compile-mcs-error-tests --timeout=40m --fatal make -w -C mcs/errors -j4 compile-all
+${TESTCMD} --label=package-for-helix --timeout=5m --fatal make -w -C package-helix
 rm -rf helix-tasks.zip helix-tasks
 # TODO: reupload Microsoft.DotNet.Build.CloudTest to xamjenkinsarticats and package in .tar to avoid unzip dependency
 wget -O helix-tasks.zip "https://dotnet.myget.org/F/dotnet-buildtools/api/v2/package/Microsoft.DotNet.Build.CloudTest/2.2.0-preview1-03013-03"

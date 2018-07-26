@@ -275,46 +275,6 @@ $(tmpinst)/bin/al: $(tmpinst)/bin/mono Makefile
 test-support-files: $(TEST_SUPPORT_FILES)
 	@:
 
-package-helix:
-	rm -rf helix-payload
-	mkdir -p helix-payload/net_4_x/runtime
-	mkdir -p helix-payload/net_4_x/tests/mcs
-	mkdir -p helix-payload/net_4_x/tests/mcs-errors
-	cp -R -L $(top_builddir)/runtime/mono-helix-wrapper.sh helix-payload/
-	cp -R -L $(mcs_topdir)/class/lib/net_4_x helix-payload/
-	cp -R -L helix-payload/net_4_x/compiler-tester.* helix-payload/net_4_x/tests/mcs/
-	cp -R -L helix-payload/net_4_x/compiler-tester.* helix-payload/net_4_x/tests/mcs-errors/
-	cp -R -L $(mcs_topdir)/tests/known-issues-net_4_x helix-payload/net_4_x/tests/mcs/known-issues-net_4_x
-	cp -R -L $(mcs_topdir)/tests/ver-il-net_4_x.xml helix-payload/net_4_x/tests/mcs/ver-il-net_4_x.xml
-	cp -R -L $(mcs_topdir)/tests/dlls helix-payload/net_4_x/tests/mcs/
-	cp -R -L $(mcs_topdir)/tests/*.cs helix-payload/net_4_x/tests/mcs/
-	cp -R -L $(mcs_topdir)/tests/*.xml helix-payload/net_4_x/tests/mcs/
-	cp -R -L $(mcs_topdir)/tests/*.inc helix-payload/net_4_x/tests/mcs/
-	cp -R -L $(mcs_topdir)/tests/*.dll helix-payload/net_4_x/tests/mcs/
-	cp -R -L $(mcs_topdir)/tests/*.snk helix-payload/net_4_x/tests/mcs/
-	cp -R -L $(mcs_topdir)/errors/known-issues-net_4_x helix-payload/net_4_x/tests/mcs-errors/known-issues-net_4_x
-	cp -R -L $(mcs_topdir)/errors/dlls helix-payload/net_4_x/tests/mcs-errors/
-	cp -R -L $(mcs_topdir)/errors/*.cs helix-payload/net_4_x/tests/mcs-errors/
-	cp -R -L $(mcs_topdir)/errors/*.inc helix-payload/net_4_x/tests/mcs-errors/
-	cp -R -L $(mcs_topdir)/errors/*.dll helix-payload/net_4_x/tests/mcs-errors/
-	cp -R -L $(mcs_topdir)/errors/*.snk helix-payload/net_4_x/tests/mcs-errors/
-	cp -R -L $(mcs_topdir)/errors/*.pub helix-payload/net_4_x/tests/mcs-errors/
-	cp -R -L $(top_builddir)/mono/mini/mono-sgen helix-payload/net_4_x/
-	chmod +x helix-payload/net_4_x/mono-sgen
-	cp -R -L $(top_builddir)/mono/metadata/.libs/libmono-system-native$(libsuffix) helix-payload/net_4_x/
-	cp -R -L $(top_builddir)/mono/btls/build-shared/libmono-btls-shared$(libsuffix) helix-payload/net_4_x/
-	cp -R -L $(top_builddir)/mono/profiler/.libs/libmono-profiler-log$(libsuffix) helix-payload/net_4_x/
-	cp -R -L $(top_builddir)/support/.libs/libMonoPosixHelper$(libsuffix) helix-payload/net_4_x/
-	cp -R -L $(top_builddir)/runtime/etc helix-payload/net_4_x/runtime/
-	sed 's,$$mono_libdir/,,g' $(top_builddir)/data/config > helix-payload/net_4_x/runtime/etc/mono/config
-	cp -R -L $(top_srcdir)/external/xunit-binaries/*.dll $(top_srcdir)/external/xunit-binaries/*.exe $(top_srcdir)/external/xunit-binaries/*.config helix-payload/net_4_x/
-	cp -R -L $(top_srcdir)/external/xunit-binaries/xunit.execution.desktop.dll helix-payload/net_4_x/tests/
-	find helix-payload -empty -print0 | xargs -0 rm -rf  # FIXME: helix doesn't seem to like empty files/folders
-# TODO: find out if we can keep the AOT images
-#	find helix-payload -name "*.dylib" -print0 | xargs -0 rm -rf
-#	find helix-payload -name "*.dSYM" -print0 | xargs -0 rm -rf
-#	find helix-payload -name "*.so" -print0 | xargs -0 rm -rf
-
 # the 'cygnus' option also disables the default 'distdir:' target, which we _do_ want
 MYDISTFILES = $(DIST_COMMON)
 distdir: $(MYDISTFILES)
