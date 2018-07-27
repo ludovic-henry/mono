@@ -120,7 +120,7 @@ tee <<'EOF' helix.proj
 
   <Target Name="CreateMonoTestsBundle">
     <ZipFileCreateFromDirectory
-        SourceDirectory="runtime/helix-payload"
+        SourceDirectory="helix-payload"
         DestinationArchive="helix-tests.zip"
         OverwriteDestination="true" />
   </Target>
