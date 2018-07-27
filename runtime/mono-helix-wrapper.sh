@@ -103,3 +103,29 @@ if [ "$1" = "run-aot-test" ]; then
     fi
     exit 0
 fi
+
+if [ "$1" = "run-mini" ]; then
+    cd tests/mini
+    "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" --regression *.exe > regressiontests.out 2>&1
+    cat regressiontests.out
+    if grep -q "100% pass" regressiontests.out; then
+        resultstring="Pass"
+        failurescount=0
+        successcount=1
+    else
+        resultstring="Fail"
+        failurescount=1
+        successcount=0
+    fi
+    echo "<?xml version='1.0' encoding='utf-8'?>\
+        <assemblies>\
+            <assembly name='mini.regression-tests' environment='Mono' test-framework='custom' run-date='$(date +%F)' run-time='$(date +%T)' total='1' passed='$successcount' failed='$failurescount' skipped='0' errors='0' time='0'>\
+                <collection total='1' passed='$successcount' failed='$failurescount' skipped='0' name='Test collection for mini.regression-tests' time='0'>\
+                    <test name='mini.regression-tests.all' type='mini.regression-tests' method='all' time='0' result='$resultstring'>" > "${helix_root}/testResults.xml"; fi
+                    if [ "$resultstring" = "Fail" ]; then echo "<failure exception-type='MiniRegressionTestsException'><message><![CDATA[$(cat regressiontests.out)]]></message><stack-trace></stack-trace></failure>" >> "${helix_root}/testResults.xml"; fi
+                echo "</test>
+                </collection>\
+            </assembly>\
+        </assemblies>" >> "${helix_root}/testResults.xml";
+    exit $failurescount
+fi

@@ -1,5 +1,6 @@
 #!/bin/bash -e
 
+${TESTCMD} --label=compile-mini-tests --timeout=5m --fatal make -w -C mono/mini -j4 compile-tests
 ${TESTCMD} --label=compile-bcl-tests --timeout=40m --fatal make -i -w -C runtime -j4 test xunit-test
 ${TESTCMD} --label=compile-mcs-tests --timeout=40m --fatal make -w -C mcs/tests -j4 compile-all setup
 ${TESTCMD} --label=compile-mcs-error-tests --timeout=40m --fatal make -w -C mcs/errors -j4 compile-all
@@ -160,6 +161,12 @@ tee <<'EOF' helix.proj
       <HelixWorkItem Include="aot-test">
         <WorkItemId>aot-test</WorkItemId>
         <Command>mono-helix-wrapper.sh run-aot-test</Command>
+        <PayloadFile>helix-tests.zip</PayloadFile>
+        <TimeoutInSeconds>300</TimeoutInSeconds>
+      </HelixWorkItem>
+      <HelixWorkItem Include="mini">
+        <WorkItemId>mini</WorkItemId>
+        <Command>mono-helix-wrapper.sh run-mini</Command>
         <PayloadFile>helix-tests.zip</PayloadFile>
         <TimeoutInSeconds>300</TimeoutInSeconds>
       </HelixWorkItem>

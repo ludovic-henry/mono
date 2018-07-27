@@ -158,6 +158,7 @@ package-helix:
 	mkdir -p helix-payload/net_4_x/runtime
 	mkdir -p helix-payload/net_4_x/tests/mcs
 	mkdir -p helix-payload/net_4_x/tests/mcs-errors
+	mkdir -p helix-payload/net_4_x/tests/mini
 	cp -R -L $(top_builddir)/runtime/mono-helix-wrapper.sh helix-payload/
 	cp -R -L $(mcs_topdir)/class/lib/net_4_x helix-payload/
 	cp -R -L helix-payload/net_4_x/compiler-tester.* helix-payload/net_4_x/tests/mcs/
@@ -181,6 +182,7 @@ package-helix:
 	cp -R -L $(top_builddir)/mono/mini/mono-boehm helix-payload/net_4_x/
 	chmod +x helix-payload/net_4_x/mono-sgen
 	chmod +x helix-payload/net_4_x/mono-boehm
+	cp -R -L $(top_builddir)/mono/mini/*.exe $(top_builddir)/mono/mini/TestDriver.dll $(top_builddir)/mono/mini/MemoryIntrinsics.dll $(top_builddir)/mono/mini/generics-variant-types.dll helix-payload/net_4_x/tests/mini/
 	cp -R -L $(top_builddir)/mono/metadata/.libs/libmono-system-native$(libsuffix) helix-payload/net_4_x/
 	cp -R -L $(top_builddir)/mono/btls/build-shared/libmono-btls-shared$(libsuffix) helix-payload/net_4_x/
 	cp -R -L $(top_builddir)/mono/profiler/.libs/libmono-profiler-log$(libsuffix) helix-payload/net_4_x/

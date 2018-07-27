@@ -777,6 +777,8 @@ cpu-mips.h: mini-ops.h cpu-mips.md
 testi: mono test.exe
 	$(MINI_RUNTIME) -v -v --ncompile 1 --compile Test:$(mtest) test.exe
 
+compile-tests: $(regtests)
+
 # ensure the tests are actually correct
 checktests: $(regtests)
 	for i in $(regtests); do $(MINI_RUNTIME) $$i; done
