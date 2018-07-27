@@ -3,7 +3,7 @@
 ${TESTCMD} --label=compile-mini-tests --timeout=5m --fatal make -w -C mono/mini -j4 compile-tests
 ${TESTCMD} --label=compile-bcl-tests --timeout=40m --fatal make -i -w -C runtime -j4 test xunit-test
 ${TESTCMD} --label=compile-mcs-tests --timeout=40m --fatal make -w -C mcs/tests -j4 compile-all setup
-${TESTCMD} --label=compile-mcs-error-tests --timeout=40m --fatal make -w -C mcs/errors -j4 compile-all
+${TESTCMD} --label=compile-mcs-errors-tests --timeout=40m --fatal make -w -C mcs/errors -j4 compile-all
 ${TESTCMD} --label=package-for-helix --timeout=5m --fatal make -w package-helix
 rm -rf helix-tasks.zip helix-tasks
 # TODO: reupload Microsoft.DotNet.Build.CloudTest to xamjenkinsarticats and package in .tar to avoid unzip dependency
