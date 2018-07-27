@@ -178,7 +178,9 @@ package-helix:
 	cp -R -L $(mcs_topdir)/errors/*.snk helix-payload/net_4_x/tests/mcs-errors/
 	cp -R -L $(mcs_topdir)/errors/*.pub helix-payload/net_4_x/tests/mcs-errors/
 	cp -R -L $(top_builddir)/mono/mini/mono-sgen helix-payload/net_4_x/
+	cp -R -L $(top_builddir)/mono/mini/mono-boehm helix-payload/net_4_x/
 	chmod +x helix-payload/net_4_x/mono-sgen
+	chmod +x helix-payload/net_4_x/mono-boehm
 	cp -R -L $(top_builddir)/mono/metadata/.libs/libmono-system-native$(libsuffix) helix-payload/net_4_x/
 	cp -R -L $(top_builddir)/mono/btls/build-shared/libmono-btls-shared$(libsuffix) helix-payload/net_4_x/
 	cp -R -L $(top_builddir)/mono/profiler/.libs/libmono-profiler-log$(libsuffix) helix-payload/net_4_x/

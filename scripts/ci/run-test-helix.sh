@@ -157,6 +157,12 @@ tee <<'EOF' helix.proj
         <PayloadFile>helix-tests.zip</PayloadFile>
         <TimeoutInSeconds>300</TimeoutInSeconds>
       </HelixWorkItem>
+      <HelixWorkItem Include="aot-test">
+        <WorkItemId>aot-test</WorkItemId>
+        <Command>mono-helix-wrapper.sh run-aot-test</Command>
+        <PayloadFile>helix-tests.zip</PayloadFile>
+        <TimeoutInSeconds>300</TimeoutInSeconds>
+      </HelixWorkItem>
     </ItemGroup>
   </Target>
 

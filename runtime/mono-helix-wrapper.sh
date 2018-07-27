@@ -67,3 +67,39 @@ if [ "$1" = "run-mcs-errors" ]; then
     MONO_PATH=".:$MONO_PATH" "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" compiler-tester.exe -mode:neg -files:v4 -compiler:"$r/mcs.exe" -issues:known-issues-net_4_x -log:net_4_x.log -resultXml:"${helix_root}/testResults.xml" -compiler-options:"-v --break-on-ice -d:NET_4_0;NET_4_5"
     exit $?
 fi
+
+if [ "$1" = "run-aot-test" ]; then
+    failed=0
+    passed=0
+    failed_tests=""
+    profile=$(pwd)
+    tmpfile=`mktemp -t mono_aot_outputXXXXXX` || exit 1
+    rm -f test-aot-${name}.stdout test-aot-${name}.stderr
+    for assembly in $profile/*.dll; do
+        asm_name=`basename $assembly`
+        echo "... $asm_name"
+        for conf in "|regular" "--gc=boehm|boehm"; do
+            name=`echo $conf | cut -d\| -f 2`
+            params=`echo $conf | cut -d\| -f 1`
+            test_name="${asm_name}|${name}"
+            echo "  $test_name"
+            if "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" $params --aot=outfile=$tmpfile $assembly >> test-aot-${name}.stdout 2>> test-aot-${name}.stderr
+            then
+                passed=`expr ${passed} + 1`
+            else \
+                failed=`expr ${failed} + 1`
+                failed_tests="${failed_tests} $test_name"
+            fi
+        done
+    done
+    rm $tmpfile
+    echo "${passed} test(s) passed. ${failed} test(s) did not pass."
+    if [ ${failed} != 0 ]; then
+        echo -e "\nFailed tests:\n"
+        for i in ${failed_tests}; do
+            echo ${i};
+        done
+        exit 1
+    fi
+    exit 0
+fi
