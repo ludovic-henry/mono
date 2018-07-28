@@ -35,7 +35,7 @@ if [ "$1" = "run-bcl-tests" ]; then
 fi
 
 if [ "$1" = "run-verify" ]; then
-    verifiable_files=$(find . -name "*.dll" -or -name "*.exe" | grep -v System.Runtime.CompilerServices.Unsafe.dll)
+    verifiable_files=$(find . -maxdepth 1 -name "*.dll" -or -name "*.exe" | grep -v System.Runtime.CompilerServices.Unsafe.dll)
     ok=true
     for asm in $verifiable_files; do
         echo "$asm"
