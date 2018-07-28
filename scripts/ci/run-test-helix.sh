@@ -187,7 +187,7 @@ EOF
     helix_config_label=mainline
     if [[ ${CI_TAGS} == *'-i386'*  ]]; then helix_arch_label=x86; fi
     if [[ ${CI_TAGS} == *'-amd64'* ]]; then helix_arch_label=x64; fi
-    ${TESTCMD} --label=upload-to-helix --timeout=5m --fatal msbuild helix.proj -t:RunCloudTest -p:HelixApiAccessKey=${MONO_HELIX_API_KEY} -p:CloudDropAccountKey=${MONO_HELIX_CLOUDDROUP_ACCOUNTKEY} -p:TargetQueues=${helix_target_queues} -p:BuildMoniker=${helix_build_moniker} -p:HelixArchLabel=${helix_arch_label} -p:HelixConfigLabel=${helix_config_label}
+    ${TESTCMD} --label=upload-to-helix --timeout=5m --fatal msbuild helix.proj -t:RunCloudTest -p:HelixApiAccessKey="${MONO_HELIX_API_KEY}" -p:CloudDropAccountKey="${MONO_HELIX_CLOUDDROUP_ACCOUNTKEY}" -p:TargetQueues="${helix_target_queues}" -p:BuildMoniker="${helix_build_moniker}" -p:HelixArchLabel="${helix_arch_label}" -p:HelixConfigLabel="${helix_config_label}"
     HELIX_CORRELATION_ID=$(grep -Eo '[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}' SubmittedHelixRuns.txt) # TODO: improve
     tee <<EOF wait-helix-done.sh
 #!/bin/sh
