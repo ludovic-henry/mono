@@ -131,3 +131,58 @@ if [ "$1" = "run-mini" ]; then
         </assemblies>" >> "${helix_root}/testResults.xml";
     exit $failurescount
 fi
+
+if [ "$1" = "run-symbolicate" ]; then
+    cd tests/symbolicate || exit 1
+
+    "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" --aot 2>&1 | grep -q "AOT compilation is not supported" && echo "No AOT support, skipping tests." && exit 0
+
+    ok=true
+    for config in without-aot with-aot with-aot-msym; do
+        OUT_DIR="$config"
+        MSYM_DIR="$OUT_DIR/msymdir"
+        STACKTRACE_FILE="$OUT_DIR/stacktrace.out"
+        SYMBOLICATE_RAW_FILE="$OUT_DIR/symbolicate_raw.out"
+        SYMBOLICATE_RESULT_FILE="$OUT_DIR/symbolicate.result"
+        SYMBOLICATE_EXPECTED_FILE=symbolicate.expected
+
+        echo "Checking StackTraceDumper.exe in configuration $config"
+        rm -rf "$OUT_DIR"
+        mkdir -p "$OUT_DIR"
+        mkdir -p "$MSYM_DIR"
+
+        cp StackTraceDumper.exe "$OUT_DIR"
+        cp StackTraceDumper.pdb "$OUT_DIR"
+
+        # store symbols
+        "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" "$r/mono-symbolicate.exe" store-symbols "$MSYM_DIR" "$OUT_DIR"
+        "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" "$r/mono-symbolicate.exe" store-symbols "$MSYM_DIR" "$r"
+
+        if [ "$config" = "with-aot" ]; then "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" -O=-inline --aot "$OUT_DIR/StackTraceDumper.exe"; fi
+        if [ "$config" = "with-aot-msym" ]; then "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" -O=-inline --aot=msym-dir="$MSYM_DIR" "$OUT_DIR/StackTraceDumper.exe"; fi
+
+        # check diff
+        "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" -O=-inline StackTraceDumper.exe > "$STACKTRACE_FILE"
+        "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" "$r/mono-symbolicate.exe" "$MSYM_DIR" "$STACKTRACE_FILE" > "$SYMBOLICATE_RAW_FILE"
+        tr "\\\\" "/" < "$SYMBOLICATE_RAW_FILE" | sed "s,) .* in .*/mcs/,) in mcs/," | sed "s,) .* in .*/external/,) in external/," | sed '/\[MVID\]/d' | sed '/\[AOTID\]/d' > "$SYMBOLICATE_RESULT_FILE"
+
+        DIFF=$(diff -up "$SYMBOLICATE_EXPECTED_FILE" "$SYMBOLICATE_RESULT_FILE")
+        if [ ! -z "$DIFF" ]; then
+            echo "ERROR: Symbolicate tests failed."
+            echo "If $SYMBOLICATE_RESULT_FILE is correct copy it to $SYMBOLICATE_EXPECTED_FILE."
+            echo "Otherwise runtime sequence points need to be fixed."
+            echo ""
+            echo "$DIFF"
+            ok=false
+        fi
+    done
+
+    if [ "$ok" = "true" ]; then
+        echo "<?xml version='1.0' encoding='utf-8'?><assemblies><assembly name='symbolicate' environment='Mono' test-framework='custom' run-date='$(date +%F)' run-time='$(date +%T)' total='1' passed='1' failed='0' skipped='0' errors='0' time='0'><collection total='1' passed='1' failed='0' skipped='0' name='Test collection for symbolicate' time='0'><test name='symbolicate.all' type='symbolicate' method='all' time='0' result='Pass'></test></collection></assembly></assemblies>" > "${helix_root}/testResults.xml";
+        exit 0
+    else
+        echo "<?xml version='1.0' encoding='utf-8'?><assemblies><assembly name='symbolicate' environment='Mono' test-framework='custom' run-date='$(date +%F)' run-time='$(date +%T)' total='1' passed='0' failed='1' skipped='0' errors='0' time='0'><collection total='1' passed='0' failed='1' skipped='0' name='Test collection for symbolicate' time='0'><test name='symbolicate.all' type='symbolicate' method='all' time='0' result='Fail'><failure exception-type='SymbolicateException'><message><![CDATA[Symbolicate tests failed. Check the log for more details.]]></message></failure></test></collection></assembly></assemblies>" > "${helix_root}/testResults.xml";
+        exit 1
+    fi
+
+fi

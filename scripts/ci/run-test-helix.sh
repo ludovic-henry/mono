@@ -171,6 +171,12 @@ tee <<'EOF' helix.proj
         <PayloadFile>helix-tests.zip</PayloadFile>
         <TimeoutInSeconds>300</TimeoutInSeconds>
       </HelixWorkItem>
+      <HelixWorkItem Include="symbolicate">
+        <WorkItemId>symbolicate</WorkItemId>
+        <Command>mono-helix-wrapper.sh run-symbolicate</Command>
+        <PayloadFile>helix-tests.zip</PayloadFile>
+        <TimeoutInSeconds>300</TimeoutInSeconds>
+      </HelixWorkItem>
     </ItemGroup>
   </Target>
 
