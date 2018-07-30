@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /bin/sh -e
 
 helix_root="$(pwd)"
 
@@ -11,7 +11,6 @@ MONO_EXECUTABLE=${MONO_EXECUTABLE:-"$r/mono-sgen"}
 MONO_PATH="$r:$r/tests"
 export MONO_CFG_DIR MONO_PATH PATH
 chmod +x "${MONO_EXECUTABLE}"
-
 
 
 if ! "${MONO_EXECUTABLE}" --version; then  # this can happen when running the i386 binary on amd64 and the i386 packages aren't installed
