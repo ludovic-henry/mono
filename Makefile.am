@@ -160,6 +160,7 @@ package-helix:
 	mkdir -p helix-payload/net_4_x/tests/mcs-errors
 	mkdir -p helix-payload/net_4_x/tests/mini
 	mkdir -p helix-payload/net_4_x/tests/symbolicate
+	mkdir -p helix-payload/net_4_x/tests/csi
 	cp -R -L $(top_builddir)/runtime/mono-helix-wrapper.sh helix-payload/
 	cp -R -L $(mcs_topdir)/class/lib/net_4_x helix-payload/
 	cp -R -L helix-payload/net_4_x/compiler-tester.* helix-payload/net_4_x/tests/mcs/
@@ -180,6 +181,7 @@ package-helix:
 	cp -R -L $(mcs_topdir)/errors/*.snk helix-payload/net_4_x/tests/mcs-errors/
 	cp -R -L $(mcs_topdir)/errors/*.pub helix-payload/net_4_x/tests/mcs-errors/
 	cp -R -L $(mcs_topdir)/tools/mono-symbolicate/StackTraceDumper.exe $(mcs_topdir)/tools/mono-symbolicate/StackTraceDumper.pdb $(mcs_topdir)/tools/mono-symbolicate/Test/symbolicate.expected helix-payload/net_4_x/tests/symbolicate/
+	cp -R -L $(dir $(CSC))/* helix-payload/net_4_x/tests/csi/
 	cp -R -L $(top_builddir)/mono/mini/mono-sgen helix-payload/net_4_x/
 	cp -R -L $(top_builddir)/mono/mini/mono-boehm helix-payload/net_4_x/
 	chmod +x helix-payload/net_4_x/mono-sgen
