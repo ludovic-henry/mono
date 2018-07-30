@@ -177,6 +177,12 @@ tee <<'EOF' helix.proj
         <PayloadFile>helix-tests.zip</PayloadFile>
         <TimeoutInSeconds>300</TimeoutInSeconds>
       </HelixWorkItem>
+      <HelixWorkItem Include="csi">
+        <WorkItemId>csi</WorkItemId>
+        <Command>mono-helix-wrapper.sh run-csi</Command>
+        <PayloadFile>helix-tests.zip</PayloadFile>
+        <TimeoutInSeconds>300</TimeoutInSeconds>
+      </HelixWorkItem>
     </ItemGroup>
   </Target>
 
