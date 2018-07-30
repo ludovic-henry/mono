@@ -145,7 +145,7 @@ if [ "$1" = "run-symbolicate" ]; then
         SYMBOLICATE_RESULT_FILE="$OUT_DIR/symbolicate.result"
         SYMBOLICATE_EXPECTED_FILE=symbolicate.expected
 
-        echo "Checking StackTraceDumper.exe in configuration $config"
+        echo "Checking StackTraceDumper.exe in configuration $config..."
         rm -rf "$OUT_DIR"
         mkdir -p "$OUT_DIR"
         mkdir -p "$MSYM_DIR"
@@ -173,6 +173,8 @@ if [ "$1" = "run-symbolicate" ]; then
             echo ""
             echo "$DIFF"
             ok=false
+        else
+            echo "Success."
         fi
     done
 
