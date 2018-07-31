@@ -73,7 +73,7 @@ if [ "$1" = "run-aot-test" ]; then
     failed_tests=""
     profile=$(pwd)
     tmpfile=$(mktemp -t mono_aot_outputXXXXXX) || exit 1
-    rm -f "test-aot-${name}.stdout" "test-aot-${name}.stderr"
+    rm -f "test-aot-*.stdout" "test-aot-*.stderr" "${helix_root}/testResults-cases.xml"
     for assembly in "$profile"/*.dll; do
         asm_name=$(basename "$assembly")
         echo "... $asm_name"
@@ -82,15 +82,33 @@ if [ "$1" = "run-aot-test" ]; then
             params=$(echo $conf | cut -d\| -f 1)
             test_name="${asm_name}|${name}"
             echo "  $test_name"
-            if "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" "$params" --aot=outfile="$tmpfile" "$assembly" >> "test-aot-${name}.stdout" 2>> "test-aot-${name}.stderr"
+            if "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" "$params" --aot=outfile="$tmpfile" "$assembly" > "test-aot-${name}-${asm_name}.stdout" 2> "test-aot-${name}-${asm_name}.stderr"
             then
                 passed=$((passed + 1))
+                resultstring="Pass"
             else \
                 failed=$((failed + 1))
                 failed_tests="${failed_tests} $test_name"
+                resultstring="Fail"
             fi
+            echo "<test name='aot-test.$name.$asm_name' type='aot-test.$name' method='$asm_name' time='0' result='$resultstring'>" >> "${helix_root}/testResults-cases.xml"
+            if [ "$resultstring" = "Fail" ]; then
+                echo "<failure exception-type='AotTestException'><message><![CDATA[
+                    STDOUT:
+                    $(cat "test-aot-${name}-${asm_name}.stdout")
+                    STDERR:
+                    $(cat "test-aot-${name}-${asm_name}.stderr")]]></message><stack-trace></stack-trace></failure>" >> "${helix_root}/testResults-cases.xml"; fi
+            echo "</test>" >> "${helix_root}/testResults-cases.xml"
         done
     done
+    echo "<?xml version='1.0' encoding='utf-8'?>\
+    <assemblies>\
+        <assembly name='aot-test' environment='Mono' test-framework='custom' run-date='$(date +%F)' run-time='$(date +%T)' total='$((passed + failed))' passed='$passed' failed='$failed' skipped='0' errors='0' time='0'>\
+            <collection total='$((passed + failed))' passed='$passed' failed='$failed' skipped='0' name='Test collection for aot-test' time='0'>\
+                $(cat "${helix_root}/testResults-cases.xml")
+            </collection>\
+        </assembly>\
+    </assemblies>" > "${helix_root}/testResults.xml";
     rm "$tmpfile"
     echo "${passed} test(s) passed. ${failed} test(s) did not pass."
     if [ "${failed}" != 0 ]; then
