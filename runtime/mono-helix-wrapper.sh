@@ -25,7 +25,7 @@ if [ "$1" = "run-bcl-tests" ]; then
         "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" --debug xunit.console.exe "tests/$3" -noappdomain -noshadow -parallel none -xml "${helix_root}/testResults.xml" -notrait category=failing -notrait category=nonmonotests -notrait Benchmark=true -notrait category=outerloop -notrait category=nonlinuxtests
         exit $?
     elif [ "$2" = "nunit" ]; then
-        MONO_REGISTRY_PATH="$HOME/.mono/registry" MONO_TESTS_IN_PROGRESS="yes" "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" --debug nunit-lite-console.exe "tests/$3" -format:xunit -result:"${helix_root}/testResults.xml"
+        MONO_REGISTRY_PATH="$HOME/.mono/registry" MONO_TESTS_IN_PROGRESS="yes" "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" --debug nunit-lite-console.exe "tests/$3" -exclude=NotWorking,CAS -labels -format:xunit -result:"${helix_root}/testResults.xml"
         exit $?
     else
         echo "Unknown test runner."
@@ -203,5 +203,10 @@ if [ "$1" = "run-csi" ]; then
         echo "<?xml version='1.0' encoding='utf-8'?><assemblies><assembly name='csi' environment='Mono' test-framework='custom' run-date='$(date +%F)' run-time='$(date +%T)' total='1' passed='0' failed='1' skipped='0' errors='0' time='0'><collection total='1' passed='0' failed='1' skipped='0' name='Test collection for csi' time='0'><test name='csi.all' type='csi' method='all' time='0' result='Fail'><failure exception-type='CsiException'><message><![CDATA[csi.exe tests failed. Check the log for more details.]]></message></failure></test></collection></assembly></assemblies>" > "${helix_root}/testResults.xml";
         exit 1
     fi
+
+fi
+
+if [ "$1" = "run-profiler" ]; then
+    cd tests/csi || exit 1
 
 fi
