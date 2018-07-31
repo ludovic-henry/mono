@@ -277,6 +277,7 @@ sub emit_nunit_report
 
 sub add_xunit_testcase_result
 {
+	my $testcase_simple_name = substr ($testcase_name, 0, index ($testcase_name, "("));
 	my $resultstring;
 	if ($total_errors > 0) {
 		$resultstring = "Fail";
@@ -286,7 +287,7 @@ sub add_xunit_testcase_result
 		$testcases_succeeded++;
 	}
 
-	$testcase_xml .= "        <test name=\"profiler.tests.$testcase_name\" type=\"profiler.tests\" method=\"$testcase_name\" time=\"0\" result=\"$resultstring\"";
+	$testcase_xml .= "        <test name=\"profiler.tests.$testcase_name\" type=\"profiler.tests\" method=\"$testcase_simple_name\" time=\"0\" result=\"$resultstring\"";
 	if ($total_errors > 0) {
 		$testcase_xml .=  ">\n";
 		$testcase_xml .=  "          <failure exception-type=\"ProfilerTestException\">\n";
