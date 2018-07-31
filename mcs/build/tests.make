@@ -318,7 +318,7 @@ XTEST_COVERAGE_FLAGS = -O=-aot --profile=coverage:output=$(topdir)/class/lib/$(P
 endif
 
 check: run-xunit-test-local
-xunit-test-local: $(xtest_lib_output)
+xunit-test-local: $(xtest_lib_output) $(XTEST_REMOTE_EXECUTOR)
 run-xunit-test-local: run-xunit-test-lib
 
 # cp -rf is a HACK for xunit runner to require xunit.execution.dOTNET.dll file in local folder on .net only
@@ -334,7 +334,7 @@ run-xunit-test-lib: xunit-test-local
 $(XTEST_REMOTE_EXECUTOR): $(topdir)/../external/corefx/src/Common/tests/System/Diagnostics/RemoteExecutorConsoleApp/RemoteExecutorConsoleApp.cs
 	$(TEST_COMPILE) -r:$(topdir)/class/lib/$(PROFILE)/mscorlib.dll $< -out:$@
 
-$(xtest_lib_output): $(the_assembly) $(xtest_response) $(xunit_libs_dep) $(xunit_src) $(test_lib_dir) $(XTEST_REMOTE_EXECUTOR)
+$(xtest_lib_output): $(the_assembly) $(xtest_response) $(xunit_libs_dep) $(xunit_src) $(test_lib_dir)
 	$(TEST_COMPILE) $(LIBRARY_FLAGS) $(XTEST_LIB_FLAGS) -target:library -out:$@ $(xtest_flags) @$(xtest_response) $(xunit_src)
 
 xtest_response_preprocessed = $(xtest_response)_preprocessed
