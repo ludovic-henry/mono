@@ -9,7 +9,7 @@ MONO_CFG_DIR="$r/runtime/etc"
 PATH="$r/runtime/_tmpinst/bin:$PATH"
 MONO_EXECUTABLE=${MONO_EXECUTABLE:-"$r/mono-sgen"}
 MONO_PATH="$r:$r/tests"
-export MONO_CFG_DIR MONO_PATH PATH
+export MONO_CFG_DIR MONO_PATH MONO_EXECUTABLE PATH
 chmod +x "${MONO_EXECUTABLE}"
 
 
@@ -225,6 +225,7 @@ if [ "$1" = "run-csi" ]; then
 fi
 
 if [ "$1" = "run-profiler" ]; then
-    cd tests/csi || exit 1
-
+    cd tests/profiler || exit 1
+    export DYLD_LIBRARY_PATH="$r:$DYLD_LIBRARY_PATH"
+    perl ptestrunner.pl "helix" xunit "${helix_root}/testResults.xml"
 fi

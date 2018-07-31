@@ -161,8 +161,10 @@ MCS = $(TOOLS_RUNTIME) $(CSC) -lib:$(CLASS) -unsafe -nologo -noconfig -nowarn:01
 %.exe: %.cs
 	$(MCS) -out:$@ $<
 
+compile-tests: $(PLOG_TESTS)
+
 testlog: $(PLOG_TESTS)
-	MONO_PATH=$(CLASS) perl $(srcdir)/ptestrunner.pl $(top_builddir)
+	MONO_PATH=$(CLASS) perl $(srcdir)/ptestrunner.pl $(top_builddir) nunit TestResult-profiler.xml
 
 check-local: $(check_targets)
 

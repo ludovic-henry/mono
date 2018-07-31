@@ -159,6 +159,7 @@ package-helix:
 	mkdir -p helix-payload/net_4_x/tests/mcs
 	mkdir -p helix-payload/net_4_x/tests/mcs-errors
 	mkdir -p helix-payload/net_4_x/tests/mini
+	mkdir -p helix-payload/net_4_x/tests/profiler
 	mkdir -p helix-payload/net_4_x/tests/symbolicate
 	mkdir -p helix-payload/net_4_x/tests/csi
 	cp -R -L $(top_builddir)/runtime/mono-helix-wrapper.sh helix-payload/
@@ -190,6 +191,9 @@ package-helix:
 	cp -R -L $(top_builddir)/mono/metadata/.libs/libmono-system-native$(libsuffix) helix-payload/net_4_x/
 	cp -R -L $(top_builddir)/mono/btls/build-shared/libmono-btls-shared$(libsuffix) helix-payload/net_4_x/
 	cp -R -L $(top_builddir)/mono/profiler/.libs/libmono-profiler-log$(libsuffix) helix-payload/net_4_x/
+	cp -R -L $(top_builddir)/mono/profiler/test-*.exe helix-payload/net_4_x/tests/profiler/
+	cp -R -L $(top_builddir)/mono/profiler/ptestrunner.pl helix-payload/net_4_x/tests/profiler/
+	cp -R -L $(top_builddir)/mono/profiler/mprof-report helix-payload/net_4_x/tests/profiler/
 	cp -R -L $(top_builddir)/support/.libs/libMonoPosixHelper$(libsuffix) helix-payload/net_4_x/
 	cp -R -L $(top_builddir)/runtime/etc helix-payload/net_4_x/runtime/
 	sed 's,$$mono_libdir/,,g' $(top_builddir)/data/config > helix-payload/net_4_x/runtime/etc/mono/config

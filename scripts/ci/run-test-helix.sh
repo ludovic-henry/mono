@@ -1,6 +1,7 @@
 #!/bin/bash -e
 
 ${TESTCMD} --label=compile-mini-tests --timeout=5m --fatal make -w -C mono/mini -j4 compile-tests
+${TESTCMD} --label=compile-profiler-tests --timeout=5m --fatal make -w -C mono/profiler -j4 compile-tests
 ${TESTCMD} --label=compile-bcl-tests --timeout=40m --fatal make -i -w -C runtime -j4 test xunit-test
 ${TESTCMD} --label=compile-mcs-tests --timeout=40m --fatal make -w -C mcs/tests -j4 test
 ${TESTCMD} --label=compile-mcs-errors-tests --timeout=40m --fatal make -w -C mcs/errors -j4 test
@@ -180,6 +181,12 @@ tee <<'EOF' helix.proj
       <HelixWorkItem Include="csi">
         <WorkItemId>csi</WorkItemId>
         <Command>mono-helix-wrapper.sh run-csi</Command>
+        <PayloadFile>helix-tests.zip</PayloadFile>
+        <TimeoutInSeconds>300</TimeoutInSeconds>
+      </HelixWorkItem>
+      <HelixWorkItem Include="profiler">
+        <WorkItemId>profiler</WorkItemId>
+        <Command>mono-helix-wrapper.sh run-profiler</Command>
         <PayloadFile>helix-tests.zip</PayloadFile>
         <TimeoutInSeconds>300</TimeoutInSeconds>
       </HelixWorkItem>
