@@ -226,6 +226,5 @@ fi
 
 if [ "$1" = "run-profiler" ]; then
     cd tests/profiler || exit 1
-    export DYLD_LIBRARY_PATH="$r:$DYLD_LIBRARY_PATH"
     perl ptestrunner.pl "helix" xunit "${helix_root}/testResults.xml"
 fi

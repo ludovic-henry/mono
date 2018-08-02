@@ -1,6 +1,7 @@
 #!/usr/bin/perl -w
 
 use strict;
+use File::Basename;
 
 sub print_usage
 {
@@ -20,24 +21,25 @@ my $testcases_failed = 0;
 my $report;
 my $testcase_name;
 my $testcase_xml;
+my $profmoduledir;
 my $monosgen;
 my $mprofreport;
 
 if ($builddir eq "helix") {
 	$monosgen = $ENV{'MONO_EXECUTABLE'};
-	$mprofreport = "mprof-report";
+	$profmoduledir = dirname ($monosgen);
+	$mprofreport = "$profmoduledir/mprof-report";
 } else {
-	my $profbuilddir = $builddir . "/mono/profiler";
-	my $minibuilddir = $builddir . "/mono/mini";
+	my $profbuilddir = "$builddir/mono/profiler";
+	my $minibuilddir = "$builddir/mono/mini";
+	$profmoduledir = "$minibuilddir/.libs";
 	$monosgen = "$minibuilddir/mono-sgen";
 	$mprofreport = "$profbuilddir/mprof-report";
-
-	# Setup the execution environment
-	# for the profiler module
-	append_path ("DYLD_LIBRARY_PATH", $minibuilddir . "/.libs");
-	# for mprof-report
-	append_path ("PATH", $profbuilddir);
 }
+
+# Setup the execution environment
+# for the profiler module
+append_path ("DYLD_LIBRARY_PATH", $profmoduledir);
 
 # first a basic test
 $report = run_test ("test-alloc.exe", "report,legacy,calls,alloc");
@@ -295,7 +297,7 @@ sub add_xunit_testcase_result
 		foreach my $e (@errors) {
 			$testcase_xml .= "Error: $e\n";
 		}
-		$testcase_xml .= "\nReport:\n";
+		$testcase_xml .= "\nSTDOUT/STDERR:\n";
 		$testcase_xml .=  $report;
 		$testcase_xml .= "]]></message>\n";
 		$testcase_xml .=  "          </failure>\n";
