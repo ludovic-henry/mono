@@ -39,6 +39,7 @@ if ($builddir eq "helix") {
 
 # Setup the execution environment
 # for the profiler module
+append_path ("LD_LIBRARY_PATH", $profmoduledir);
 append_path ("DYLD_LIBRARY_PATH", $profmoduledir);
 
 # first a basic test
