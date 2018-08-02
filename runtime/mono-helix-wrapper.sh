@@ -667,6 +667,6 @@ if [ "$1" = "run-runtime" ]; then
     verbose.exe"
 
     # TODO: only ported runtest-managed for now
-    "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" --debug test-runner.exe --verbose --config tests-config --runtime "${MONO_EXECUTABLE}" --mono-path "$r" -j a --testsuite-name "runtime" --timeout 300 --disabled "$DISABLED_TESTS" $TESTS_CS # $(TESTS_IL) $(TESTS_BENCH)
+    "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" --debug test-runner.exe --verbose --xunit "${helix_root}/testResults.xml" --config tests-config --runtime "${MONO_EXECUTABLE}" --mono-path "$r" -j a --testsuite-name "runtime" --timeout 300 --disabled "$DISABLED_TESTS" $TESTS_CS # $(TESTS_IL) $(TESTS_BENCH)
 
 fi
