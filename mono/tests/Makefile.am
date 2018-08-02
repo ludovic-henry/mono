@@ -1962,7 +1962,7 @@ test-env-options:
 compile-tests:
 	$(MAKE) -j4 compile-tests-parallel
 
-compile-tests-parallel: $(TESTS_CS) $(TESTS_IL) $(TESTS_BENCH) $(TESTS_STRESS) $(TESTS_GSHARED) $(TESTSAOT_CS) $(TESTSAOT_IL) $(TESTSAOT_BENCH) $(TESTSAOT_STRESS) $(TESTSAOT_GSHARED) $(TESTS_TAILCALL) $(TESTSAOT_TAILCALL) compile-gac-loading compile-assembly-load-reference
+compile-tests-parallel: $(TESTS_CS) $(TESTS_IL) $(TESTS_BENCH) $(TESTS_STRESS) $(TESTS_GSHARED) $(TESTSAOT_CS) $(TESTSAOT_IL) $(TESTSAOT_BENCH) $(TESTSAOT_STRESS) $(TESTSAOT_GSHARED) $(TESTS_TAILCALL) $(TESTSAOT_TAILCALL) compile-gac-loading compile-assembly-load-reference test-runner.exe
 
 # Remove empty .stdout and .stderr files for wrench
 rm-empty-logs:
