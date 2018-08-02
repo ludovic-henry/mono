@@ -295,10 +295,9 @@ sub add_xunit_testcase_result
 		foreach my $e (@errors) {
 			$testcase_xml .= "Error: $e\n";
 		}
-		$testcase_xml .= "]]></message>\n";
-		$testcase_xml .=  "            <stack-trace><![CDATA[";
+		$testcase_xml .= "\nReport:\n"
 		$testcase_xml .=  $report;
-		$testcase_xml .=  "]]></stack-trace>\n";
+		$testcase_xml .= "]]></message>\n";
 		$testcase_xml .=  "          </failure>\n";
 		$testcase_xml .=  "        </test>\n";
 	} else {
