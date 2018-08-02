@@ -226,6 +226,7 @@ if [ "$2" = "run-csi" ]; then
 fi
 
 if [ "$2" = "run-profiler" ]; then
+    chmod +x mprof-report
     cd tests/profiler || exit 1
     perl ptestrunner.pl "helix" xunit "${helix_root}/testResults.xml"
 fi
