@@ -155,6 +155,8 @@ update-solution-files-with-tests:
 
 package-helix:
 	rm -rf helix-payload
+	rm -rf helix-wrapper
+	mkdir -p helix-wrapper
 	mkdir -p helix-payload/net_4_x/runtime
 	mkdir -p helix-payload/net_4_x/tests/mcs
 	mkdir -p helix-payload/net_4_x/tests/mcs-errors
@@ -163,7 +165,7 @@ package-helix:
 	mkdir -p helix-payload/net_4_x/tests/runtime
 	mkdir -p helix-payload/net_4_x/tests/symbolicate
 	mkdir -p helix-payload/net_4_x/tests/csi
-	cp -R -L $(top_builddir)/runtime/mono-helix-wrapper.sh helix-payload/
+	cp -R -L $(top_builddir)/runtime/mono-helix-wrapper.sh helix-wrapper/
 	cp -R -L $(mcs_topdir)/class/lib/net_4_x helix-payload/
 	cp -R -L helix-payload/net_4_x/compiler-tester.* helix-payload/net_4_x/tests/mcs/
 	cp -R -L helix-payload/net_4_x/compiler-tester.* helix-payload/net_4_x/tests/mcs-errors/

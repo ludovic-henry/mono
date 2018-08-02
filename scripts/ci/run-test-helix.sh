@@ -122,10 +122,18 @@ tee <<'EOF' helix.proj
     <MonoNUnitTestAssemblies Include="net_4_x_Commons.Xml.Relaxng_test.dll" />
   </ItemGroup>
 
+  <ItemGroup>
+    <HelixCorrelationPayloadFile Include="helix-payload.zip" />
+  </ItemGroup>
+
   <Target Name="CreateMonoTestsBundle">
     <ZipFileCreateFromDirectory
         SourceDirectory="helix-payload"
-        DestinationArchive="helix-tests.zip"
+        DestinationArchive="helix-payload.zip"
+        OverwriteDestination="true" />
+    <ZipFileCreateFromDirectory
+        SourceDirectory="helix-wrapper"
+        DestinationArchive="helix-wrapper.zip"
         OverwriteDestination="true" />
   </Target>
 
@@ -133,68 +141,68 @@ tee <<'EOF' helix.proj
     <ItemGroup>
       <HelixWorkItem Include="%(MonoXunitTestAssemblies.Identity)">
         <WorkItemId>%(MonoXunitTestAssemblies.Identity)</WorkItemId>
-        <Command>mono-helix-wrapper.sh run-bcl-tests xunit %(MonoXunitTestAssemblies.Identity)</Command>
-        <PayloadFile>helix-tests.zip</PayloadFile>
+        <Command>mono-helix-wrapper.sh $HELIX_CORRELATION_PAYLOAD run-bcl-tests xunit %(MonoXunitTestAssemblies.Identity)</Command>
+        <PayloadFile>helix-wrapper.zip</PayloadFile>
         <TimeoutInSeconds>300</TimeoutInSeconds>
       </HelixWorkItem>
       <HelixWorkItem Include="%(MonoNUnitTestAssemblies.Identity)">
         <WorkItemId>%(MonoNUnitTestAssemblies.Identity)</WorkItemId>
-        <Command>mono-helix-wrapper.sh run-bcl-tests nunit %(MonoNUnitTestAssemblies.Identity)</Command>
-        <PayloadFile>helix-tests.zip</PayloadFile>
+        <Command>mono-helix-wrapper.sh $HELIX_CORRELATION_PAYLOAD run-bcl-tests nunit %(MonoNUnitTestAssemblies.Identity)</Command>
+        <PayloadFile>helix-wrapper.zip</PayloadFile>
         <TimeoutInSeconds>300</TimeoutInSeconds>
       </HelixWorkItem>
       <HelixWorkItem Include="mcs">
         <WorkItemId>mcs</WorkItemId>
-        <Command>mono-helix-wrapper.sh run-mcs</Command>
-        <PayloadFile>helix-tests.zip</PayloadFile>
+        <Command>mono-helix-wrapper.sh $HELIX_CORRELATION_PAYLOAD run-mcs</Command>
+        <PayloadFile>helix-wrapper.zip</PayloadFile>
         <TimeoutInSeconds>300</TimeoutInSeconds>
       </HelixWorkItem>
       <HelixWorkItem Include="mcs-errors">
         <WorkItemId>mcs-errors</WorkItemId>
-        <Command>mono-helix-wrapper.sh run-mcs-errors</Command>
-        <PayloadFile>helix-tests.zip</PayloadFile>
+        <Command>mono-helix-wrapper.sh $HELIX_CORRELATION_PAYLOAD run-mcs-errors</Command>
+        <PayloadFile>helix-wrapper.zip</PayloadFile>
         <TimeoutInSeconds>300</TimeoutInSeconds>
       </HelixWorkItem>
       <HelixWorkItem Include="verify">
         <WorkItemId>verify</WorkItemId>
-        <Command>mono-helix-wrapper.sh run-verify</Command>
-        <PayloadFile>helix-tests.zip</PayloadFile>
+        <Command>mono-helix-wrapper.sh $HELIX_CORRELATION_PAYLOAD run-verify</Command>
+        <PayloadFile>helix-wrapper.zip</PayloadFile>
         <TimeoutInSeconds>300</TimeoutInSeconds>
       </HelixWorkItem>
       <HelixWorkItem Include="aot-test">
         <WorkItemId>aot-test</WorkItemId>
-        <Command>mono-helix-wrapper.sh run-aot-test</Command>
-        <PayloadFile>helix-tests.zip</PayloadFile>
+        <Command>mono-helix-wrapper.sh $HELIX_CORRELATION_PAYLOAD run-aot-test</Command>
+        <PayloadFile>helix-wrapper.zip</PayloadFile>
         <TimeoutInSeconds>300</TimeoutInSeconds>
       </HelixWorkItem>
       <HelixWorkItem Include="mini">
         <WorkItemId>mini</WorkItemId>
-        <Command>mono-helix-wrapper.sh run-mini</Command>
-        <PayloadFile>helix-tests.zip</PayloadFile>
+        <Command>mono-helix-wrapper.sh $HELIX_CORRELATION_PAYLOAD run-mini</Command>
+        <PayloadFile>helix-wrapper.zip</PayloadFile>
         <TimeoutInSeconds>300</TimeoutInSeconds>
       </HelixWorkItem>
       <HelixWorkItem Include="symbolicate">
         <WorkItemId>symbolicate</WorkItemId>
-        <Command>mono-helix-wrapper.sh run-symbolicate</Command>
-        <PayloadFile>helix-tests.zip</PayloadFile>
+        <Command>mono-helix-wrapper.sh $HELIX_CORRELATION_PAYLOAD run-symbolicate</Command>
+        <PayloadFile>helix-wrapper.zip</PayloadFile>
         <TimeoutInSeconds>300</TimeoutInSeconds>
       </HelixWorkItem>
       <HelixWorkItem Include="csi">
         <WorkItemId>csi</WorkItemId>
-        <Command>mono-helix-wrapper.sh run-csi</Command>
-        <PayloadFile>helix-tests.zip</PayloadFile>
+        <Command>mono-helix-wrapper.sh $HELIX_CORRELATION_PAYLOAD run-csi</Command>
+        <PayloadFile>helix-wrapper.zip</PayloadFile>
         <TimeoutInSeconds>300</TimeoutInSeconds>
       </HelixWorkItem>
       <HelixWorkItem Include="profiler">
         <WorkItemId>profiler</WorkItemId>
-        <Command>mono-helix-wrapper.sh run-profiler</Command>
-        <PayloadFile>helix-tests.zip</PayloadFile>
+        <Command>mono-helix-wrapper.sh $HELIX_CORRELATION_PAYLOAD run-profiler</Command>
+        <PayloadFile>helix-wrapper.zip</PayloadFile>
         <TimeoutInSeconds>300</TimeoutInSeconds>
       </HelixWorkItem>
       <HelixWorkItem Include="runtime">
         <WorkItemId>runtime</WorkItemId>
-        <Command>mono-helix-wrapper.sh run-runtime</Command>
-        <PayloadFile>helix-tests.zip</PayloadFile>
+        <Command>mono-helix-wrapper.sh $HELIX_CORRELATION_PAYLOAD run-runtime</Command>
+        <PayloadFile>helix-wrapper.zip</PayloadFile>
         <TimeoutInSeconds>300</TimeoutInSeconds>
       </HelixWorkItem>
     </ItemGroup>
@@ -203,7 +211,7 @@ tee <<'EOF' helix.proj
   <Import Project="helix-tasks\build\CloudTest.Helix.targets" />
 
   <Target Name="RunCloudTest" DependsOnTargets="PopulateHelixWorkItems">
-    <Message Text="Beginning Cloud Build!" />
+    <Message Text="Beginning Helix tests!" />
     <CallTarget Targets="HelixCloudBuild" />
   </Target>
 

@@ -2,6 +2,7 @@
 
 helix_root="$(pwd)"
 
+cd "$1" || exit 1
 cd net_4_x || exit 1    # TODO: get rid of this, currently required because the compiler-tester tries to find the profile dir by looking for "net_4_x"
 
 r="$(pwd)"
@@ -19,13 +20,13 @@ if ! "${MONO_EXECUTABLE}" --version; then  # this can happen when running the i3
     sudo apt install -y libc6-i386 lib32gcc1
 fi
 
-if [ "$1" = "run-bcl-tests" ]; then
-    if [ "$2" = "xunit" ]; then
+if [ "$2" = "run-bcl-tests" ]; then
+    if [ "$3" = "xunit" ]; then
         export REMOTE_EXECUTOR="$r/RemoteExecutorConsoleApp.exe"
-        "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" --debug xunit.console.exe "tests/$3" -noappdomain -noshadow -parallel none -xml "${helix_root}/testResults.xml" -notrait category=failing -notrait category=nonmonotests -notrait Benchmark=true -notrait category=outerloop -notrait category=nonlinuxtests
+        "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" --debug xunit.console.exe "tests/$4" -noappdomain -noshadow -parallel none -xml "${helix_root}/testResults.xml" -notrait category=failing -notrait category=nonmonotests -notrait Benchmark=true -notrait category=outerloop -notrait category=nonlinuxtests
         exit $?
-    elif [ "$2" = "nunit" ]; then
-        MONO_REGISTRY_PATH="$HOME/.mono/registry" MONO_TESTS_IN_PROGRESS="yes" "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" --debug nunit-lite-console.exe "tests/$3" -exclude=NotWorking,CAS -labels -format:xunit -result:"${helix_root}/testResults.xml"
+    elif [ "$3" = "nunit" ]; then
+        MONO_REGISTRY_PATH="$HOME/.mono/registry" MONO_TESTS_IN_PROGRESS="yes" "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" --debug nunit-lite-console.exe "tests/$4" -exclude=NotWorking,CAS -labels -format:xunit -result:"${helix_root}/testResults.xml"
         exit $?
     else
         echo "Unknown test runner."
@@ -33,7 +34,7 @@ if [ "$1" = "run-bcl-tests" ]; then
     fi
 fi
 
-if [ "$1" = "run-verify" ]; then
+if [ "$2" = "run-verify" ]; then
     verifiable_files=$(find . -maxdepth 1 -name "*.dll" -or -name "*.exe" | grep -v System.Runtime.CompilerServices.Unsafe.dll)
     ok=true
     for asm in $verifiable_files; do
@@ -55,19 +56,19 @@ if [ "$1" = "run-verify" ]; then
     fi
 fi
 
-if [ "$1" = "run-mcs" ]; then
+if [ "$2" = "run-mcs" ]; then
     cd tests/mcs || exit 1
     MONO_PATH=".:$MONO_PATH" "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" --verify-all compiler-tester.exe -mode:pos -files:v4 -compiler:"$r/mcs.exe" -issues:known-issues-net_4_x -log:net_4_x.log -il:ver-il-net_4_x.xml -resultXml:"${helix_root}/testResults.xml" -compiler-options:"-d:NET_4_0;NET_4_5 -debug"
     exit $?
 fi
 
-if [ "$1" = "run-mcs-errors" ]; then
+if [ "$2" = "run-mcs-errors" ]; then
     cd tests/mcs-errors || exit 1
     MONO_PATH=".:$MONO_PATH" "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" compiler-tester.exe -mode:neg -files:v4 -compiler:"$r/mcs.exe" -issues:known-issues-net_4_x -log:net_4_x.log -resultXml:"${helix_root}/testResults.xml" -compiler-options:"-v --break-on-ice -d:NET_4_0;NET_4_5"
     exit $?
 fi
 
-if [ "$1" = "run-aot-test" ]; then
+if [ "$2" = "run-aot-test" ]; then
     failed=0
     passed=0
     failed_tests=""
@@ -123,7 +124,7 @@ if [ "$1" = "run-aot-test" ]; then
     exit 0
 fi
 
-if [ "$1" = "run-mini" ]; then
+if [ "$2" = "run-mini" ]; then
     cd tests/mini || exit 1
     "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" --regression ./*.exe > regressiontests.out 2>&1
     cat regressiontests.out
@@ -149,7 +150,7 @@ if [ "$1" = "run-mini" ]; then
     exit $failurescount
 fi
 
-if [ "$1" = "run-symbolicate" ]; then
+if [ "$2" = "run-symbolicate" ]; then
     cd tests/symbolicate || exit 1
 
     "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" --aot 2>&1 | grep -q "AOT compilation is not supported" && echo "No AOT support, skipping tests." && exit 0
@@ -206,7 +207,7 @@ if [ "$1" = "run-symbolicate" ]; then
 
 fi
 
-if [ "$1" = "run-csi" ]; then
+if [ "$2" = "run-csi" ]; then
     cd tests/csi || exit 1
     echo 'Console.WriteLine ("hello world: " + DateTime.Now)' > csi-test.csx
 
@@ -224,12 +225,12 @@ if [ "$1" = "run-csi" ]; then
 
 fi
 
-if [ "$1" = "run-profiler" ]; then
+if [ "$2" = "run-profiler" ]; then
     cd tests/profiler || exit 1
     perl ptestrunner.pl "helix" xunit "${helix_root}/testResults.xml"
 fi
 
-if [ "$1" = "run-runtime" ]; then
+if [ "$2" = "run-runtime" ]; then
     cd tests/runtime || exit 1
     export CI=1
     TESTS_CS="generic-unloading-sub.2.exe \
