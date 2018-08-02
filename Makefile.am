@@ -193,7 +193,7 @@ package-helix:
 	cp -R -L $(top_builddir)/mono/profiler/.libs/libmono-profiler-log$(libsuffix) helix-payload/net_4_x/
 	cp -R -L $(top_builddir)/mono/profiler/test-*.exe helix-payload/net_4_x/tests/profiler/
 	cp -R -L $(top_builddir)/mono/profiler/ptestrunner.pl helix-payload/net_4_x/tests/profiler/
-	cp -R -L $(top_builddir)/mono/profiler/mprof-report helix-payload/net_4_x/tests/profiler/
+	cp -R -L $(top_builddir)/mono/profiler/mprof-report helix-payload/net_4_x/
 	cp -R -L $(top_builddir)/support/.libs/libMonoPosixHelper$(libsuffix) helix-payload/net_4_x/
 	cp -R -L $(top_builddir)/runtime/etc helix-payload/net_4_x/runtime/
 	sed 's,$$mono_libdir/,,g' $(top_builddir)/data/config > helix-payload/net_4_x/runtime/etc/mono/config
