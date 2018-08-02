@@ -21,6 +21,7 @@ tee <<'EOF' helix.proj
     <HelixCorrelationInfoFileName>SubmittedHelixRuns.txt</HelixCorrelationInfoFileName>
     <CloudDropConnectionString>DefaultEndpointsProtocol=https;AccountName=helixstoragetest;AccountKey=$(CloudDropAccountKey);EndpointSuffix=core.windows.net</CloudDropConnectionString>
     <CloudResultsConnectionString>$(CloudDropConnectionString)</CloudResultsConnectionString>
+    <CloudResultsReadTokenValidDays>365</CloudResultsReadTokenValidDays>
     <ArchivesRoot>.</ArchivesRoot>
     <UseScriptRunner>true</UseScriptRunner>
   </PropertyGroup>
