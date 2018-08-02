@@ -290,12 +290,12 @@ sub add_xunit_testcase_result
 	$testcase_xml .= "        <test name=\"profiler.tests.$testcase_name\" type=\"profiler.tests\" method=\"$testcase_simple_name\" time=\"0\" result=\"$resultstring\"";
 	if ($total_errors > 0) {
 		$testcase_xml .=  ">\n";
-		$testcase_xml .=  "          <failure exception-type=\"ProfilerTestException\">\n";
+		$testcase_xml .=  "          <failure exception-type=\"ProfilerTestsException\">\n";
 		$testcase_xml .=  "            <message><![CDATA[";
 		foreach my $e (@errors) {
 			$testcase_xml .= "Error: $e\n";
 		}
-		$testcase_xml .= "\nReport:\n"
+		$testcase_xml .= "\nReport:\n";
 		$testcase_xml .=  $report;
 		$testcase_xml .= "]]></message>\n";
 		$testcase_xml .=  "          </failure>\n";
