@@ -133,3 +133,4 @@ msvc/scripts/inputs/
 extensions-config.h
 *.mlpd
 helix-payload/
+helix-wrapper/
