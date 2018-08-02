@@ -48,10 +48,10 @@ if [ "$2" = "run-verify" ]; then
         fi
     done;
     if [ "$ok" = "true" ]; then
-        echo "<?xml version='1.0' encoding='utf-8'?><assemblies><assembly name='verify' environment='Mono' test-framework='custom' run-date='$(date +%F)' run-time='$(date +%T)' total='1' passed='1' failed='0' skipped='0' errors='0' time='0'><collection total='1' passed='1' failed='0' skipped='0' name='Test collection for verify' time='0'><test name='verify.all' type='verify' method='all' time='0' result='Pass'></test></collection></assembly></assemblies>" > "${helix_root}/testResults.xml";
+        echo "<?xml version=\"1.0\" encoding=\"utf-8\"?><assemblies><assembly name=\"verify\" environment=\"Mono\" test-framework=\"custom\" run-date=\"$(date +%F)\" run-time=\"$(date +%T)\" total=\"1\" passed=\"1\" failed=\"0\" skipped=\"0\" errors=\"0\" time=\"0\"><collection total=\"1\" passed=\"1\" failed=\"0\" skipped=\"0\" name=\"Test collection for verify\" time=\"0\"><test name=\"verify.all\" type=\"verify\" method=\"all\" time=\"0\" result=\"Pass\"></test></collection></assembly></assemblies>" > "${helix_root}/testResults.xml";
         exit 0
     else
-        echo "<?xml version='1.0' encoding='utf-8'?><assemblies><assembly name='verify' environment='Mono' test-framework='custom' run-date='$(date +%F)' run-time='$(date +%T)' total='1' passed='0' failed='1' skipped='0' errors='0' time='0'><collection total='1' passed='0' failed='1' skipped='0' name='Test collection for verify' time='0'><test name='verify.all' type='verify' method='all' time='0' result='Fail'><failure exception-type='VerifyException'><message><![CDATA[Verifying framework assemblies failed. Check the log for more details.]]></message></failure></test></collection></assembly></assemblies>" > "${helix_root}/testResults.xml";
+        echo "<?xml version=\"1.0\" encoding=\"utf-8\"?><assemblies><assembly name=\"verify\" environment=\"Mono\" test-framework=\"custom\" run-date=\"$(date +%F)\" run-time=\"$(date +%T)\" total=\"1\" passed=\"0\" failed=\"1\" skipped=\"0\" errors=\"0\" time=\"0\"><collection total=\"1\" passed=\"0\" failed=\"1\" skipped=\"0\" name=\"Test collection for verify\" time=\"0\"><test name=\"verify.all\" type=\"verify\" method=\"all\" time=\"0\" result=\"Fail\"><failure exception-type=\"VerifyException\"><message><![CDATA[Verifying framework assemblies failed. Check the log for more details.]]></message></failure></test></collection></assembly></assemblies>" > "${helix_root}/testResults.xml";
         exit 1
     fi
 fi
@@ -92,9 +92,9 @@ if [ "$2" = "run-aot-test" ]; then
                 failed_tests="${failed_tests} $test_name"
                 resultstring="Fail"
             fi
-            echo "<test name='aot-test.$name.$asm_name' type='aot-test.$name' method='$asm_name' time='0' result='$resultstring'>" >> "${helix_root}/testResults-cases.xml"
+            echo "<test name=\"aot-test.$name.$asm_name\" type=\"aot-test.$name\" method=\"$asm_name\" time=\"0\" result=\"$resultstring\">" >> "${helix_root}/testResults-cases.xml"
             if [ "$resultstring" = "Fail" ]; then
-                echo "<failure exception-type='AotTestException'><message><![CDATA[
+                echo "<failure exception-type=\"AotTestException\"><message><![CDATA[
                     STDOUT:
                     $(cat "test-aot-${name}-${asm_name}.stdout")
                     STDERR:
@@ -102,10 +102,10 @@ if [ "$2" = "run-aot-test" ]; then
             echo "</test>" >> "${helix_root}/testResults-cases.xml"
         done
     done
-    echo "<?xml version='1.0' encoding='utf-8'?>\
+    echo "<?xml version=\"1.0\" encoding=\"utf-8\"?>\
     <assemblies>\
-        <assembly name='aot-test' environment='Mono' test-framework='custom' run-date='$(date +%F)' run-time='$(date +%T)' total='$((passed + failed))' passed='$passed' failed='$failed' skipped='0' errors='0' time='0'>\
-            <collection total='$((passed + failed))' passed='$passed' failed='$failed' skipped='0' name='Test collection for aot-test' time='0'>\
+        <assembly name=\"aot-test\" environment=\"Mono\" test-framework=\"custom\" run-date=\"$(date +%F)\" run-time=\"$(date +%T)\" total=\"$((passed + failed))\" passed=\"$passed\" failed=\"$failed\" skipped=\"0\" errors=\"0\" time=\"0\">\
+            <collection total=\"$((passed + failed))\" passed=\"$passed\" failed=\"$failed\" skipped=\"0\" name=\"Test collection for aot-test\" time=\"0\">\
                 $(cat "${helix_root}/testResults-cases.xml")
             </collection>\
         </assembly>\
@@ -137,12 +137,12 @@ if [ "$2" = "run-mini" ]; then
         failurescount=1
         successcount=0
     fi
-    echo "<?xml version='1.0' encoding='utf-8'?>\
+    echo "<?xml version=\"1.0\" encoding=\"utf-8\"?>\
         <assemblies>\
-            <assembly name='mini.regression-tests' environment='Mono' test-framework='custom' run-date='$(date +%F)' run-time='$(date +%T)' total='1' passed='$successcount' failed='$failurescount' skipped='0' errors='0' time='0'>\
-                <collection total='1' passed='$successcount' failed='$failurescount' skipped='0' name='Test collection for mini.regression-tests' time='0'>\
-                    <test name='mini.regression-tests.all' type='mini.regression-tests' method='all' time='0' result='$resultstring'>" > "${helix_root}/testResults.xml"
-                    if [ "$resultstring" = "Fail" ]; then echo "<failure exception-type='MiniRegressionTestsException'><message><![CDATA[$(cat regressiontests.out)]]></message><stack-trace></stack-trace></failure>" >> "${helix_root}/testResults.xml"; fi
+            <assembly name=\"mini.regression-tests\" environment=\"Mono\" test-framework=\"custom\" run-date=\"$(date +%F)\" run-time=\"$(date +%T)\" total=\"1\" passed=\"$successcount\" failed=\"$failurescount\" skipped=\"0\" errors=\"0\" time=\"0\">\
+                <collection total=\"1\" passed=\"$successcount\" failed=\"$failurescount\" skipped=\"0\" name=\"Test collection for mini.regression-tests\" time=\"0\">\
+                    <test name=\"mini.regression-tests.all\" type=\"mini.regression-tests\" method=\"all\" time=\"0\" result=\"$resultstring\">" > "${helix_root}/testResults.xml"
+                    if [ "$resultstring" = "Fail" ]; then echo "<failure exception-type=\"MiniRegressionTestsException\"><message><![CDATA[$(cat regressiontests.out)]]></message><stack-trace></stack-trace></failure>" >> "${helix_root}/testResults.xml"; fi
                 echo "</test>
                 </collection>\
             </assembly>\
@@ -198,10 +198,10 @@ if [ "$2" = "run-symbolicate" ]; then
     done
 
     if [ "$ok" = "true" ]; then
-        echo "<?xml version='1.0' encoding='utf-8'?><assemblies><assembly name='symbolicate' environment='Mono' test-framework='custom' run-date='$(date +%F)' run-time='$(date +%T)' total='1' passed='1' failed='0' skipped='0' errors='0' time='0'><collection total='1' passed='1' failed='0' skipped='0' name='Test collection for symbolicate' time='0'><test name='symbolicate.all' type='symbolicate' method='all' time='0' result='Pass'></test></collection></assembly></assemblies>" > "${helix_root}/testResults.xml";
+        echo "<?xml version=\"1.0\" encoding=\"utf-8\"?><assemblies><assembly name=\"symbolicate\" environment=\"Mono\" test-framework=\"custom\" run-date=\"$(date +%F)\" run-time=\"$(date +%T)\" total=\"1\" passed=\"1\" failed=\"0\" skipped=\"0\" errors=\"0\" time=\"0\"><collection total=\"1\" passed=\"1\" failed=\"0\" skipped=\"0\" name=\"Test collection for symbolicate\" time=\"0\"><test name=\"symbolicate.all\" type=\"symbolicate\" method=\"all\" time=\"0\" result=\"Pass\"></test></collection></assembly></assemblies>" > "${helix_root}/testResults.xml";
         exit 0
     else
-        echo "<?xml version='1.0' encoding='utf-8'?><assemblies><assembly name='symbolicate' environment='Mono' test-framework='custom' run-date='$(date +%F)' run-time='$(date +%T)' total='1' passed='0' failed='1' skipped='0' errors='0' time='0'><collection total='1' passed='0' failed='1' skipped='0' name='Test collection for symbolicate' time='0'><test name='symbolicate.all' type='symbolicate' method='all' time='0' result='Fail'><failure exception-type='SymbolicateException'><message><![CDATA[Symbolicate tests failed. Check the log for more details.]]></message></failure></test></collection></assembly></assemblies>" > "${helix_root}/testResults.xml";
+        echo "<?xml version=\"1.0\" encoding=\"utf-8\"?><assemblies><assembly name=\"symbolicate\" environment=\"Mono\" test-framework=\"custom\" run-date=\"$(date +%F)\" run-time=\"$(date +%T)\" total=\"1\" passed=\"0\" failed=\"1\" skipped=\"0\" errors=\"0\" time=\"0\"><collection total=\"1\" passed=\"0\" failed=\"1\" skipped=\"0\" name=\"Test collection for symbolicate\" time=\"0\"><test name=\"symbolicate.all\" type=\"symbolicate\" method=\"all\" time=\"0\" result=\"Fail\"><failure exception-type=\"SymbolicateException\"><message><![CDATA[Symbolicate tests failed. Check the log for more details.]]></message></failure></test></collection></assembly></assemblies>" > "${helix_root}/testResults.xml";
         exit 1
     fi
 
@@ -209,17 +209,17 @@ fi
 
 if [ "$2" = "run-csi" ]; then
     cd tests/csi || exit 1
-    echo 'Console.WriteLine ("hello world: " + DateTime.Now)' > csi-test.csx
+    echo "Console.WriteLine (\"hello world: \" + DateTime.Now)" > csi-test.csx
 
     ok=true
     "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" csi.exe csi-test.csx > csi-test-output.txt || ok=false
     cat csi-test-output.txt && grep -q "hello world" csi-test-output.txt || ok=false
 
     if [ "$ok" = "true" ]; then
-        echo "<?xml version='1.0' encoding='utf-8'?><assemblies><assembly name='csi' environment='Mono' test-framework='custom' run-date='$(date +%F)' run-time='$(date +%T)' total='1' passed='1' failed='0' skipped='0' errors='0' time='0'><collection total='1' passed='1' failed='0' skipped='0' name='Test collection for csi' time='0'><test name='csi.all' type='csi' method='all' time='0' result='Pass'></test></collection></assembly></assemblies>" > "${helix_root}/testResults.xml";
+        echo "<?xml version=\"1.0\" encoding=\"utf-8\"?><assemblies><assembly name=\"csi\" environment=\"Mono\" test-framework=\"custom\" run-date=\"$(date +%F)\" run-time=\"$(date +%T)\" total=\"1\" passed=\"1\" failed=\"0\" skipped=\"0\" errors=\"0\" time=\"0\"><collection total=\"1\" passed=\"1\" failed=\"0\" skipped=\"0\" name=\"Test collection for csi\" time=\"0\"><test name=\"csi.all\" type=\"csi\" method=\"all\" time=\"0\" result=\"Pass\"></test></collection></assembly></assemblies>" > "${helix_root}/testResults.xml";
         exit 0
     else
-        echo "<?xml version='1.0' encoding='utf-8'?><assemblies><assembly name='csi' environment='Mono' test-framework='custom' run-date='$(date +%F)' run-time='$(date +%T)' total='1' passed='0' failed='1' skipped='0' errors='0' time='0'><collection total='1' passed='0' failed='1' skipped='0' name='Test collection for csi' time='0'><test name='csi.all' type='csi' method='all' time='0' result='Fail'><failure exception-type='CsiException'><message><![CDATA[csi.exe tests failed. Check the log for more details.]]></message></failure></test></collection></assembly></assemblies>" > "${helix_root}/testResults.xml";
+        echo "<?xml version=\"1.0\" encoding=\"utf-8\"?><assemblies><assembly name=\"csi\" environment=\"Mono\" test-framework=\"custom\" run-date=\"$(date +%F)\" run-time=\"$(date +%T)\" total=\"1\" passed=\"0\" failed=\"1\" skipped=\"0\" errors=\"0\" time=\"0\"><collection total=\"1\" passed=\"0\" failed=\"1\" skipped=\"0\" name=\"Test collection for csi\" time=\"0\"><test name=\"csi.all\" type=\"csi\" method=\"all\" time=\"0\" result=\"Fail\"><failure exception-type=\"CsiException\"><message><![CDATA[csi.exe tests failed. Check the log for more details.]]></message></failure></test></collection></assembly></assemblies>" > "${helix_root}/testResults.xml";
         exit 1
     fi
 
