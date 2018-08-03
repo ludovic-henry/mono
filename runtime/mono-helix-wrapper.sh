@@ -9,7 +9,7 @@ r="$(pwd)"
 MONO_CFG_DIR="$r/runtime/etc"
 PATH="$r/runtime/_tmpinst/bin:$PATH"
 MONO_EXECUTABLE=${MONO_EXECUTABLE:-"$r/mono-sgen"}
-MONO_PATH="$r:$r/tests"
+MONO_PATH="$r"
 export MONO_CFG_DIR MONO_PATH MONO_EXECUTABLE PATH
 chmod +x "${MONO_EXECUTABLE}"
 
@@ -21,6 +21,7 @@ if ! "${MONO_EXECUTABLE}" --version; then  # this can happen when running the i3
 fi
 
 if [ "$2" = "run-bcl-tests" ]; then
+    export MONO_PATH="$r/tests:$MONO_PATH"
     if [ "$3" = "xunit" ]; then
         export REMOTE_EXECUTOR="$r/RemoteExecutorConsoleApp.exe"
         "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" --debug xunit.console.exe "tests/$4" -noappdomain -noshadow -parallel none -xml "${helix_root}/testResults.xml" -notrait category=failing -notrait category=nonmonotests -notrait Benchmark=true -notrait category=outerloop -notrait category=nonlinuxtests
