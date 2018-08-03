@@ -20,19 +20,17 @@ if ! "${MONO_EXECUTABLE}" --version; then  # this can happen when running the i3
     sudo apt install -y libc6-i386 lib32gcc1
 fi
 
-if [ "$2" = "run-bcl-tests" ]; then
+if [ "$2" = "run-xunit" ]; then
     export MONO_PATH="$r/tests:$MONO_PATH"
-    if [ "$3" = "xunit" ]; then
-        export REMOTE_EXECUTOR="$r/RemoteExecutorConsoleApp.exe"
-        "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" --debug xunit.console.exe "tests/$4" -noappdomain -noshadow -parallel none -xml "${helix_root}/testResults.xml" -notrait category=failing -notrait category=nonmonotests -notrait Benchmark=true -notrait category=outerloop -notrait category=nonlinuxtests
-        exit $?
-    elif [ "$3" = "nunit" ]; then
-        MONO_REGISTRY_PATH="$HOME/.mono/registry" MONO_TESTS_IN_PROGRESS="yes" "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" --debug nunit-lite-console.exe "tests/$4" -exclude=NotWorking,CAS -labels -format:xunit -result:"${helix_root}/testResults.xml"
-        exit $?
-    else
-        echo "Unknown test runner."
-        exit 1
-    fi
+    export REMOTE_EXECUTOR="$r/RemoteExecutorConsoleApp.exe"
+    "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" --debug xunit.console.exe "tests/$4" -noappdomain -noshadow -parallel none -xml "${helix_root}/testResults.xml" -notrait category=failing -notrait category=nonmonotests -notrait Benchmark=true -notrait category=outerloop -notrait category=nonlinuxtests
+    exit $?
+fi
+
+if [ "$2" = "run-nunit" ]; then
+    export MONO_PATH="$r/tests:$MONO_PATH"
+    MONO_REGISTRY_PATH="$HOME/.mono/registry" MONO_TESTS_IN_PROGRESS="yes" "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" --debug nunit-lite-console.exe "tests/$4" -exclude=NotWorking,CAS -labels -format:xunit -result:"${helix_root}/testResults.xml"
+    exit $?
 fi
 
 if [ "$2" = "run-verify" ]; then

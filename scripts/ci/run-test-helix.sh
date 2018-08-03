@@ -142,13 +142,13 @@ tee <<'EOF' helix.proj
     <ItemGroup>
       <HelixWorkItem Include="%(MonoXunitTestAssemblies.Identity)">
         <WorkItemId>%(MonoXunitTestAssemblies.Identity)</WorkItemId>
-        <Command>mono-helix-wrapper.sh $HELIX_CORRELATION_PAYLOAD run-bcl-tests xunit %(MonoXunitTestAssemblies.Identity)</Command>
+        <Command>mono-helix-wrapper.sh $HELIX_CORRELATION_PAYLOAD run-xunit %(MonoXunitTestAssemblies.Identity)</Command>
         <PayloadFile>helix-wrapper.zip</PayloadFile>
         <TimeoutInSeconds>300</TimeoutInSeconds>
       </HelixWorkItem>
       <HelixWorkItem Include="%(MonoNUnitTestAssemblies.Identity)">
         <WorkItemId>%(MonoNUnitTestAssemblies.Identity)</WorkItemId>
-        <Command>mono-helix-wrapper.sh $HELIX_CORRELATION_PAYLOAD run-bcl-tests nunit %(MonoNUnitTestAssemblies.Identity)</Command>
+        <Command>mono-helix-wrapper.sh $HELIX_CORRELATION_PAYLOAD run-nunit %(MonoNUnitTestAssemblies.Identity)</Command>
         <PayloadFile>helix-wrapper.zip</PayloadFile>
         <TimeoutInSeconds>300</TimeoutInSeconds>
       </HelixWorkItem>
