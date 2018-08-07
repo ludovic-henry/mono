@@ -157,7 +157,7 @@ package-helix:
 	rm -rf helix-payload
 	rm -rf helix-wrapper
 	mkdir -p helix-wrapper
-	mkdir -p helix-payload/net_4_x/runtime
+	mkdir -p helix-payload/net_4_x/runtime/_tmpinst/bin
 	mkdir -p helix-payload/net_4_x/tests/mcs
 	mkdir -p helix-payload/net_4_x/tests/mcs-errors
 	mkdir -p helix-payload/net_4_x/tests/mini
@@ -201,6 +201,10 @@ package-helix:
 	cp -R -L $(top_builddir)/support/.libs/libMonoPosixHelper$(libsuffix) helix-payload/net_4_x/
 	cp -R -L $(top_builddir)/runtime/etc helix-payload/net_4_x/runtime/
 	sed 's,$$mono_libdir/,,g' $(top_builddir)/data/config > helix-payload/net_4_x/runtime/etc/mono/config
+	sed 's,$$mono_libdir/,,g' $(top_builddir)/data/config > helix-payload/net_4_x/runtime/etc/mono/config
+	echo '#! /bin/sh' > helix-payload/net_4_x/runtime/_tmpinst/bin/mcs
+	echo '"$$MONO_EXECUTABLE" $$(dirname "$$MONO_EXECUTABLE")/mcs.exe "$$@"' >> helix-payload/net_4_x/runtime/_tmpinst/bin/mcs
+	chmod +x helix-payload/net_4_x/runtime/_tmpinst/bin/mcs
 	cp -R -L $(top_srcdir)/external/xunit-binaries/*.dll $(top_srcdir)/external/xunit-binaries/*.exe $(top_srcdir)/external/xunit-binaries/*.config helix-payload/net_4_x/
 	cp -R -L $(top_srcdir)/external/xunit-binaries/xunit.execution.desktop.dll helix-payload/net_4_x/tests/
 	find helix-payload -empty -print0 | xargs -0 rm -rf  # FIXME: helix doesn't seem to like empty files/folders
