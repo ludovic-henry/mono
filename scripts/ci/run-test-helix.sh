@@ -1,11 +1,11 @@
 #!/bin/bash -e
 
-${TESTCMD} --label=compile-mini-tests --timeout=5m --fatal make -w -C mono/mini -j4 compile-tests
-${TESTCMD} --label=compile-runtime-tests --timeout=5m --fatal make -w -C mono/tests -j4 tests
-${TESTCMD} --label=compile-profiler-tests --timeout=5m --fatal make -w -C mono/profiler -j4 compile-tests
-${TESTCMD} --label=compile-bcl-tests --timeout=40m --fatal make -i -w -C runtime -j4 test xunit-test
-${TESTCMD} --label=compile-mcs-tests --timeout=40m --fatal make -w -C mcs/tests -j4 test
-${TESTCMD} --label=compile-mcs-errors-tests --timeout=40m --fatal make -w -C mcs/errors -j4 test
+${TESTCMD} --label=compile-mini-tests --timeout=5m --fatal make -w -C mono/mini -j ${CI_CPU_COUNT} compile-tests
+${TESTCMD} --label=compile-runtime-tests --timeout=5m --fatal make -w -C mono/tests -j ${CI_CPU_COUNT} tests
+${TESTCMD} --label=compile-profiler-tests --timeout=5m --fatal make -w -C mono/profiler -j ${CI_CPU_COUNT} compile-tests
+${TESTCMD} --label=compile-bcl-tests --timeout=40m --fatal make -i -w -C runtime -j ${CI_CPU_COUNT} test xunit-test
+${TESTCMD} --label=compile-mcs-tests --timeout=40m --fatal make -w -C mcs/tests -j ${CI_CPU_COUNT} test
+${TESTCMD} --label=compile-mcs-errors-tests --timeout=40m --fatal make -w -C mcs/errors -j ${CI_CPU_COUNT} test
 ${TESTCMD} --label=package-for-helix --timeout=5m --fatal make -w package-helix
 rm -rf helix-tasks.zip helix-tasks
 # TODO: reupload Microsoft.DotNet.Build.CloudTest to xamjenkinsarticats and package in .tar to avoid unzip dependency
@@ -16,8 +16,7 @@ tee <<'EOF' helix.proj
 
   <PropertyGroup>
     <HelixApiEndpoint>https://helix.dot.net/api/2018-03-14/jobs</HelixApiEndpoint>
-    <HelixJobType>test/functional/cli/</HelixJobType>
-    <HelixSource>pr/jenkins/mono/mono/master/</HelixSource>
+    <HelixJobType>test/mainline/</HelixJobType>
     <HelixCorrelationInfoFileName>SubmittedHelixRuns.txt</HelixCorrelationInfoFileName>
     <CloudDropConnectionString>DefaultEndpointsProtocol=https;AccountName=helixstoragetest;AccountKey=$(CloudDropAccountKey);EndpointSuffix=core.windows.net</CloudDropConnectionString>
     <CloudResultsConnectionString>$(CloudDropConnectionString)</CloudResultsConnectionString>
@@ -219,12 +218,13 @@ tee <<'EOF' helix.proj
 </Project>
 EOF
     helix_target_queues=debian.9.amd64.open
+    helix_source=automated/mono/mono/$MONO_BRANCH/
     helix_build_moniker=$(git rev-parse HEAD)
     helix_config_label=mainline
     helix_creator=akoeplinger
     if [[ ${CI_TAGS} == *'-i386'*  ]]; then helix_arch_label=x86; fi
     if [[ ${CI_TAGS} == *'-amd64'* ]]; then helix_arch_label=x64; fi
-    ${TESTCMD} --label=upload-to-helix --timeout=5m --fatal msbuild helix.proj -t:RunCloudTest -p:HelixApiAccessKey="${MONO_HELIX_API_KEY}" -p:CloudDropAccountKey="${MONO_HELIX_CLOUDDROUP_ACCOUNTKEY}" -p:TargetQueues="${helix_target_queues}" -p:BuildMoniker="${helix_build_moniker}" -p:HelixArchLabel="${helix_arch_label}" -p:HelixConfigLabel="${helix_config_label}" -p:HelixCreator="${helix_creator}"
+    ${TESTCMD} --label=upload-to-helix --timeout=5m --fatal msbuild helix.proj -t:RunCloudTest -p:HelixApiAccessKey="${MONO_HELIX_API_KEY}" -p:CloudDropAccountKey="${MONO_HELIX_CLOUDDROUP_ACCOUNTKEY}" -p:TargetQueues="${helix_target_queues}" -p:BuildMoniker="${helix_build_moniker}" -p:HelixArchLabel="${helix_arch_label}" -p:HelixConfigLabel="${helix_config_label}" -p:HelixCreator="${helix_creator}" -p:HelixSource="${helix_source}"
     HELIX_CORRELATION_ID=$(grep -Eo '[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}' SubmittedHelixRuns.txt) # TODO: improve
     tee <<EOF wait-helix-done.sh
 #!/bin/sh
