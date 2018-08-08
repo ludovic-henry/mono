@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.InteropServices;
 using NUnit.Framework;
 using Mono.Compiler;
 
@@ -12,18 +13,20 @@ namespace MonoTests.Mono.Compiler
 
 		[TestFixtureSetUp]
 		public void Init () {
-			runtimeInfo = new RuntimeInformation ();
+			runtimeInfo = null;
 			compiler = new MiniCompiler ();
 		}
 
+		delegate void EmptyDelegate ();
 		public static void EmptyMethod () {
-			return;
 		}
 
+		delegate int AddDelegate (int a, int b);
 		public static int AddMethod (int a, int b) {
 			return a + b;
 		}
 
+		delegate int AddDelegate3 (int a, int b, int c);
 		public static int AddMethod3 (int a, int b, int c) {
 			return a + b + c;
 		}
@@ -38,8 +41,7 @@ namespace MonoTests.Mono.Compiler
 			Assert.AreNotEqual((IntPtr)nativeCode.Blob, IntPtr.Zero);
 			// AssertHelper.Greater(nativeCode.Length, 0);
 
-			InstalledRuntimeCode irc = runtimeInfo.InstallCompilationResult (result, methodInfo, nativeCode);
-			runtimeInfo.ExecuteInstalledMethod (irc);
+			Marshal.GetDelegateForFunctionPointer<EmptyDelegate> ((IntPtr) nativeCode.Blob) ();
 		}
 
 		[Test]
@@ -52,9 +54,7 @@ namespace MonoTests.Mono.Compiler
 			Assert.AreNotEqual((IntPtr)nativeCode.Blob, IntPtr.Zero);
 			// AssertHelper.Greater(nativeCode.Length, 0);
 
-			InstalledRuntimeCode irc = runtimeInfo.InstallCompilationResult (result, methodInfo, nativeCode);
-			int addition = (int) runtimeInfo.ExecuteInstalledMethod (irc, 1, 2);
-			Assert.AreEqual (addition, 3);
+			Assert.AreEqual (3, Marshal.GetDelegateForFunctionPointer<AddDelegate> ((IntPtr) nativeCode.Blob) (1, 2));
 		}
 
 		[Test]
@@ -67,9 +67,7 @@ namespace MonoTests.Mono.Compiler
 			Assert.AreNotEqual((IntPtr)nativeCode.Blob, IntPtr.Zero);
 			// AssertHelper.Greater(nativeCode.Length, 0);
 
-			InstalledRuntimeCode irc = runtimeInfo.InstallCompilationResult (result, methodInfo, nativeCode);
-			int addition = (int) runtimeInfo.ExecuteInstalledMethod (irc, 1, 2, 3);
-			Assert.AreEqual (addition, 6);
+			Assert.AreEqual (6, Marshal.GetDelegateForFunctionPointer<AddDelegate3> ((IntPtr) nativeCode.Blob) (1, 2, 3));
 		}
 	}
 }
