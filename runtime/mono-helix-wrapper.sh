@@ -11,7 +11,6 @@ PATH="$r/runtime/_tmpinst/bin:$PATH"
 MONO_EXECUTABLE=${MONO_EXECUTABLE:-"$r/mono-sgen"}
 MONO_PATH="$r"
 export MONO_CFG_DIR MONO_PATH MONO_EXECUTABLE PATH
-chmod +x "${MONO_EXECUTABLE}"
 
 if file "${MONO_EXECUTABLE}" | grep "ELF 32-bit"; then  # when running the i386 binary on amd64, install the i386 packages
     sudo dpkg --add-architecture i386
@@ -19,6 +18,7 @@ if file "${MONO_EXECUTABLE}" | grep "ELF 32-bit"; then  # when running the i386 
     sudo apt install -y libc6-i386 lib32gcc1 libsqlite3-0:i386
 fi
 
+chmod +x "${MONO_EXECUTABLE}"
 "${MONO_EXECUTABLE}" --version
 
 if [ "$2" = "run-xunit" ]; then
@@ -30,6 +30,13 @@ fi
 
 if [ "$2" = "run-nunit" ]; then
     export MONO_PATH="$r/tests:$MONO_PATH"
+    case "$3" in
+        *"Microsoft.Build"*)
+            export TESTING_MONO=a
+            export MSBuildExtensionsPath="$r/tests/xbuild/extensions"
+            export XBUILD_FRAMEWORK_FOLDERS_PATH="$r/tests/xbuild/frameworks"
+            ;;
+    esac
     MONO_REGISTRY_PATH="$HOME/.mono/registry" MONO_TESTS_IN_PROGRESS="yes" "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" --debug nunit-lite-console.exe "tests/$3" -exclude=NotWorking,CAS -labels -format:xunit -result:"${helix_root}/testResults.xml"
     exit $?
 fi
