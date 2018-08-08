@@ -13,12 +13,13 @@ MONO_PATH="$r"
 export MONO_CFG_DIR MONO_PATH MONO_EXECUTABLE PATH
 chmod +x "${MONO_EXECUTABLE}"
 
-
-if ! "${MONO_EXECUTABLE}" --version; then  # this can happen when running the i386 binary on amd64 and the i386 packages aren't installed
+if file "${MONO_EXECUTABLE}" | grep "ELF 32-bit"; then  # when running the i386 binary on amd64, install the i386 packages
     sudo dpkg --add-architecture i386
     sudo apt update
-    sudo apt install -y libc6-i386 lib32gcc1
+    sudo apt install -y libc6-i386 lib32gcc1 libsqlite3-0:i386
 fi
+
+"${MONO_EXECUTABLE}" --version
 
 if [ "$2" = "run-xunit" ]; then
     export MONO_PATH="$r/tests:$MONO_PATH"
