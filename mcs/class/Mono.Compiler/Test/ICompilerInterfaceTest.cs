@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.InteropServices;
 using NUnit.Framework;
 using Mono.Compiler;
 
@@ -14,7 +15,7 @@ namespace MonoTests.Mono.CompilerInterface
 
 		[TestFixtureSetUp]
 		public void Init () {
-			runtimeInfo = new RuntimeInformation ();
+			runtimeInfo = new global::Mono.Compiler.RuntimeInformation ();
 			compiler = new ManagedJIT ();
 		}
 
@@ -43,81 +44,79 @@ namespace MonoTests.Mono.CompilerInterface
 			return staticField;
 		}
 
-                public static int IfElse1 (int a, int b) {
-                        if (a > 10) {
-                                b = a * b;
-                        } else{
-                                b = a + b;
-                        }
-                        
-                        return b;
+		delegate int IfElse1Delegate (int a, int b);
+		public static int IfElse1 (int a, int b) {
+			if (a > 10) {
+				b = a * b;
+			} else{
+				b = a + b;
+			}
+			
+			return b;
 		}
 
-                public static int ForLoop1 (int unit) {
-                        int result = 0;
-                        for (int i = 0; i <= 5; i++) {
-                                result += unit;
-                        }
-                        
-                        return result;
+		delegate int ForLoop1Delegate (int unit);
+		public static int ForLoop1 (int unit) {
+			int result = 0;
+			for (int i = 0; i <= 5; i++) {
+				result += unit;
+			}
+			
+			return result;
 		}
 
-                public static int WhileLoop1 (int times, int unit) {
-                        int result = 0;
-                        while (times > 0) {
-                                result += unit;
-                                times--;
-                        }
-                        
-                        return result;
+		delegate int WhileLoop1Delegate (int times, int unit);
+		public static int WhileLoop1 (int times, int unit) {
+			int result = 0;
+			while (times > 0) {
+				result += unit;
+				times--;
+			}
+			
+			return result;
 		}
 
-                public static int ArrayAccess1 (int[] array, int index) {
-                        int result = array[index];
-                        return result;
+		delegate int ArrayAccess1Delegate (int[] array, int index);
+		public static int ArrayAccess1 (int[] array, int index) {
+			int result = array[index];
+			return result;
 		}
 
 		[Test]
-		public void TestArrayAccess1 () {
-                        int[] array = new int[]{4937, 5443, 6673, 7561};
-                        InstalledRuntimeCode irc = CompileCode("ArrayAccess1");
-                        int result = (int) runtimeInfo.ExecuteInstalledMethod (irc, array, 2);
-			Assert.AreEqual (6673, result);
-                }
+		public unsafe void TestArrayAccess1 () {
+			NativeCodeHandle nativeCode = CompileCode("ArrayAccess1");
+			Assert.AreEqual (6673, Marshal.GetDelegateForFunctionPointer<ArrayAccess1Delegate> ((IntPtr) nativeCode.Blob) (new int[]{4937, 5443, 6673, 7561}, 2));
+		}
 
 		[Test]
-		public void TestWhileLoop1 () {
-                        InstalledRuntimeCode irc = CompileCode("WhileLoop1");
-                        int addition = (int) runtimeInfo.ExecuteInstalledMethod (irc, 3, 7);
-			Assert.AreEqual (21, addition);
-                }
+		public unsafe void TestWhileLoop1 () {
+			NativeCodeHandle nativeCode = CompileCode("WhileLoop1");
+			Assert.AreEqual (21, Marshal.GetDelegateForFunctionPointer<WhileLoop1Delegate> ((IntPtr) nativeCode.Blob) (3, 7));
+		}
 
 		[Test]
-		public void TestForLoop1 () {
-                        InstalledRuntimeCode irc = CompileCode("ForLoop1");
-                        int addition = (int) runtimeInfo.ExecuteInstalledMethod (irc, 3);
-			Assert.AreEqual (18, addition);
-                }
+		public unsafe void TestForLoop1 () {
+			NativeCodeHandle nativeCode = CompileCode("ForLoop1");
+			Assert.AreEqual (18, Marshal.GetDelegateForFunctionPointer<ForLoop1Delegate> ((IntPtr) nativeCode.Blob) (3));
+		}
 
 		[Test]
-		public void TestIfElse1 () {
-                        InstalledRuntimeCode irc = CompileCode("IfElse1");
-                        int addition = (int) runtimeInfo.ExecuteInstalledMethod (irc, 11, 2);
-			Assert.AreEqual (22, addition);
-                        addition = (int) runtimeInfo.ExecuteInstalledMethod (irc, 5, 2);
-			Assert.AreEqual (7, addition);
-                }
+		public unsafe void TestIfElse1 () {
+			NativeCodeHandle nativeCode = CompileCode("IfElse1");
+			Assert.AreEqual (22, Marshal.GetDelegateForFunctionPointer<IfElse1Delegate> ((IntPtr) nativeCode.Blob) (11, 2));
+			Assert.AreEqual (7, Marshal.GetDelegateForFunctionPointer<IfElse1Delegate> ((IntPtr) nativeCode.Blob) (5, 2));
+		}
 
-                private InstalledRuntimeCode CompileCode(string methodName) {
-                        ClassInfo ci = runtimeInfo.GetClassInfoFor (typeof (ICompilerTests).AssemblyQualifiedName);
+		private NativeCodeHandle CompileCode(string methodName) {
+			ClassInfo ci = runtimeInfo.GetClassInfoFor (typeof (ICompilerTests).AssemblyQualifiedName);
 			MethodInfo mi = runtimeInfo.GetMethodInfoFor (ci, methodName);
 			NativeCodeHandle nativeCode;
 
 			CompilationResult result = compiler.CompileMethod (runtimeInfo, mi, CompilationFlags.None, out nativeCode);
-			InstalledRuntimeCode irc = runtimeInfo.InstallCompilationResult (result, mi, nativeCode);
-                        return irc;
-                }
-                
+			Assert.AreEqual(result, CompilationResult.Ok);
+			return nativeCode;
+		}
+		
 		[Test]
 		public void TestAddMethod () {
 			ClassInfo ci = runtimeInfo.GetClassInfoFor (typeof (ICompilerTests).AssemblyQualifiedName);
@@ -138,7 +137,7 @@ namespace MonoTests.Mono.CompilerInterface
 
 			CompilationResult result = CompilationResult.Ok;
 			byte[] amd64addblob = { 0x48, 0x8d, 0x04, 0x37, /* lea rax, [rdi + rsi * 1] */
-			                        0xc3};                  /* ret */
+						0xc3};                  /* ret */
 
 			fixed (byte *b = amd64addblob) {
 				NativeCodeHandle nativeCode = new NativeCodeHandle (b, amd64addblob.Length);
@@ -161,8 +160,8 @@ namespace MonoTests.Mono.CompilerInterface
 
 			CompilationResult result = CompilationResult.Ok;
 			byte[] amd64addblob = { 0x48, 0x01, 0xf7,       /* add rdi, rsi */
-			                        0x48, 0x8d, 0x04, 0x17, /* lea rax, [rdi + rdx * 1] */
-			                        0xc3};                  /* ret */
+						0x48, 0x8d, 0x04, 0x17, /* lea rax, [rdi + rdx * 1] */
+						0xc3};                  /* ret */
 
 			fixed (byte *b = amd64addblob) {
 				NativeCodeHandle nativeCode = new NativeCodeHandle (b, amd64addblob.Length);
