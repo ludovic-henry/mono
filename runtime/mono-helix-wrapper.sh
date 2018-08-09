@@ -36,6 +36,9 @@ if [ "$2" = "run-nunit" ]; then
             export MSBuildExtensionsPath="$r/tests/xbuild/extensions"
             export XBUILD_FRAMEWORK_FOLDERS_PATH="$r/tests/xbuild/frameworks"
             ;;
+        *"Mono.Messaging.RabbitMQ"*)
+            export MONO_MESSAGING_PROVIDER=Mono.Messaging.RabbitMQ.RabbitMQMessagingProvider,Mono.Messaging.RabbitMQ
+            ;;
     esac
     cp -f "tests/${3}.nunitlite.config" nunit-lite-console.exe.config
     MONO_REGISTRY_PATH="$HOME/.mono/registry" MONO_TESTS_IN_PROGRESS="yes" "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" --debug nunit-lite-console.exe "tests/$3" -exclude=NotWorking,CAS -labels -format:xunit -result:"${helix_root}/testResults.xml"
