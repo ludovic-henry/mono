@@ -45,8 +45,8 @@ tee <<'EOF' helix.proj
     <MonoXunitTestAssemblies Include="net_4_x_Microsoft.CSharp_xunit-test.dll" />
 
     <!-- NUnit tests -->
-    <-- fails one test and needs to get rid of CallerFilePath to locate test resources -->
-    <-- <MonoNUnitTestAssemblies Include="net_4_x_monodoc_test.dll" /> -->
+    <!-- fails one test and needs to get rid of CallerFilePath to locate test resources -->
+    <!-- <MonoNUnitTestAssemblies Include="net_4_x_monodoc_test.dll" /> -->
     <MonoNUnitTestAssemblies Include="net_4_x_corlib_test.dll" />
     <MonoNUnitTestAssemblies Include="net_4_x_WindowsBase_test.dll" />
     <MonoNUnitTestAssemblies Include="net_4_x_WebMatrix.Data_test.dll" />
