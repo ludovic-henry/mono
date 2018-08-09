@@ -75,7 +75,8 @@ tee <<'EOF' helix.proj
     <MonoNUnitTestAssemblies Include="net_4_x_System.Runtime.Caching_test.dll" />
     <MonoNUnitTestAssemblies Include="net_4_x_System.Numerics_test.dll" />
     <MonoNUnitTestAssemblies Include="net_4_x_System.Net.Http_test.dll" />
-    <MonoNUnitTestAssemblies Include="net_4_x_System.Messaging_test.dll" />
+    <!-- needs RabbitMQ installed and hangs on process exit -->
+    <!-- <MonoNUnitTestAssemblies Include="net_4_x_System.Messaging_test.dll" /> -->
     <MonoNUnitTestAssemblies Include="net_4_x_System.Json_test.dll" />
     <MonoNUnitTestAssemblies Include="net_4_x_System.Json.Microsoft_test.dll" />
     <MonoNUnitTestAssemblies Include="net_4_x_System.IdentityModel_test.dll" />
