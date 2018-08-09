@@ -47,6 +47,13 @@ public class DebuggerTests
 	public static string runtime = Environment.GetEnvironmentVariable ("DBG_RUNTIME");
 	public static string runtime_args = Environment.GetEnvironmentVariable ("DBG_RUNTIME_ARGS");
 	public static string agent_args = Environment.GetEnvironmentVariable ("DBG_AGENT_ARGS");
+#if MONODROID_TEST
+	// AssemblyInfo.Location doesn't work on Android, we expect test .exe's to be in the working dir
+	public static string this_assembly_path = "";
+#else
+	// expect test .exe's to be next to this assembly
+	public static string this_assembly_path = Path.GetDirectoryName (Assembly.GetExecutingAssembly ().Location);
+#endif
 
 	// Not currently used, but can be useful when debugging individual tests.
 	void StackTraceDump (Event e)
@@ -74,16 +81,16 @@ public class DebuggerTests
 
 		if (runtime != null) {
 			pi.FileName = runtime;
-		} else if (Path.DirectorySeparatorChar == '\\') {
+		} else {
 			string processExe = Diag.Process.GetCurrentProcess ().MainModule.FileName;
 			if (processExe != null) {
 				string fileName = Path.GetFileName (processExe);
-				if (fileName.StartsWith ("mono") && fileName.EndsWith (".exe"))
+				if (fileName.StartsWith ("mono"))
 					pi.FileName = processExe;
 			}
 		}
 		if (string.IsNullOrEmpty (pi.FileName))
-			pi.FileName = "mono";
+			throw new ArgumentException ("Couldn't find mono runtime.");
 		pi.Arguments = String.Join (" ", args);
 		if (runtime_args != null)
 			pi.Arguments = runtime_args + " " + pi.Arguments;
@@ -362,7 +369,7 @@ public class DebuggerTests
 	[SetUp]
 	public void SetUp () {
 		ThreadMirror.NativeTransitions = false;
-		Start (new string [] { "dtest-app.exe" });
+		Start (new string [] { Path.Combine (this_assembly_path, "dtest-app.exe") });
 	}
 
 	[TearDown]
@@ -494,7 +501,7 @@ public class DebuggerTests
 	public void IsDynamicAssembly () {
 		vm.Detach ();
 
-		Start (new string[] {"dtest-app.exe", "ref-emit-test"});
+		Start (new string[] { Path.Combine (this_assembly_path, "dtest-app.exe"), "ref-emit-test"});
 
 		run_until ("ref_emit_call");
 		var assemblyMirrors = entry_point.DeclaringType.Assembly.Domain.GetAssemblies ();
@@ -672,7 +679,7 @@ public class DebuggerTests
 	public void ClassLocalReflection () {
 		vm.Detach ();
 
-		Start (new string [] { "dtest-app.exe", "local-reflect" });
+		Start (new string [] { Path.Combine (this_assembly_path, "dtest-app.exe"), "local-reflect" });
 
 		MethodMirror m = entry_point.DeclaringType.Assembly.GetType ("LocalReflectClass").GetMethod ("RunMe");
 
@@ -2573,7 +2580,7 @@ public class DebuggerTests
 	public void Suspend () {
 		vm.Detach ();
 
-		Start (new string [] { "dtest-app.exe", "suspend-test" });
+		Start (new string [] { Path.Combine (this_assembly_path, "dtest-app.exe"), "suspend-test" });
 
 		Event e = run_until ("suspend");
 
@@ -3052,7 +3059,7 @@ public class DebuggerTests
 	public void InvokeSingleThreaded () {
 		vm.Detach ();
 
-		Start (new string [] { "dtest-app.exe", "invoke-single-threaded" });
+		Start (new string [] { Path.Combine (this_assembly_path, "dtest-app.exe"), "invoke-single-threaded" });
 
 		Event e = run_until ("invoke_single_threaded_2");
 
@@ -3133,7 +3140,7 @@ public class DebuggerTests
 	public void InvokeAbort () {
 		vm.Detach ();
 
-		Start (new string [] { "dtest-app.exe", "invoke-abort" });
+		Start (new string [] { Path.Combine (this_assembly_path, "dtest-app.exe"), "invoke-abort" });
 
 		Event e = run_until ("invoke_abort");
 
@@ -3466,7 +3473,7 @@ public class DebuggerTests
 	public void ExceptionFilter2 () {
 		vm.Detach ();
 
-		Start (new string [] { "dtest-excfilter.exe" });
+		Start (new string [] { Path.Combine (this_assembly_path, "dtest-excfilter.exe") });
 
 		MethodMirror filter_method = entry_point.DeclaringType.GetMethod ("Filter");
 		Assert.IsNotNull (filter_method);
@@ -3566,7 +3573,7 @@ public class DebuggerTests
 	public void MemberInOtherDomain () {
 		vm.Detach ();
 
-		Start (new string [] { "dtest-app.exe", "domain-test" });
+		Start (new string [] { Path.Combine (this_assembly_path, "dtest-app.exe"), "domain-test" });
 
 		vm.EnableEvents (EventType.AppDomainCreate, EventType.AppDomainUnload, EventType.AssemblyUnload);
 
@@ -3582,7 +3589,7 @@ public class DebuggerTests
 	public void Domains () {
 		vm.Detach ();
 
-		Start (new string [] { "dtest-app.exe", "domain-test" });
+		Start (new string [] { Path.Combine (this_assembly_path, "dtest-app.exe"), "domain-test" });
 
 		vm.EnableEvents (EventType.AppDomainCreate, EventType.AppDomainUnload, EventType.AssemblyUnload);
 
@@ -3705,7 +3712,7 @@ public class DebuggerTests
 	public void RefEmit () {
 		vm.Detach ();
 
-		Start (new string [] { "dtest-app.exe", "ref-emit-test" });
+		Start (new string [] { Path.Combine (this_assembly_path, "dtest-app.exe"), "ref-emit-test" });
 
 		Event e = run_until ("ref_emit_call");
 
@@ -3741,7 +3748,7 @@ public class DebuggerTests
 		// Check that stack traces can be produced for threads in native code
 		vm.Detach ();
 
-		Start (new string [] { "dtest-app.exe", "frames-in-native" });
+		Start (new string [] { Path.Combine (this_assembly_path, "dtest-app.exe"), "frames-in-native" });
 
 		var e = run_until ("frames_in_native");
 
@@ -4115,7 +4122,7 @@ public class DebuggerTests
 	public void UnhandledException () {
 		vm.Exit (0);
 
-		Start (new string [] { "dtest-app.exe", "unhandled-exception" });
+		Start (new string [] { Path.Combine (this_assembly_path, "dtest-app.exe"), "unhandled-exception" });
 
 		var req = vm.CreateExceptionRequest (null, false, true);
 		req.Enable ();
@@ -4134,7 +4141,7 @@ public class DebuggerTests
 	public void UnhandledException_2 () {
 		vm.Exit (0);
 
-		Start (new string [] { "dtest-app.exe", "unhandled-exception-endinvoke" });
+		Start (new string [] { Path.Combine (this_assembly_path, "dtest-app.exe"), "unhandled-exception-endinvoke" });
 
 		var req = vm.CreateExceptionRequest (null, false, true);
 		req.Enable ();
@@ -4158,7 +4165,7 @@ public class DebuggerTests
 		vm.Detach ();
 
 		// Exceptions caught in non-user code are treated as unhandled
-		Start (new string [] { "dtest-app.exe", "unhandled-exception-user" });
+		Start (new string [] { Path.Combine (this_assembly_path, "dtest-app.exe"), "unhandled-exception-user" });
 
 		var req = vm.CreateExceptionRequest (null, false, true);
 		req.AssemblyFilter = new List<AssemblyMirror> () { entry_point.DeclaringType.Assembly };
@@ -4229,7 +4236,7 @@ public class DebuggerTests
 	[Test]
 	public void InspectThreadSuspenedOnWaitOne () {
 		TearDown ();
-		Start (true, "dtest-app.exe", "wait-one" );
+		Start (true, Path.Combine (this_assembly_path, "dtest-app.exe"), "wait-one" );
 
 		ThreadMirror.NativeTransitions = true;
 
@@ -4401,7 +4408,7 @@ public class DebuggerTests
 	[Test]
 	public void ThreadpoolIOsinglestep () {
 		TearDown ();
-		Start ("dtest-app.exe", "threadpool-io");
+		Start (Path.Combine (this_assembly_path, "dtest-app.exe"), "threadpool-io");
 		// This is a regression test for #42625.  It tests the
 		// interaction (particularly in coop GC) of the
 		// threadpool I/O mechanism and the soft debugger.
@@ -4418,7 +4425,7 @@ public class DebuggerTests
 	[Category("NotWorking")] // flaky, see https://github.com/mono/mono/issues/6997
 	public void StepOutAsync () {
 		vm.Detach ();
-		Start (new string [] { "dtest-app.exe", "step-out-void-async" });
+		Start (new string [] { Path.Combine (this_assembly_path, "dtest-app.exe"), "step-out-void-async" });
 		var e = run_until ("step_out_void_async_2");
 		create_step (e);
 		var e2 = step_out ();
@@ -4468,7 +4475,7 @@ public class DebuggerTests
 		vm.Exit (0);
 
 		// Launch the app using server=y,suspend=n
-		var pi = CreateStartInfo (new string[] { "--debugger-agent=transport=dt_socket,address=127.0.0.1:10000,server=y,suspend=n", "dtest-app.exe", "attach" });
+		var pi = CreateStartInfo (new string[] { "--debugger-agent=transport=dt_socket,address=127.0.0.1:10000,server=y,suspend=n", Path.Combine (this_assembly_path, "dtest-app.exe"), "attach" });
 		var process = Diag.Process.Start (pi);
 
 		// Wait for the app to reach the Sleep () in attach ().
