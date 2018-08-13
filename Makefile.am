@@ -200,8 +200,7 @@ package-helix:
 	cp -R -L $(top_builddir)/mono/tests/*.exe $(top_builddir)/mono/tests/*.dll $(top_builddir)/mono/tests/tests-config helix-payload/net_4_x/tests/runtime/
 	cp -R -L $(top_builddir)/support/.libs/libMonoPosixHelper$(libsuffix) helix-payload/net_4_x/
 	cp -R -L $(top_builddir)/runtime/etc helix-payload/net_4_x/runtime/
-	sed 's,$$mono_libdir/,,g' $(top_builddir)/data/config > helix-payload/net_4_x/runtime/etc/mono/config
-	sed 's,$$mono_libdir/,,g' $(top_builddir)/data/config > helix-payload/net_4_x/runtime/etc/mono/config
+	sed -e 's,$$mono_libdir,$$helix_root_dir,g' -e 's,target="$(libgdiplus_install_loc)",target="$$helix_root_dir/mono-libgdiplus$(libsuffix)",g' $(top_builddir)/data/config > helix-payload/net_4_x/runtime/etc/mono/config.tmpl
 	echo '#! /bin/sh' > helix-payload/net_4_x/runtime/_tmpinst/bin/mcs
 	echo '"$$MONO_EXECUTABLE" $$(dirname "$$MONO_EXECUTABLE")/mcs.exe "$$@"' >> helix-payload/net_4_x/runtime/_tmpinst/bin/mcs
 	chmod +x helix-payload/net_4_x/runtime/_tmpinst/bin/mcs

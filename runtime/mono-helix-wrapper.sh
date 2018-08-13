@@ -15,8 +15,14 @@ export MONO_CFG_DIR MONO_PATH MONO_EXECUTABLE PATH
 if file "${MONO_EXECUTABLE}" | grep "ELF 32-bit"; then  # when running the i386 binary on amd64, install the i386 packages
     sudo dpkg --add-architecture i386
     sudo apt update
-    sudo apt install -y libc6-i386 lib32gcc1 libsqlite3-0:i386
+    sudo apt install -y libc6-i386 lib32gcc1 libsqlite3-0:i386 libglib2.0-0:i386 libcairo2:i386 libfreetype6:i386 libjpeg62-turbo:i386 libtiff5:i386 libgif7:i386 libpng16-16:i386 libx11-6:i386 exif:i386 libfontconfig1:i386
+    wget "https://xamjenkinsartifact.blob.core.windows.net/test-libgdiplus-mainline/280/debian-9-i386/src/.libs/libgdiplus.so" -O "$r/mono-libgdiplus.so"
+else
+    wget "https://xamjenkinsartifact.blob.core.windows.net/test-libgdiplus-mainline/280/debian-9-amd64/src/.libs/libgdiplus.so" -O "$r/mono-libgdiplus.so"
 fi
+
+ldd "$r/mono-libgdiplus.so"
+sed "s,\$helix_root_dir,$r,g"  "$r/runtime/etc/mono/config.tmpl" > "$r/runtime/etc/mono/config"
 
 chmod +x "${MONO_EXECUTABLE}"
 "${MONO_EXECUTABLE}" --version
