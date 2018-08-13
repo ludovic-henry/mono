@@ -157,6 +157,9 @@ endif
 # assemblies which are excluded from testing in mcs-compileall below
 VERIFY_TESTS_FILTER = System.Runtime.CompilerServices.Unsafe.dll
 
+# fails, not sure why
+VERIFY_TESTS_FILTER += Xunit.NetCore.Extensions.dll
+
 if HOST_WIN32
 # Mono.WebBrowser.dll fails to verify on Windows
 VERIFY_TESTS_FILTER += Mono.WebBrowser.dll

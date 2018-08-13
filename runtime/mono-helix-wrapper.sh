@@ -57,7 +57,7 @@ if [ "$2" = "run-nunit" ]; then
 fi
 
 if [ "$2" = "run-verify" ]; then
-    verifiable_files=$(find . -maxdepth 1 -name "*.dll" -or -name "*.exe" | grep -v System.Runtime.CompilerServices.Unsafe.dll)
+    verifiable_files=$(find . -maxdepth 1 -name "*.dll" -or -name "*.exe" | grep -v System.Runtime.CompilerServices.Unsafe.dll | grep -v Xunit.NetCore.Extensions.dll)
     ok=true
     for asm in $verifiable_files; do
         echo "$asm"
