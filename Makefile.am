@@ -203,7 +203,10 @@ package-helix:
 	sed -e 's,$$mono_libdir,$$helix_root_dir,g' -e 's,target="$(libgdiplus_install_loc)",target="$$helix_root_dir/mono-libgdiplus$(libsuffix)",g' $(top_builddir)/data/config > helix-payload/net_4_x/runtime/etc/mono/config.tmpl
 	echo '#! /bin/sh' > helix-payload/net_4_x/runtime/_tmpinst/bin/mcs
 	echo '"$$MONO_EXECUTABLE" $$(dirname "$$MONO_EXECUTABLE")/mcs.exe "$$@"' >> helix-payload/net_4_x/runtime/_tmpinst/bin/mcs
+	echo '#! /bin/sh' > helix-payload/net_4_x/runtime/_tmpinst/bin/al
+	echo '"$$MONO_EXECUTABLE" $$(dirname "$$MONO_EXECUTABLE")/al.exe "$$@"' >> helix-payload/net_4_x/runtime/_tmpinst/bin/al
 	chmod +x helix-payload/net_4_x/runtime/_tmpinst/bin/mcs
+	chmod +x helix-payload/net_4_x/runtime/_tmpinst/bin/al
 	cp -R -L $(top_srcdir)/external/xunit-binaries/*.dll $(top_srcdir)/external/xunit-binaries/*.exe $(top_srcdir)/external/xunit-binaries/*.config helix-payload/net_4_x/
 	cp -R -L $(top_srcdir)/external/xunit-binaries/xunit.execution.desktop.dll helix-payload/net_4_x/tests/
 	find helix-payload -empty -print0 | xargs -0 rm -rf  # FIXME: helix doesn't seem to like empty files/folders
