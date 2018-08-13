@@ -175,7 +175,7 @@ tee <<'EOF' helix.proj
         <WorkItemId>aot-test</WorkItemId>
         <Command>mono-helix-wrapper.sh $HELIX_CORRELATION_PAYLOAD run-aot-test</Command>
         <PayloadFile>helix-wrapper.zip</PayloadFile>
-        <TimeoutInSeconds>300</TimeoutInSeconds>
+        <TimeoutInSeconds>500</TimeoutInSeconds>
       </HelixWorkItem>
       <HelixWorkItem Include="mini">
         <WorkItemId>mini</WorkItemId>
