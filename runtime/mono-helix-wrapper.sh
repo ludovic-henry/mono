@@ -105,7 +105,7 @@ if [ "$2" = "run-aot-test" ]; then
             params=$(echo $conf | cut -d\| -f 1)
             test_name="${asm_name}|${name}"
             echo "  $test_name"
-            if "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" "$params" --aot=outfile="$tmpfile" "$assembly" > "test-aot-${name}-${asm_name}.stdout" 2> "test-aot-${name}-${asm_name}.stderr"
+            if "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" $params --aot=outfile="$tmpfile" "$assembly" > "test-aot-${name}-${asm_name}.stdout" 2> "test-aot-${name}-${asm_name}.stderr"
             then
                 passed=$((passed + 1))
                 resultstring="Pass"
