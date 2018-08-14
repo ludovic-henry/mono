@@ -23,18 +23,14 @@ my $testcase_name;
 my $testcase_xml;
 my $profmoduledir;
 my $monosgen;
-my $mprofreport;
 
 if ($builddir eq "helix") {
 	$monosgen = $ENV{'MONO_EXECUTABLE'};
 	$profmoduledir = dirname ($monosgen);
-	$mprofreport = "$profmoduledir/mprof-report";
 } else {
-	my $profbuilddir = "$builddir/mono/profiler";
 	my $minibuilddir = "$builddir/mono/mini";
 	$profmoduledir = "$minibuilddir/.libs";
 	$monosgen = "$minibuilddir/mono-sgen";
-	$mprofreport = "$profbuilddir/mprof-report";
 }
 
 # Setup the execution environment
@@ -168,7 +164,7 @@ sub run_test
 	my $report = `$bin --profile=log:$option $test_name`;
 	print "\n";
 	if (defined $roptions) {
-		return `$mprofreport $roptions`;
+		return `mprof-report $roptions`;
 	}
 	return $report;
 }
