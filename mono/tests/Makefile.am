@@ -2011,6 +2011,9 @@ runtest-managed: test-runner.exe compile-tests
 runtest-managed-serial: test-runner.exe compile-tests
 	$(TOOLS_RUNTIME) --debug $(TEST_RUNNER) -j 1 --testsuite-name "runtime" --disabled "$(DISABLED_TESTS)" $(TESTS_CS) $(TESTS_IL) $(TESTS_BENCH)
 
+generate-test-list:
+	@echo $(TESTS_CS) $(TESTS_IL) $(TESTS_BENCH) > $(TEST_LIST_PATH)
+
 test-jit:
 	@if test x$(M) != x0; then $(MAKE) runtest-managed; else $(MAKE) runtest; fi
 

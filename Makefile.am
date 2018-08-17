@@ -167,6 +167,8 @@ package-helix:
 	mkdir -p helix-payload/net_4_x/tests/csi
 	cp -R -L $(top_builddir)/runtime/mono-helix-wrapper.sh helix-wrapper/
 	cp -R -L $(mcs_topdir)/class/lib/net_4_x helix-payload/
+	cp -R -L $(mcs_topdir)/class/lib/xbuild_12 helix-payload/
+	cp -R -L $(mcs_topdir)/class/lib/xbuild_14 helix-payload/
 	cp -R -L helix-payload/net_4_x/compiler-tester.* helix-payload/net_4_x/tests/mcs/
 	cp -R -L helix-payload/net_4_x/compiler-tester.* helix-payload/net_4_x/tests/mcs-errors/
 	cp -R -L $(mcs_topdir)/tests/known-issues-net_4_x helix-payload/net_4_x/tests/mcs/known-issues-net_4_x
@@ -197,7 +199,10 @@ package-helix:
 	cp -R -L $(top_builddir)/mono/profiler/test-*.exe helix-payload/net_4_x/tests/profiler/
 	cp -R -L $(top_builddir)/mono/profiler/ptestrunner.pl helix-payload/net_4_x/tests/profiler/
 	cp -R -L $(top_builddir)/mono/profiler/mprof-report helix-payload/net_4_x//tests/profiler/
-	cp -R -L $(top_builddir)/mono/tests/*.exe $(top_builddir)/mono/tests/*.dll $(top_builddir)/mono/tests/tests-config helix-payload/net_4_x/tests/runtime/
+	$(MAKE) -C mono/tests generate-test-list TEST_LIST_PATH=$(abs_top_builddir)/helix-payload/net_4_x/tests/runtime/runtime-test-list.txt
+	cp -R -L $(top_builddir)/mono/tests/tests-config helix-payload/net_4_x/tests/runtime/
+	cp -R -L $(top_builddir)/mono/tests/.libs/libtest$(libsuffix) helix-payload/net_4_x/tests/runtime/
+	$(foreach test,$(shell cd mono/tests && find . \( -name "*.exe" -o -name "*.dll" -o -name "*.config" -o -name "*.netmodule" \)),mkdir -p helix-payload/net_4_x/tests/runtime/$(dir $(test)); cp -R -L mono/tests/$(test) helix-payload/net_4_x/tests/runtime/$(dir $(test))/$(notdir $(test));)
 	cp -R -L $(top_builddir)/support/.libs/libMonoPosixHelper$(libsuffix) helix-payload/net_4_x/
 	cp -R -L $(top_builddir)/runtime/etc helix-payload/net_4_x/runtime/
 	sed -e 's,$$mono_libdir,$$helix_root_dir,g' -e 's,target="$(libgdiplus_install_loc)",target="$$helix_root_dir/mono-libgdiplus$(libsuffix)",g' $(top_builddir)/data/config > helix-payload/net_4_x/runtime/etc/mono/config.tmpl
