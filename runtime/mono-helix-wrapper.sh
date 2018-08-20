@@ -22,7 +22,8 @@ else
 fi
 
 ldd "$r/mono-libgdiplus.so"
-sed "s,\$helix_root_dir,$r,g"  "$r/runtime/etc/mono/config.tmpl" > "$r/runtime/etc/mono/config"
+sed "s,\$helix_root_dir,$r,g" "$r/runtime/etc/mono/config.tmpl" > "$r/runtime/etc/mono/config"
+sed "s,\$helix_root_dir,$r,g" "$r/tests/runtime/tests-config.tmpl" > "$r/tests/runtime/tests-config"
 
 chmod +x "${MONO_EXECUTABLE}"
 "${MONO_EXECUTABLE}" --version

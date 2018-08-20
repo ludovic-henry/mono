@@ -200,7 +200,7 @@ package-helix:
 	cp -R -L $(top_builddir)/mono/profiler/ptestrunner.pl helix-payload/net_4_x/tests/profiler/
 	cp -R -L $(top_builddir)/mono/profiler/mprof-report helix-payload/net_4_x//tests/profiler/
 	$(MAKE) -C mono/tests generate-test-list TEST_LIST_PATH=$(abs_top_builddir)/helix-payload/net_4_x/tests/runtime/runtime-test-list.txt
-	cp -R -L $(top_builddir)/mono/tests/tests-config helix-payload/net_4_x/tests/runtime/
+	sed -e 's,$$mono_libdir,$$helix_root_dir,g' $(top_builddir)/mono/tests/tests-config > helix-payload/net_4_x/tests/runtime/tests-config.tmpl
 	cp -R -L $(top_builddir)/mono/tests/.libs/libtest$(libsuffix) helix-payload/net_4_x/tests/runtime/
 	$(foreach test,$(shell cd mono/tests && find . \( -name "*.exe" -o -name "*.dll" -o -name "*.config" -o -name "*.netmodule" \)),mkdir -p helix-payload/net_4_x/tests/runtime/$(dir $(test)); cp -R -L mono/tests/$(test) helix-payload/net_4_x/tests/runtime/$(dir $(test))/$(notdir $(test));)
 	cp -R -L $(top_builddir)/support/.libs/libMonoPosixHelper$(libsuffix) helix-payload/net_4_x/
