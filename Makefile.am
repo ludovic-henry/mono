@@ -165,6 +165,7 @@ package-helix:
 	mkdir -p helix-payload/net_4_x/tests/runtime
 	mkdir -p helix-payload/net_4_x/tests/symbolicate
 	mkdir -p helix-payload/net_4_x/tests/csi
+	mkdir -p helix-payload/net_4_x/.libs
 	cp -R -L $(top_builddir)/runtime/mono-helix-wrapper.sh helix-wrapper/
 	cp -R -L $(mcs_topdir)/class/lib/net_4_x helix-payload/
 	cp -R -L $(mcs_topdir)/class/lib/xbuild_12 helix-payload/
@@ -195,10 +196,10 @@ package-helix:
 	cp -R -L $(top_builddir)/mono/mini/*.exe $(top_builddir)/mono/mini/TestDriver.dll $(top_builddir)/mono/mini/MemoryIntrinsics.dll $(top_builddir)/mono/mini/generics-variant-types.dll helix-payload/net_4_x/tests/mini/
 	cp -R -L $(top_builddir)/mono/metadata/.libs/libmono-system-native$(libsuffix) helix-payload/net_4_x/
 	cp -R -L $(top_builddir)/mono/btls/build-shared/libmono-btls-shared$(libsuffix) helix-payload/net_4_x/
-	cp -R -L $(top_builddir)/mono/profiler/.libs/libmono-profiler-log$(libsuffix) helix-payload/net_4_x/
+	cp -R -L $(top_builddir)/mono/profiler/.libs/libmono-profiler-log$(libsuffix) helix-payload/net_4_x/.libs/
 	cp -R -L $(top_builddir)/mono/profiler/test-*.exe helix-payload/net_4_x/tests/profiler/
 	cp -R -L $(top_builddir)/mono/profiler/ptestrunner.pl helix-payload/net_4_x/tests/profiler/
-	cp -R -L $(top_builddir)/mono/profiler/mprof-report helix-payload/net_4_x//tests/profiler/
+	cp -R -L $(top_builddir)/mono/profiler/mprof-report helix-payload/net_4_x/tests/profiler/
 	$(MAKE) -C mono/tests generate-test-list TEST_LIST_PATH=$(abs_top_builddir)/helix-payload/net_4_x/tests/runtime/runtime-test-list.txt
 	sed -e 's,$$mono_libdir,$$helix_root_dir,g' $(top_builddir)/mono/tests/tests-config > helix-payload/net_4_x/tests/runtime/tests-config.tmpl
 	cp -R -L $(top_builddir)/mono/tests/.libs/libtest$(libsuffix) helix-payload/net_4_x/tests/runtime/
