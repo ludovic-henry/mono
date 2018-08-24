@@ -60,7 +60,7 @@ platform_sources = $(unix_sources)
 endif
 
 if HOST_ANDROID
-platform_sources += ../../support/libm/complex.c
+platform_sources += ../../support/libm/complex.c android.c
 endif
 
 if HOST_WASM

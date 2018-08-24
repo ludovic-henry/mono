@@ -128,11 +128,13 @@ _android-$(1)_AC_VARS= \
 
 _android-$(1)_CFLAGS= \
 	-fstack-protector \
-	-DMONODROID=1
+	-DMONODROID=1 \
+	$(if $(filter $(CONFIGURATION),release),-DRELEASE=1)
 
 _android-$(1)_CXXFLAGS= \
 	-fstack-protector \
-	-DMONODROID=1
+	-DMONODROID=1 \
+	$(if $(filter $(CONFIGURATION),release),-DRELEASE=1)
 
 _android-$(1)_CPPFLAGS= \
 	-I$$(ANDROID_TOOLCHAIN_PREFIX)/$(1)-clang/usr/include
@@ -190,8 +192,8 @@ $(eval $(call AndroidTargetTemplate,arm64-v8a,arm64,aarch64-linux-android,aarch6
 $(eval $(call AndroidTargetTemplate,x86,x86,i686-linux-android,i686-linux-android))
 
 ## android-x86_64
-android-x86_64_CFLAGS=-DL_cuserid=9
-android-x86_64_CXXFLAGS=-DL_cuserid=9
+android-x86_64_CFLAGS=-DL_cuserid=9 -DANDROID64
+android-x86_64_CXXFLAGS=-DL_cuserid=9 -DANDROID64
 $(eval $(call AndroidTargetTemplate,x86_64,x86_64,x86_64-linux-android,x86_64-linux-android))
 
 ##
@@ -213,9 +215,13 @@ _android-$(1)_RANLIB=ranlib
 _android-$(1)_STRIP=strip
 
 _android-$(1)_CFLAGS= \
+	$$(if $$(RELEASE),-DRELEASE=1) \
+	$$(if $$(filter $$(UNAME),Darwin),-mmacosx-version-min=10.9) \
 	$$(patsubst %,-I%,$$(JDK_INCLUDE_DIRS))
 
 _android-$(1)_CXXFLAGS= \
+	$$(if $$(RELEASE),-DRELEASE=1) \
+	$$(if $$(filter $$(UNAME),Darwin),-mmacosx-version-min=10.9) \
 	$$(patsubst %,-I%,$$(JDK_INCLUDE_DIRS))
 
 _android-$(1)_CONFIGURE_FLAGS= \
@@ -238,7 +244,6 @@ $$(eval $$(call RuntimeTemplate,android-$(1)))
 
 endef
 
-android-host-Darwin_CFLAGS=-mmacosx-version-min=10.9
 $(eval $(call AndroidHostTemplate,host-Darwin))
 $(eval $(call AndroidHostTemplate,host-Linux))
 
@@ -266,10 +271,12 @@ _android-$(1)_AC_VARS= \
 
 _android-$(1)_CFLAGS= \
 	-DXAMARIN_PRODUCT_VERSION=0 \
+	$(if $(filter $(CONFIGURATION),release),-DRELEASE=1) \
 	$$(patsubst %,-I%,$$(JDK_INCLUDE_DIRS))
 
 _android-$(1)_CXXFLAGS= \
 	-DXAMARIN_PRODUCT_VERSION=0 \
+	$(if $(filter $(CONFIGURATION),release),-DRELEASE=1) \
 	$$(patsubst %,-I%,$$(JDK_INCLUDE_DIRS))
 
 _android-$(1)_CONFIGURE_FLAGS= \
