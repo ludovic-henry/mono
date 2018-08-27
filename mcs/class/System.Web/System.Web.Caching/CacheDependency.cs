@@ -27,6 +27,7 @@
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 using System.Collections;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.Security.Permissions;
@@ -44,7 +45,7 @@ namespace System.Web.Caching
 		CacheDependency dependency;
 		DateTime start;
 		Cache cache;
-		FileSystemWatcher[] watchers;
+		static Dictionary<string, FileSystemWatcher> watchers;
 		bool hasChanged;
 		bool used;
 		DateTime utcLastModified;
@@ -92,35 +93,47 @@ namespace System.Web.Caching
 		
 		public CacheDependency (string[] filenames, string[] cachekeys, CacheDependency dependency, DateTime start)
 		{
-			int flen = filenames != null ? filenames.Length : 0;
-			
-			if (flen > 0) {
-				watchers = new FileSystemWatcher [flen];
-				string filename;
-				
-				for (int n = 0; n < flen; n++) {
-					filename = filenames [n];
+			lock (locker) {
+				if (watchers == null)
+					watchers = new Dictionary<string, FileSystemWatcher> ();
+			}
+
+			if (filenames?.Length > 0) {
+				foreach (var filename in filenames) {
 					if (String.IsNullOrEmpty (filename))
 						continue;
-					
-					FileSystemWatcher watcher = new FileSystemWatcher ();
+					Console.WriteLine ("CacheDependency: filename:" + filename);
+					string path = null;
+					string filter = null;
 					if (Directory.Exists (filename))
-						watcher.Path = filename;
+						path = filename;
 					else {
 						string parentPath = Path.GetDirectoryName (filename);
 						if (parentPath != null && Directory.Exists (parentPath)) {
-							watcher.Path = parentPath;
-							watcher.Filter = Path.GetFileName (filename);
+							path = parentPath;
+							filter = Path.GetFileName (filename);
 						} else
 							continue;
 					}
-					watcher.NotifyFilter |= NotifyFilters.Size;
-					watcher.Created += new FileSystemEventHandler (OnChanged);
-					watcher.Changed += new FileSystemEventHandler (OnChanged);
-					watcher.Deleted += new FileSystemEventHandler (OnChanged);
-					watcher.Renamed += new RenamedEventHandler (OnChanged);
-					watcher.EnableRaisingEvents = true;
-					watchers [n] = watcher;
+
+					lock (locker) {
+						FileSystemWatcher watcher;
+						if (!watchers.TryGetValue (path, out watcher)) {
+							Console.WriteLine ("CacheDependency: new FSW: path:" + path);
+							watcher = new FileSystemWatcher ();
+							watcher.Path = path;
+							watcher.NotifyFilter |= NotifyFilters.Size;
+
+							watchers [path] = watcher;
+						}
+						Console.WriteLine ("CacheDependency: FSW: filter: " + filter);
+
+						watcher.Created += new FileSystemEventHandler ((s, e) => { if (filter == null || e.Name == filter) OnChanged (s, e); });
+						watcher.Changed += new FileSystemEventHandler ((s, e) => { if (filter == null || e.Name == filter) OnChanged (s, e); });
+						watcher.Deleted += new FileSystemEventHandler ((s, e) => { if (filter == null || e.Name == filter) OnChanged (s, e); });
+						watcher.Renamed += new RenamedEventHandler ((s, e) => { if (filter == null || e.OldName == filter) OnChanged (s, e); });
+						watcher.EnableRaisingEvents = true;
+					}
 				}
 			}
 			this.cachekeys = cachekeys;
@@ -138,9 +151,11 @@ namespace System.Web.Caching
 			
 			lock (locker) {
 				if (watchers != null)
-					foreach (FileSystemWatcher fsw in watchers)
+					foreach (var item in watchers) {
+						FileSystemWatcher fsw = item.Value;
 						if (fsw != null && fsw.Path != null && fsw.Path.Length != 0)
 							sb.Append ("_" + fsw.Path);
+					}
 			}
 
 			if (cachekeys != null)
@@ -151,6 +166,7 @@ namespace System.Web.Caching
 		
 		void OnChanged (object sender, FileSystemEventArgs args)
 		{
+			Console.WriteLine ("OnChanged: " + args.Name);
 			OnDependencyChanged (sender, args);
 		}
 
@@ -174,9 +190,12 @@ namespace System.Web.Caching
 		{
 			lock (locker) {
 				if (watchers != null) {
-					foreach (FileSystemWatcher w in watchers)
+					foreach (var item in watchers) {
+						FileSystemWatcher w = item.Value;
 						if (w != null)
-							w.Dispose ();
+							//w.Dispose ();
+							Console.WriteLine ("Dispose FSW!!");
+					}
 				}
 				watchers = null;
 			}
