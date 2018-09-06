@@ -5631,7 +5631,7 @@ mono_test_marshal_return_single_double_struct (void)
 }
 
 
-#ifndef TARGET_X86
+#if !defined(TARGET_X86) || defined(TARGET_ANDROID)
 
 LIBTEST_API int STDCALL
 mono_test_has_thiscall (void)
