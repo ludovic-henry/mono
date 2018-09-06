@@ -236,15 +236,15 @@ define AndroidHostMxeTemplate
 
 _android-$(1)_PATH=$$(MXE_PREFIX)/bin
 
-_android-$(1)_AR=$$(MXE_PREFIX)/bin/$(2)-w64-mingw32.static-ar
-_android-$(1)_AS=$$(MXE_PREFIX)/bin/$(2)-w64-mingw32.static-as
-_android-$(1)_CC=$$(MXE_PREFIX)/bin/$(2)-w64-mingw32.static-gcc
-_android-$(1)_CXX=$$(MXE_PREFIX)/bin/$(2)-w64-mingw32.static-g++
-_android-$(1)_DLLTOOL=$$(MXE_PREFIX)/bin/$(2)-w64-mingw32.static-dlltool
-_android-$(1)_LD=$$(MXE_PREFIX)/bin/$(2)-w64-mingw32.static-ld
-_android-$(1)_OBJDUMP=$$(MXE_PREFIX)/bin/$(2)-w64-mingw32.static-objdump
-_android-$(1)_RANLIB=$$(MXE_PREFIX)/bin/$(2)-w64-mingw32.static-ranlib
-_android-$(1)_STRIP=$$(MXE_PREFIX)/bin/$(2)-w64-mingw32.static-strip
+_android-$(1)_AR=$$(MXE_PREFIX)/bin/$(2)-w64-mingw32$$(if $$(filter $(UNAME),Darwin),.static)-ar
+_android-$(1)_AS=$$(MXE_PREFIX)/bin/$(2)-w64-mingw32$$(if $$(filter $(UNAME),Darwin),.static)-as
+_android-$(1)_CC=$$(MXE_PREFIX)/bin/$(2)-w64-mingw32$$(if $$(filter $(UNAME),Darwin),.static)-gcc
+_android-$(1)_CXX=$$(MXE_PREFIX)/bin/$(2)-w64-mingw32$$(if $$(filter $(UNAME),Darwin),.static)-g++
+_android-$(1)_DLLTOOL=$$(MXE_PREFIX)/bin/$(2)-w64-mingw32$$(if $$(filter $(UNAME),Darwin),.static)-dlltool
+_android-$(1)_LD=$$(MXE_PREFIX)/bin/$(2)-w64-mingw32$$(if $$(filter $(UNAME),Darwin),.static)-ld
+_android-$(1)_OBJDUMP=$$(MXE_PREFIX)/bin/$(2)-w64-mingw32$$(if $$(filter $(UNAME),Darwin),.static)-objdump
+_android-$(1)_RANLIB=$$(MXE_PREFIX)/bin/$(2)-w64-mingw32$$(if $$(filter $(UNAME),Darwin),.static)-ranlib
+_android-$(1)_STRIP=$$(MXE_PREFIX)/bin/$(2)-w64-mingw32$$(if $$(filter $(UNAME),Darwin),.static)-strip
 
 _android-$(1)_AC_VARS= \
 	ac_cv_header_zlib_h=no \
@@ -271,7 +271,7 @@ _android-$(1)_CONFIGURE_FLAGS= \
 
 .stamp-android-$(1)-$$(CONFIGURATION)-configure: | $(if $(IGNORE_PROVISION_MXE),,provision-mxe)
 
-$$(eval $$(call RuntimeTemplate,android-$(1),$(2)-w64-mingw32.static))
+$$(eval $$(call RuntimeTemplate,android-$(1),$(2)-w64-mingw32$$(if $$(filter $(UNAME),Darwin),.static)))
 
 endef
 
@@ -342,15 +342,15 @@ _android-$(1)_OFFSETS_DUMPER_ARGS=--gen-android --android-ndk="$$(ANDROID_TOOLCH
 
 _android-$(1)_PATH=$$(MXE_PREFIX)/bin
 
-_android-$(1)_AR=$$(MXE_PREFIX)/bin/$(2)-w64-mingw32.static-ar
-_android-$(1)_AS=$$(MXE_PREFIX)/bin/$(2)-w64-mingw32.static-as
-_android-$(1)_CC=$$(MXE_PREFIX)/bin/$(2)-w64-mingw32.static-gcc
-_android-$(1)_CXX=$$(MXE_PREFIX)/bin/$(2)-w64-mingw32.static-g++
-_android-$(1)_DLLTOOL=$$(MXE_PREFIX)/bin/$(2)-w64-mingw32.static-dlltool
-_android-$(1)_LD=$$(MXE_PREFIX)/bin/$(2)-w64-mingw32.static-ld
-_android-$(1)_OBJDUMP=$$(MXE_PREFIX)/bin/$(2)-w64-mingw32.static-objdump
-_android-$(1)_RANLIB=$$(MXE_PREFIX)/bin/$(2)-w64-mingw32.static-ranlib
-_android-$(1)_STRIP=$$(MXE_PREFIX)/bin/$(2)-w64-mingw32.static-strip
+_android-$(1)_AR=$$(MXE_PREFIX)/bin/$(2)-w64-mingw32$$(if $$(filter $(UNAME),Darwin),.static)-ar
+_android-$(1)_AS=$$(MXE_PREFIX)/bin/$(2)-w64-mingw32$$(if $$(filter $(UNAME),Darwin),.static)-as
+_android-$(1)_CC=$$(MXE_PREFIX)/bin/$(2)-w64-mingw32$$(if $$(filter $(UNAME),Darwin),.static)-gcc
+_android-$(1)_CXX=$$(MXE_PREFIX)/bin/$(2)-w64-mingw32$$(if $$(filter $(UNAME),Darwin),.static)-g++
+_android-$(1)_DLLTOOL=$$(MXE_PREFIX)/bin/$(2)-w64-mingw32$$(if $$(filter $(UNAME),Darwin),.static)-dlltool
+_android-$(1)_LD=$$(MXE_PREFIX)/bin/$(2)-w64-mingw32$$(if $$(filter $(UNAME),Darwin),.static)-ld
+_android-$(1)_OBJDUMP=$$(MXE_PREFIX)/bin/$(2)-w64-mingw32$$(if $$(filter $(UNAME),Darwin),.static)-objdump
+_android-$(1)_RANLIB=$$(MXE_PREFIX)/bin/$(2)-w64-mingw32$$(if $$(filter $(UNAME),Darwin),.static)-ranlib
+_android-$(1)_STRIP=$$(MXE_PREFIX)/bin/$(2)-w64-mingw32$$(if $$(filter $(UNAME),Darwin),.static)-strip
 
 _android-$(1)_CFLAGS= \
 	$$(if $$(RELEASE),,-DDEBUG_CROSS) \
@@ -379,7 +379,7 @@ _android-$(1)_CONFIGURE_FLAGS= \
 
 .stamp-android-$(1)-$$(CONFIGURATION)-configure: | $(if $(IGNORE_PROVISION_MXE),,provision-mxe)
 
-$$(eval $$(call CrossRuntimeTemplate,android-$(1),$(2)-w64-mingw32.static,$(3)-linux-android,$(4),$(5),$(6)))
+$$(eval $$(call CrossRuntimeTemplate,android-$(1),$(2)-w64-mingw32$$(if $$(filter $(UNAME),Darwin),.static),$(3)-linux-android,$(4),$(5),$(6)))
 
 endef
 

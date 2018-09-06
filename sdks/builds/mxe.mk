@@ -1,4 +1,15 @@
 
+ifeq ($(UNAME),Linux)
+LINUX_FLAVOR=$(shell ./determine-linux-flavor.sh)
+endif
+
+ifeq ($(LINUX_FLAVOR),Ubuntu)
+MXE_PREFIX=/usr
+
+.PHONY: provision-mxe
+provision-mxe:
+	@echo $(LINUX_FLAVOR) Linux does not require mxe provisioning. mingw from packages is used instead
+else
 MXE_SRC?=$(TOP)/sdks/builds/toolchains/mxe
 MXE_PREFIX_DIR?=$(HOME)/android-toolchain
 
@@ -16,6 +27,7 @@ $(MXE_PREFIX)/.stamp:
 
 .PHONY: provision-mxe
 provision-mxe: $(MXE_PREFIX)/.stamp
+endif
 
 .PHONY: provision
 provision: provision-mxe

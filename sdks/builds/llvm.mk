@@ -185,7 +185,9 @@ $(eval $(call LLVM36Template,llvm32,i386))
 #  $(2): arch
 define LLVMMxeTemplate
 
+ifeq ($$(UNAME),Darwin)
 _llvm-$(1)_CMAKE=$$(MXE_PREFIX)/bin/$(2)-w64-mingw32.static-cmake
+endif
 
 # -DCROSS_TOOLCHAIN_FLAGS_NATIVE is needed to compile the native tools (tlbgen) using the host compilers
 # -DLLVM_ENABLE_THREADS=0 is needed because mxe doesn't define std::mutex etc.
@@ -203,7 +205,7 @@ setup-llvm-$(1):
 .PHONY: package-llvm-$(1)
 package-llvm-$(1): setup-llvm-$(1) $$(LLVM_SRC)/CMakeLists.txt
 	$$(MAKE) -C $$(TOP)/llvm -f build.mk install-llvm \
-		CMAKE=$$(_llvm-$(1)_CMAKE) \
+		$$(if $$(_llvm-$(1)_CMAKE),CMAKE=$$(_llvm-$(1)_CMAKE)) \
 		LLVM_PATH="$$(LLVM_SRC)" \
 		LLVM_BUILD="$$(TOP)/sdks/builds/llvm-$(1)" \
 		LLVM_PREFIX="$$(TOP)/sdks/out/llvm-$(1)" \
@@ -212,7 +214,7 @@ package-llvm-$(1): setup-llvm-$(1) $$(LLVM_SRC)/CMakeLists.txt
 .PHONY: clean-llvm-$(1)
 clean-llvm-$(1)::
 	$$(MAKE) -C $$(TOP)/llvm -f build.mk clean-llvm \
-		CMAKE=$$(_llvm-$(1)_CMAKE) \
+		$$(if $$(_llvm-$(1)_CMAKE),CMAKE=$$(_llvm-$(1)_CMAKE)) \
 		LLVM_PATH="$$(LLVM_SRC)" \
 		LLVM_BUILD="$$(TOP)/sdks/builds/llvm-$(1)" \
 		LLVM_PREFIX="$$(TOP)/sdks/out/llvm-$(1)"
