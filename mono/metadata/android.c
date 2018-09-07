@@ -20,6 +20,13 @@
 #include <windows.h>
 #endif
 
+#ifdef HOST_ANDROID
+#include <sys/system_properties.h>
+#else
+#define PROP_NAME_MAX   32
+#define PROP_VALUE_MAX  92
+#endif
+
 #include "appdomain.h"
 #include "object.h"
 #include "threads.h"
@@ -30,6 +37,12 @@
 /* Symbols which are accessed via `DllImport("__Internal")` or `dlsym` */
 
 struct _monodroid_ifaddrs;
+
+MONO_API void
+monodroid_add_system_property (const gchar *name, const gchar *value);
+
+MONO_API gint32
+monodroid_get_system_property (const gchar *name, gchar **value);
 
 MONO_API void
 monodroid_free (gpointer ptr);
@@ -807,4 +820,172 @@ ves_icall_Mono_Unix_Android_AndroidUtils_DetectCpuAndArchitecture (guint16 *buil
 	*built_for_cpu = get_built_for_cpu ();
 	g_assert (running_on_cpu);
 	*running_on_cpu = get_running_on_cpu ();
+}
+
+struct BundledProperty {
+	gchar *name;
+	gchar *value;
+	gint   value_len;
+	struct BundledProperty *next;
+};
+
+static struct BundledProperty* bundled_properties;
+
+static struct BundledProperty*
+lookup_system_property (const gchar *name)
+{
+	struct BundledProperty *p = bundled_properties;
+	for ( ; p ; p = p->next)
+		if (strcmp (p->name, name) == 0)
+			return p;
+	return NULL;
+}
+
+void
+monodroid_add_system_property (const gchar *name, const gchar *value)
+{
+	gint name_len, value_len;
+
+	struct BundledProperty* p = lookup_system_property (name);
+	if (p) {
+		gchar *n = g_strdup (value);
+		g_free (p->value);
+		p->value      = n;
+		p->value_len  = strlen (p->value);
+		return;
+	}
+
+	name_len  = strlen (name);
+	value_len = strlen (value);
+
+	p = g_malloc0 (sizeof (struct BundledProperty) + name_len + 1);
+
+	p->name = ((char*) p) + sizeof (struct BundledProperty);
+	strncpy (p->name, name, name_len);
+	p->name [name_len] = '\0';
+
+	p->value      = g_strdup (value);
+	p->value_len  = value_len;
+
+	p->next             = bundled_properties;
+	bundled_properties  = p;
+}
+
+#ifdef HOST_ANDROID
+#ifndef ANDROID64
+static gint
+_monodroid__system_property_get (const gchar *name, gchar *sp_value, gsize sp_value_len)
+{
+	if (!name)
+		return -1;
+
+	g_assert (sp_value);
+	g_assert (sp_value_len == PROP_VALUE_MAX + 1);
+
+	return __system_property_get (name, sp_value);
+}
+#else
+/* __system_property_get was removed in Android 5.0/64bit. This is hopefully temporary replacement, until we find better
+ * solution. */
+static gint
+_monodroid__system_property_get (const gchar *name, gchar *sp_value, gsize sp_value_len)
+{
+	if (!name)
+		return -1;
+
+	/* sp_value buffer should be at least PROP_VALUE_MAX+1 bytes long */
+
+	g_assert (sp_value);
+	g_assert (sp_value_len == PROP_VALUE_MAX + 1);
+
+	gchar *cmd = g_strdup_printf ("getprop %s", name);
+	FILE* result = popen (cmd, "r");
+	gint len = (gint) fread (sp_value, 1, sp_value_len, result);
+	fclose (result);
+	sp_value [len] = 0;
+	if (len > 0 && sp_value [len - 1] == '\n') {
+		sp_value [len - 1] = 0;
+		len--;
+	} else {
+		if (len != 0)
+			len = 0;
+		sp_value [0] = 0;
+	}
+
+	mono_trace (G_LOG_LEVEL_MESSAGE, MONO_TRACE_ANDROID_DEFAULT, "%s %s: '%s' len: %d", __func__, name, sp_value, len);
+
+	return len;
+}
+#endif /* ANDROID64 */
+#else
+static void
+monodroid_strreplace (gchar *buffer, gchar old_char, gchar new_char)
+{
+	if (buffer == NULL)
+		return;
+	while (*buffer != '\0') {
+		if (*buffer == old_char)
+			*buffer = new_char;
+		buffer++;
+	}
+}
+
+static gint
+_monodroid__system_property_get (const gchar *name, gchar *sp_value, gsize sp_value_len)
+{
+	if (!name)
+		return -1;
+
+	g_assert (sp_value);
+	g_assert (sp_value_len == PROP_VALUE_MAX + 1);
+
+	gchar *env_name = g_strdup_printf ("__XA_%s", name);
+	monodroid_strreplace (env_name, '.', '_');
+	gchar *env_value = g_getenv (env_name);
+	g_free (env_name);
+
+	gsize env_value_len = env_value ? strlen (env_value) : 0;
+	if (env_value_len == 0) {
+		sp_value[0] = '\0';
+		return 0;
+	}
+
+	if (env_value_len >= sp_value_len)
+		mono_trace (G_LOG_LEVEL_WARNING, MONO_TRACE_ANDROID_DEFAULT, "System property buffer size too small by %u bytes", env_value_len == sp_value_len ? 1 : env_value_len - sp_value_len);
+
+	strncpy (sp_value, env_value, sp_value_len);
+	sp_value[sp_value_len] = '\0';
+
+	return strlen (sp_value);
+}
+#endif /* HOST_ANDROID */
+
+gint32
+monodroid_get_system_property (const gchar *name, gchar **value)
+{
+	gchar  buf [PROP_VALUE_MAX+1] = { 0, };
+	gint   len;
+	struct BundledProperty *p;
+
+	g_assert (value);
+	*value = NULL;
+
+	len = _monodroid__system_property_get (name, buf, sizeof (buf));
+	if (len > 0) {
+		*value = g_strndup (buf, len);
+		return len;
+	}
+
+	if ((p = lookup_system_property (name))) {
+		*value = g_strndup (p->value, p->value_len);
+		return p->value_len;
+	}
+
+	return -1;
+}
+
+gint32
+ves_icall_System_TimezoneInfo_AndroidTimeZones_GetSystemProperty (const gchar *name, gchar **value)
+{
+	return monodroid_get_system_property (name, value);
 }
