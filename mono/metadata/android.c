@@ -129,7 +129,6 @@ static struct {
 	void (*_monodroid_gc_wait_for_bridge_processing) (void);
 	gint32 (*_monodroid_gref_log_new) (jobject curHandle, gchar curType, jobject newHandle, gchar newType, const gchar *threadName, gint32 threadId, gchar *from, gint32 from_writable);
 	void (*_monodroid_gref_log_delete) (jobject handle, gchar type, const gchar *threadName, gint32 threadId, gchar *from, gint32 from_writable);
-	void (*monodroid_free) (gpointer ptr);
 
 	void (*monodroid_jvm_initialize) (JavaVM *);
 	void (*monodroid_runtime_init) (JNIEnv*, jclass, jstring, jobjectArray, jstring, jobjectArray, jobject, jobjectArray, jobjectArray, jstring);
@@ -489,7 +488,6 @@ monodroid_load (const gchar *libmonodroid_path)
 	LOAD_SYMBOL (_monodroid_weak_gref_new);
 	LOAD_SYMBOL (monodroid_typemap_java_to_managed);
 	LOAD_SYMBOL (monodroid_typemap_managed_to_java);
-	LOAD_SYMBOL (monodroid_free);
 
 	LOAD_SYMBOL (monodroid_jvm_initialize);
 	LOAD_SYMBOL (monodroid_runtime_init);
@@ -510,7 +508,7 @@ monodroid_load (const gchar *libmonodroid_path)
 void
 monodroid_free (gpointer ptr)
 {
-	monodroid.monodroid_free (ptr);
+	g_free (ptr);
 }
 
 void
