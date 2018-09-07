@@ -95,6 +95,7 @@ ICALL_TYPE(RUNTIME, "Mono.Runtime", RUNTIME_1)
 HANDLES(ICALL(RUNTIME_1, "DisableMicrosoftTelemetry", ves_icall_Mono_Runtime_DisableMicrosoftTelemetry))
 HANDLES(ICALL(RUNTIME_2, "EnableMicrosoftTelemetry_internal", ves_icall_Mono_Runtime_EnableMicrosoftTelemetry))
 HANDLES(ICALL(RUNTIME_3, "ExceptionToState_internal", ves_icall_Mono_Runtime_ExceptionToState))
+NOHANDLES(ICALL(RUNTIME_5, "GFree", ves_icall_Mono_Runtime_GFree))
 HANDLES(ICALL(RUNTIME_4, "GetDisplayName", ves_icall_Mono_Runtime_GetDisplayName))
 HANDLES(ICALL(RUNTIME_12, "GetNativeStackTrace", ves_icall_Mono_Runtime_GetNativeStackTrace))
 HANDLES(ICALL(RUNTIME_13, "SendMicrosoftTelemetry_internal", ves_icall_Mono_Runtime_SendMicrosoftTelemetry))
@@ -1044,6 +1045,11 @@ ICALL(VOLATILE_26, "Write(ulong&,ulong)", ves_icall_System_Threading_Volatile_Wr
 ICALL_TYPE(WAITH, "System.Threading.WaitHandle", WAITH_1)
 HANDLES(ICALL(WAITH_1, "SignalAndWait_Internal", ves_icall_System_Threading_WaitHandle_SignalAndWait_Internal))
 HANDLES(ICALL(WAITH_2, "Wait_internal", ves_icall_System_Threading_WaitHandle_Wait_internal))
+
+#ifdef ENABLE_MONODROID
+ICALL_TYPE(ANDROIDTIMEZONES, "System.TimeZoneInfo/AndroidTimeZones", ANDROIDTIMEZONES_1)
+NOHANDLES(ICALL(ANDROIDTIMEZONES_1, "GetDefaultTimeZoneId", ves_icall_System_TimezoneInfo_AndroidTimeZones_GetDefaultTimeZoneId))
+#endif
 
 ICALL_TYPE(TYPE, "System.Type", TYPE_1)
 HANDLES(ICALL(TYPE_1, "internal_from_handle", ves_icall_System_Type_internal_from_handle))

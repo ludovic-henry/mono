@@ -18,7 +18,9 @@
 #include <windows.h>
 #endif
 
+#include "appdomain.h"
 #include "object.h"
+#include "threads.h"
 
 #include "utils/mono-logger-internals.h"
 #include "utils/mono-dl.h"
@@ -90,9 +92,6 @@ _monodroid_getifaddrs (struct _monodroid_ifaddrs **ifap);
 MONO_API void
 _monodroid_freeifaddrs (struct _monodroid_ifaddrs *ifa);
 
-MONO_API gpointer
-_monodroid_timezone_get_default_id (void);
-
 JNIEXPORT void JNICALL
 Java_mono_android_Runtime_init (JNIEnv *env, jclass klass, jstring lang, jobjectArray runtimeApks, jstring runtimeNativeLibDir, jobjectArray appDirs, jobject loader, jobjectArray externalStorageDirs, jobjectArray assemblies, jstring packageName);
 
@@ -137,7 +136,6 @@ static struct {
 	void (*_monodroid_detect_cpu_and_architecture) (gushort*, gushort*, guchar*);
 	gint (*_monodroid_getifaddrs) (struct _monodroid_ifaddrs**);
 	void (*_monodroid_freeifaddrs) (struct _monodroid_ifaddrs*);
-	gpointer (*_monodroid_timezone_get_default_id) (void);
 	gint (*_monodroid_get_dns_servers) (gpointer *dns_servers_array);
 	MonoBoolean (*_monodroid_get_network_interface_up_state) (const gchar *ifname, MonoBoolean *is_up);
 	MonoBoolean (*_monodroid_get_network_interface_supports_multicast) (const gchar *ifname, MonoBoolean *supports_multicast);
@@ -156,13 +154,44 @@ static gboolean initialized = FALSE;
 
 static JavaVM *jvm;
 
+static jclass     TimeZone_class;
+static jmethodID  TimeZone_getDefault;
+static jmethodID  TimeZone_getID;
+
+static jobject
+lref_to_gref (JNIEnv *env, jobject lref)
+{
+	jobject g;
+	if (lref == 0)
+		return 0;
+	g = (*env)->NewGlobalRef (env, lref);
+	(*env)->DeleteLocalRef (env, lref);
+	return g;
+}
+
 void
 mono_jvm_initialize (JavaVM *vm)
 {
+	JNIEnv *env;
+
 	if (initialized)
 		return;
 
 	jvm = vm;
+
+	(*jvm)->GetEnv (jvm, (gpointer*)&env, JNI_VERSION_1_6);
+
+	TimeZone_class = lref_to_gref (env, (*env)->FindClass (env, "java/util/TimeZone"));
+	if (!TimeZone_class)
+		g_error ("%s: Fatal error: Could not find java.util.TimeZone class!", __func__);
+
+	TimeZone_getDefault = (*env)->GetStaticMethodID (env, TimeZone_class, "getDefault", "()Ljava/util/TimeZone;");
+	if (!TimeZone_getDefault)
+		g_error ("%s: Fatal error: Could not find java.util.TimeZone.getDefault() method!", __func__);
+
+	TimeZone_getID = (*env)->GetMethodID (env, TimeZone_class, "getID", "()Ljava/lang/String;");
+	if (!TimeZone_getID)
+		g_error ("%s: Fatal error: Could not find java.util.TimeZone.getDefault() method!", __func__);
 
 	initialized = TRUE;
 }
@@ -172,6 +201,24 @@ JNI_OnLoad (JavaVM *vm, gpointer reserved)
 {
 	mono_jvm_initialize (vm);
 	return JNI_VERSION_1_6;
+}
+
+static JNIEnv*
+mono_jvm_get_jnienv (void)
+{
+	JNIEnv *env;
+
+	g_assert (initialized);
+
+	(*jvm)->GetEnv (jvm, (void**)&env, JNI_VERSION_1_6);
+	if (env)
+		return env;
+
+	(*jvm)->AttachCurrentThread(jvm, &env, NULL);
+	if (env)
+			return env;
+
+	g_error ("%s: Fatal error: Could not create env", __func__);
 }
 
 #ifdef HOST_WIN32
@@ -434,7 +481,6 @@ monodroid_load (const gchar *libmonodroid_path)
 	LOAD_SYMBOL (_monodroid_detect_cpu_and_architecture);
 	LOAD_SYMBOL (_monodroid_getifaddrs);
 	LOAD_SYMBOL (_monodroid_freeifaddrs);
-	LOAD_SYMBOL (_monodroid_timezone_get_default_id);
 	LOAD_SYMBOL (_monodroid_get_dns_servers);
 	LOAD_SYMBOL (_monodroid_get_network_interface_up_state);
 	LOAD_SYMBOL (_monodroid_get_network_interface_supports_multicast);
@@ -545,12 +591,6 @@ _monodroid_max_gref_get (void)
 	return monodroid._monodroid_max_gref_get ();
 }
 
-gpointer
-_monodroid_timezone_get_default_id (void)
-{
-	return monodroid._monodroid_timezone_get_default_id ();
-}
-
 const gchar *
 monodroid_typemap_java_to_managed (const gchar *java)
 {
@@ -630,4 +670,21 @@ JNIEXPORT void JNICALL
 Java_mono_android_Runtime_propagateUncaughtException (JNIEnv *env, jclass klass, jobject javaThread, jthrowable javaException)
 {
 	monodroid.monodroid_runtime_propagateUncaughtException (env, klass, javaThread, javaException);
+}
+
+gpointer
+ves_icall_System_TimezoneInfo_AndroidTimeZones_GetDefaultTimeZoneId (void)
+{
+	JNIEnv *env = mono_jvm_get_jnienv ();
+	jobject d = (*env)->CallStaticObjectMethod (env, TimeZone_class, TimeZone_getDefault);
+	jstring id = (*env)->CallObjectMethod (env, d, TimeZone_getID);
+	const gchar *mutf8 = (*env)->GetStringUTFChars (env, id, NULL);
+
+	gchar *def_id = g_strdup (mutf8);
+
+	(*env)->ReleaseStringUTFChars (env, id, mutf8);
+	(*env)->DeleteLocalRef (env, id);
+	(*env)->DeleteLocalRef (env, d);
+
+	return def_id;
 }
