@@ -45,9 +45,13 @@ if [ "$2" = "run-nunit" ]; then
         *"Mono.Messaging.RabbitMQ"*)
             export MONO_MESSAGING_PROVIDER=Mono.Messaging.RabbitMQ.RabbitMQMessagingProvider,Mono.Messaging.RabbitMQ
             ;;
+        *"System.Windows.Forms"*)
+            sudo apt install -y xvfb xauth
+            XVFBRUN="xvfb-run -a --"
+            ;;
     esac
     cp -f "tests/${3}.nunitlite.config" nunit-lite-console.exe.config
-    MONO_REGISTRY_PATH="$HOME/.mono/registry" MONO_TESTS_IN_PROGRESS="yes" "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" --debug nunit-lite-console.exe "tests/$3" -exclude=NotWorking,CAS -labels -format:xunit -result:"${helix_root}/testResults.xml"
+    MONO_REGISTRY_PATH="$HOME/.mono/registry" MONO_TESTS_IN_PROGRESS="yes" $XVFBRUN "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" --debug nunit-lite-console.exe "tests/$3" -exclude=NotWorking,CAS -labels -format:xunit -result:"${helix_root}/testResults.xml"
     exit $?
 fi
 
