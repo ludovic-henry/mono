@@ -5,6 +5,37 @@ export TESTCMD=${MONO_REPO_ROOT}/scripts/ci/run-step.sh
 
 export CI_CPU_COUNT=$(getconf _NPROCESSORS_ONLN || echo 4)
 
+if [[ ${CI_TAGS} == *'-i386'*  ]]; then export helix_arch_label=x86; fi
+if [[ ${CI_TAGS} == *'-amd64'* ]]; then export helix_arch_label=x64; fi
+
+if [[ "${CI_TAGS}" == *'pull-request'* ]]; then
+	export helix_target_queues=debian.9.amd64.open
+	export helix_source=pr/jenkins/mono/mono/$MONO_BRANCH/
+	export helix_build_moniker=$(git rev-parse HEAD)
+else
+	export helix_target_queues=debian.9.amd64
+	export helix_source=official/mono/mono/$MONO_BRANCH/v2/
+	version_number=$(grep AC_INIT configure.ac | sed -e 's/AC_INIT(mono, \[//' -e 's/\],//')
+	major_ver=$(echo "$version_number" | cut -d . -f 1)
+	minor_ver=$(echo "$version_number" | cut -d . -f 2)
+	build_ver=$(echo "$version_number" | cut -d . -f 3)
+	blame_rev=$(git blame configure.ac HEAD | grep AC_INIT | sed 's/ .*//')
+	patch_ver=$(git log "$blame_rev"..HEAD --oneline | wc -l | sed 's/ //g')
+	export helix_build_moniker=$(printf %d.%02d%02d%04d "$major_ver" "$minor_ver" "$build_ver" "$patch_ver")
+
+	wget -O- --method="POST" --header='Content-Type: application/json' --header='Accept: application/json' --body-data="{
+	\"QueueId\": \"debian.9.amd64\",
+	\"Source\": \"${helix_source}\",
+	\"Type\": \"build/product\",
+	\"Build\": \"${helix_build_moniker}\",
+	\"Properties\": { \"architecture\": \"${helix_arch_label}\", \"operatingSystem\": \"Debian 9\"}
+	}" "https://helix.dot.net/api/2018-03-14/telemetry/job?access_token=${MONO_HELIX_API_KEY}" > helix-job-token.txt
+	export HELIX_JOB_TOKEN=$(cat helix-job-token.txt | sed 's/"//g')
+
+	wget -O- --method="POST" --header='Accept: application/json' --header="X-Helix-Job-Token: ${HELIX_JOB_TOKEN}" "https://helix.dot.net/api/2018-03-14/telemetry/job/build?buildUri=${BUILD_URL}" > helix-build-id.txt
+	export HELIX_BUILD_ID=$(cat helix-build-id.txt | sed 's/"//g')
+fi
+
 export TEST_HARNESS_VERBOSE=1
 
 make_timeout=300m
@@ -238,10 +269,14 @@ if [[ ${CI_TAGS} == *'linux-ppc64el'* ]]; then make_parallelism=-j1; fi
 make_continue=
 if [[ ${CI_TAGS} == *'checked-all'* ]]; then make_continue=-k; fi
 
-
 if [[ ${CI_TAGS} != *'mac-sdk'* ]]; # Mac SDK builds Mono itself
 	then
-	${TESTCMD} --label=make --timeout=${make_timeout} --fatal make ${make_parallelism} ${make_continue} -w V=1
+	build_error=0
+	${TESTCMD} --label=make --timeout=${make_timeout} --fatal make ${make_parallelism} ${make_continue} -w V=1 || build_error=1
+	if [[ "${CI_TAGS}" != *'pull-request'* ]]; then
+		wget -O- --method="POST" --header='Accept: application/json' --header="X-Helix-Job-Token: ${HELIX_JOB_TOKEN}" "https://helix.dot.net/api/2018-03-14/telemetry/job/build/${HELIX_BUILD_ID}/finish?errorCount=${build_error}&warningCount=0"
+	fi
+	if [[ ${build_error} != 0 ]]; then echo "ERROR: The Mono build failed."; exit ${build_error}; fi
 fi
 
 if [[ ${CI_TAGS} == *'checked-coop'* ]]; then export MONO_CHECK_MODE=gc,thread; fi

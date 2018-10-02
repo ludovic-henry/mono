@@ -16,7 +16,6 @@ tee <<'EOF' helix.proj
 
   <PropertyGroup>
     <HelixApiEndpoint>https://helix.dot.net/api/2018-03-14/jobs</HelixApiEndpoint>
-    <HelixJobType>test/mainline/</HelixJobType>
     <HelixCorrelationInfoFileName>SubmittedHelixRuns.txt</HelixCorrelationInfoFileName>
     <CloudDropConnectionString>DefaultEndpointsProtocol=https;AccountName=helixstoragetest;AccountKey=$(CloudDropAccountKey);EndpointSuffix=core.windows.net</CloudDropConnectionString>
     <CloudResultsConnectionString>$(CloudDropConnectionString)</CloudResultsConnectionString>
@@ -145,37 +144,37 @@ tee <<'EOF' helix.proj
         <WorkItemId>%(MonoXunitTestAssemblies.Identity)</WorkItemId>
         <Command>mono-helix-wrapper.sh $HELIX_CORRELATION_PAYLOAD run-xunit %(MonoXunitTestAssemblies.Identity)</Command>
         <PayloadFile>helix-wrapper.zip</PayloadFile>
-        <TimeoutInSeconds>300</TimeoutInSeconds>
+        <TimeoutInSeconds>600</TimeoutInSeconds>
       </HelixWorkItem>
       <HelixWorkItem Include="%(MonoNUnitTestAssemblies.Identity)">
         <WorkItemId>%(MonoNUnitTestAssemblies.Identity)</WorkItemId>
         <Command>mono-helix-wrapper.sh $HELIX_CORRELATION_PAYLOAD run-nunit %(MonoNUnitTestAssemblies.Identity)</Command>
         <PayloadFile>helix-wrapper.zip</PayloadFile>
-        <TimeoutInSeconds>300</TimeoutInSeconds>
+        <TimeoutInSeconds>600</TimeoutInSeconds>
       </HelixWorkItem>
       <HelixWorkItem Include="mcs">
         <WorkItemId>mcs</WorkItemId>
         <Command>mono-helix-wrapper.sh $HELIX_CORRELATION_PAYLOAD run-mcs</Command>
         <PayloadFile>helix-wrapper.zip</PayloadFile>
-        <TimeoutInSeconds>300</TimeoutInSeconds>
+        <TimeoutInSeconds>1800</TimeoutInSeconds>
       </HelixWorkItem>
       <HelixWorkItem Include="mcs-errors">
         <WorkItemId>mcs-errors</WorkItemId>
         <Command>mono-helix-wrapper.sh $HELIX_CORRELATION_PAYLOAD run-mcs-errors</Command>
         <PayloadFile>helix-wrapper.zip</PayloadFile>
-        <TimeoutInSeconds>300</TimeoutInSeconds>
+        <TimeoutInSeconds>1800</TimeoutInSeconds>
       </HelixWorkItem>
       <HelixWorkItem Include="verify">
         <WorkItemId>verify</WorkItemId>
         <Command>mono-helix-wrapper.sh $HELIX_CORRELATION_PAYLOAD run-verify</Command>
         <PayloadFile>helix-wrapper.zip</PayloadFile>
-        <TimeoutInSeconds>300</TimeoutInSeconds>
+        <TimeoutInSeconds>900</TimeoutInSeconds>
       </HelixWorkItem>
       <HelixWorkItem Include="aot-test">
         <WorkItemId>aot-test</WorkItemId>
         <Command>mono-helix-wrapper.sh $HELIX_CORRELATION_PAYLOAD run-aot-test</Command>
         <PayloadFile>helix-wrapper.zip</PayloadFile>
-        <TimeoutInSeconds>500</TimeoutInSeconds>
+        <TimeoutInSeconds>1800</TimeoutInSeconds>
       </HelixWorkItem>
       <HelixWorkItem Include="mini">
         <WorkItemId>mini</WorkItemId>
@@ -205,7 +204,7 @@ tee <<'EOF' helix.proj
         <WorkItemId>runtime</WorkItemId>
         <Command>mono-helix-wrapper.sh $HELIX_CORRELATION_PAYLOAD run-runtime</Command>
         <PayloadFile>helix-wrapper.zip</PayloadFile>
-        <TimeoutInSeconds>300</TimeoutInSeconds>
+        <TimeoutInSeconds>1800</TimeoutInSeconds>
       </HelixWorkItem>
     </ItemGroup>
   </Target>
@@ -219,14 +218,12 @@ tee <<'EOF' helix.proj
 
 </Project>
 EOF
-    helix_target_queues=debian.9.amd64.open
-    helix_source=automated/mono/mono/$MONO_BRANCH/
-    helix_build_moniker=$(git rev-parse HEAD)
-    helix_config_label=mainline
+    helix_job_type="test/mainline/"
+    helix_config_label=Release
+    helix_os="Debian 9"
     helix_creator=akoeplinger
-    if [[ ${CI_TAGS} == *'-i386'*  ]]; then helix_arch_label=x86; fi
-    if [[ ${CI_TAGS} == *'-amd64'* ]]; then helix_arch_label=x64; fi
-    ${TESTCMD} --label=upload-to-helix --timeout=5m --fatal msbuild helix.proj -t:RunCloudTest -p:HelixApiAccessKey="${MONO_HELIX_API_KEY}" -p:CloudDropAccountKey="${MONO_HELIX_CLOUDDROUP_ACCOUNTKEY}" -p:TargetQueues="${helix_target_queues}" -p:BuildMoniker="${helix_build_moniker}" -p:HelixArchLabel="${helix_arch_label}" -p:HelixConfigLabel="${helix_config_label}" -p:HelixCreator="${helix_creator}" -p:HelixSource="${helix_source}"
+    helix_job_properties="{ \"architecture\": \"$helix_arch_label\", \"configuration\": \"$helix_config_label\", \"operatingSystem\": \"$helix_os\" }"
+    ${TESTCMD} --label=upload-to-helix --timeout=5m --fatal msbuild helix.proj -t:RunCloudTest -p:HelixApiAccessKey="${MONO_HELIX_API_KEY}" -p:CloudDropAccountKey="${MONO_HELIX_CLOUDDROUP_ACCOUNTKEY}" -p:TargetQueues="${helix_target_queues}" -p:BuildMoniker="${helix_build_moniker}" -p:HelixJobType="${helix_job_type}" -p:HelixJobProperties="${helix_job_properties}" -p:HelixCreator="${helix_creator}" -p:HelixSource="${helix_source}"
     HELIX_CORRELATION_ID=$(grep -Eo '[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}' SubmittedHelixRuns.txt) # TODO: improve
     tee <<EOF wait-helix-done.sh
 #!/bin/sh
