@@ -30,7 +30,7 @@ chmod +x "${MONO_EXECUTABLE}"
 
 if [ "$2" = "run-xunit" ]; then
     export MONO_PATH="$r/tests:$MONO_PATH"
-    export REMOTE_EXECUTOR="$r/RemoteExecutorConsoleApp.exe"
+    export REMOTE_EXECUTOR="$r/tests/RemoteExecutorConsoleApp.exe"
     "${MONO_EXECUTABLE}" --config "$r/runtime/etc/mono/config" --debug xunit.console.exe "tests/$3" -noappdomain -noshadow -parallel none -xml "${helix_root}/testResults.xml" -notrait category=failing -notrait category=nonmonotests -notrait Benchmark=true -notrait category=outerloop -notrait category=nonlinuxtests
     exit $?
 fi
