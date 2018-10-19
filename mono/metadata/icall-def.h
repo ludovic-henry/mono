@@ -91,10 +91,13 @@ HANDLES(ICALL(TLS_PROVIDER_FACTORY_1, "IsBtlsSupported", ves_icall_Mono_TlsProvi
 
 ICALL_TYPE(RUNTIME, "Mono.Runtime", RUNTIME_1)
 HANDLES(ICALL(RUNTIME_1, "DisableMicrosoftTelemetry", ves_icall_Mono_Runtime_DisableMicrosoftTelemetry))
+HANDLES(ICALL(RUNTIME_15, "DumpStateSingle_internal", ves_icall_Mono_Runtime_DumpStateSingle))
+HANDLES(ICALL(RUNTIME_16, "DumpStateTotal_internal", ves_icall_Mono_Runtime_DumpStateTotal))
 HANDLES(ICALL(RUNTIME_2, "EnableMicrosoftTelemetry_internal", ves_icall_Mono_Runtime_EnableMicrosoftTelemetry))
 HANDLES(ICALL(RUNTIME_3, "ExceptionToState_internal", ves_icall_Mono_Runtime_ExceptionToState))
 HANDLES(ICALL(RUNTIME_4, "GetDisplayName", ves_icall_Mono_Runtime_GetDisplayName))
 HANDLES(ICALL(RUNTIME_12, "GetNativeStackTrace", ves_icall_Mono_Runtime_GetNativeStackTrace))
+HANDLES(ICALL(RUNTIME_17, "RegisterReportingForNativeLib_internal", ves_icall_Mono_Runtime_RegisterReportingForNativeLib))
 HANDLES(ICALL(RUNTIME_13, "SendMicrosoftTelemetry_internal", ves_icall_Mono_Runtime_SendMicrosoftTelemetry))
 HANDLES(ICALL(RUNTIME_14, "WriteStateToFile_internal", ves_icall_Mono_Runtime_DumpTelemetry))
 
@@ -265,7 +268,7 @@ ICALL(ENV_9, "get_ExitCode", mono_environment_exitcode_get)
 ICALL(ENV_10, "get_HasShutdownStarted", ves_icall_System_Environment_get_HasShutdownStarted)
 HANDLES(ICALL(ENV_11, "get_MachineName", ves_icall_System_Environment_get_MachineName))
 ICALL(ENV_13, "get_Platform", ves_icall_System_Environment_get_Platform)
-ICALL(ENV_14, "get_ProcessorCount", mono_cpu_count)
+ICALL(ENV_14, "get_ProcessorCount", ves_icall_System_Environment_get_ProcessorCount)
 ICALL(ENV_15, "get_TickCount", ves_icall_System_Environment_get_TickCount)
 HANDLES(ICALL(ENV_16, "get_UserName", ves_icall_System_Environment_get_UserName))
 HANDLES(ICALL(ENV_16b, "get_bundled_machine_config", ves_icall_System_Environment_get_bundled_machine_config))
@@ -683,18 +686,18 @@ HANDLES(ICALL(GCH_5, "GetTargetHandle", ves_icall_System_GCHandle_GetTargetHandl
 
 #ifndef DISABLE_COM
 ICALL_TYPE(MARSHAL, "System.Runtime.InteropServices.Marshal", MARSHAL_1)
-ICALL(MARSHAL_1, "AddRefInternal", ves_icall_System_Runtime_InteropServices_Marshal_AddRefInternal)
+NOHANDLES(ICALL(MARSHAL_1, "AddRefInternal", ves_icall_System_Runtime_InteropServices_Marshal_AddRefInternal))
 #else
 ICALL_TYPE(MARSHAL, "System.Runtime.InteropServices.Marshal", MARSHAL_2)
 #endif
 HANDLES(ICALL(MARSHAL_2, "AllocCoTaskMem", ves_icall_System_Runtime_InteropServices_Marshal_AllocCoTaskMem))
 HANDLES(ICALL(MARSHAL_51,"AllocCoTaskMemSize(uintptr)", ves_icall_System_Runtime_InteropServices_Marshal_AllocCoTaskMemSize))
 HANDLES(ICALL(MARSHAL_3, "AllocHGlobal", ves_icall_System_Runtime_InteropServices_Marshal_AllocHGlobal))
-HANDLES(ICALL(MARSHAL_50, "BufferToBSTR", ves_icall_System_Runtime_InteropServices_Marshal_BufferToBSTR))
+NOHANDLES(ICALL(MARSHAL_50, "BufferToBSTR", ves_icall_System_Runtime_InteropServices_Marshal_BufferToBSTR))
 HANDLES(ICALL(MARSHAL_4, "DestroyStructure", ves_icall_System_Runtime_InteropServices_Marshal_DestroyStructure))
-HANDLES(ICALL(MARSHAL_5, "FreeBSTR", ves_icall_System_Runtime_InteropServices_Marshal_FreeBSTR))
-HANDLES(ICALL(MARSHAL_6, "FreeCoTaskMem", ves_icall_System_Runtime_InteropServices_Marshal_FreeCoTaskMem))
-HANDLES(ICALL(MARSHAL_7, "FreeHGlobal", ves_icall_System_Runtime_InteropServices_Marshal_FreeHGlobal))
+NOHANDLES(ICALL(MARSHAL_5, "FreeBSTR", ves_icall_System_Runtime_InteropServices_Marshal_FreeBSTR))
+NOHANDLES(ICALL(MARSHAL_6, "FreeCoTaskMem", ves_icall_System_Runtime_InteropServices_Marshal_FreeCoTaskMem))
+NOHANDLES(ICALL(MARSHAL_7, "FreeHGlobal", ves_icall_System_Runtime_InteropServices_Marshal_FreeHGlobal))
 #ifndef DISABLE_COM
 HANDLES(ICALL(MARSHAL_44, "GetCCW", ves_icall_System_Runtime_InteropServices_Marshal_GetCCW))
 HANDLES(ICALL(MARSHAL_8, "GetComSlotForMethodInfoInternal", ves_icall_System_Runtime_InteropServices_Marshal_GetComSlotForMethodInfoInternal))
@@ -724,13 +727,13 @@ HANDLES(ICALL(MARSHAL_19, "PtrToStringUni(intptr,int)", ves_icall_System_Runtime
 HANDLES(ICALL(MARSHAL_20, "PtrToStructure(intptr,System.Type)", ves_icall_System_Runtime_InteropServices_Marshal_PtrToStructure_type))
 HANDLES(ICALL(MARSHAL_21, "PtrToStructure(intptr,object)", ves_icall_System_Runtime_InteropServices_Marshal_PtrToStructure))
 #ifndef DISABLE_COM
-HANDLES(ICALL(MARSHAL_22, "QueryInterfaceInternal", ves_icall_System_Runtime_InteropServices_Marshal_QueryInterfaceInternal))
+NOHANDLES(ICALL(MARSHAL_22, "QueryInterfaceInternal", ves_icall_System_Runtime_InteropServices_Marshal_QueryInterfaceInternal))
 #endif
 HANDLES(ICALL(MARSHAL_43, "ReAllocCoTaskMem", ves_icall_System_Runtime_InteropServices_Marshal_ReAllocCoTaskMem))
 HANDLES(ICALL(MARSHAL_23, "ReAllocHGlobal", ves_icall_System_Runtime_InteropServices_Marshal_ReAllocHGlobal))
 #ifndef DISABLE_COM
 HANDLES(ICALL(MARSHAL_49, "ReleaseComObjectInternal", ves_icall_System_Runtime_InteropServices_Marshal_ReleaseComObjectInternal))
-HANDLES(ICALL(MARSHAL_29, "ReleaseInternal", ves_icall_System_Runtime_InteropServices_Marshal_ReleaseInternal))
+NOHANDLES(ICALL(MARSHAL_29, "ReleaseInternal", ves_icall_System_Runtime_InteropServices_Marshal_ReleaseInternal))
 #endif
 HANDLES(ICALL(MARSHAL_30, "SizeOf", ves_icall_System_Runtime_InteropServices_Marshal_SizeOf))
 HANDLES(ICALL(MARSHAL_32, "StringToHGlobalAnsi", ves_icall_System_Runtime_InteropServices_Marshal_StringToHGlobalAnsi))

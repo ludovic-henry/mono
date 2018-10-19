@@ -141,7 +141,7 @@ mono_trace_enter_method (MonoMethod *method, MonoProfilerCallContext *ctx)
 	printf ("ENTER: %s(", fname);
 	g_free (fname);
 
-	sig = mono_method_signature (method);
+	sig = mono_method_signature_internal (method);
 
 	if (method->is_inflated) {
 		/* FIXME: Might be better to pass the ji itself */
@@ -156,7 +156,7 @@ mono_trace_enter_method (MonoMethod *method, MonoProfilerCallContext *ctx)
 		}
 	}
 
-	if (mono_method_signature (method)->hasthis) {
+	if (mono_method_signature_internal (method)->hasthis) {
 		void *this_buf = mini_profiler_context_get_this (ctx);
 		if (m_class_is_valuetype (method->klass)) {
 			printf ("value:%p, ", this_buf);
@@ -182,10 +182,10 @@ mono_trace_enter_method (MonoMethod *method, MonoProfilerCallContext *ctx)
 		mini_profiler_context_free_buffer (this_buf);
 	}
 
-	for (i = 0; i < mono_method_signature (method)->param_count; ++i) {
+	for (i = 0; i < mono_method_signature_internal (method)->param_count; ++i) {
 		gpointer buf = mini_profiler_context_get_argument (ctx, i);
 
-		MonoType *type = mono_method_signature (method)->params [i];
+		MonoType *type = mono_method_signature_internal (method)->params [i];
 
 		if (type->byref) {
 			printf ("[BYREF:%p], ", *(gpointer*)buf);
@@ -318,7 +318,7 @@ mono_trace_leave_method (MonoMethod *method, MonoProfilerCallContext *ctx)
 		}
 	}
 
-	type = mini_get_underlying_type (mono_method_signature (method)->ret);
+	type = mini_get_underlying_type (mono_method_signature_internal (method)->ret);
 
 	gpointer buf = mini_profiler_context_get_result (ctx);
 	switch (type->type) {
@@ -390,7 +390,7 @@ mono_trace_leave_method (MonoMethod *method, MonoProfilerCallContext *ctx)
 		break;
 	}
 	default:
-		printf ("(unknown return type %x)", mono_method_signature (method)->ret->type);
+		printf ("(unknown return type %x)", mono_method_signature_internal (method)->ret->type);
 	}
 	mini_profiler_context_free_buffer (buf);
 

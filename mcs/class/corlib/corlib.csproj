@@ -341,14 +341,19 @@
     <Compile Include="..\..\..\external\corefx\src\Common\src\CoreLib\System\IO\EndOfStreamException.cs" />
     <Compile Include="..\..\..\external\corefx\src\Common\src\CoreLib\System\IO\Error.cs" />
     <Compile Include="..\..\..\external\corefx\src\Common\src\CoreLib\System\IO\FileAccess.cs" />
+    <Compile Include="..\..\..\external\corefx\src\Common\src\CoreLib\System\IO\FileLoadException.cs" />
     <Compile Include="..\..\..\external\corefx\src\Common\src\CoreLib\System\IO\FileMode.cs" />
     <Compile Include="..\..\..\external\corefx\src\Common\src\CoreLib\System\IO\FileNotFoundException.cs" />
     <Compile Include="..\..\..\external\corefx\src\Common\src\CoreLib\System\IO\FileOptions.cs" />
     <Compile Include="..\..\..\external\corefx\src\Common\src\CoreLib\System\IO\FileShare.cs" />
+    <Compile Include="..\..\..\external\corefx\src\Common\src\CoreLib\System\IO\IOException.cs" />
     <Compile Include="..\..\..\external\corefx\src\Common\src\CoreLib\System\IO\MemoryStream.cs" />
     <Compile Include="..\..\..\external\corefx\src\Common\src\CoreLib\System\IO\PathTooLongException.cs" />
+    <Compile Include="..\..\..\external\corefx\src\Common\src\CoreLib\System\IO\PinnedBufferMemoryStream.cs" />
     <Compile Include="..\..\..\external\corefx\src\Common\src\CoreLib\System\IO\SeekOrigin.cs" />
     <Compile Include="..\..\..\external\corefx\src\Common\src\CoreLib\System\IO\StreamHelpers.CopyValidation.cs" />
+    <Compile Include="..\..\..\external\corefx\src\Common\src\CoreLib\System\IO\UnmanagedMemoryAccessor.cs" />
+    <Compile Include="..\..\..\external\corefx\src\Common\src\CoreLib\System\IO\UnmanagedMemoryStream.cs" />
     <Compile Include="..\..\..\external\corefx\src\Common\src\CoreLib\System\IO\UnmanagedMemoryStreamWrapper.cs" />
     <Compile Include="..\..\..\external\corefx\src\Common\src\CoreLib\System\IObservable.cs" />
     <Compile Include="..\..\..\external\corefx\src\Common\src\CoreLib\System\IObserver.cs" />
@@ -468,6 +473,7 @@
     <Compile Include="..\..\..\external\corefx\src\Common\src\CoreLib\System\Reflection\TargetInvocationException.cs" />
     <Compile Include="..\..\..\external\corefx\src\Common\src\CoreLib\System\Reflection\TargetParameterCountException.cs" />
     <Compile Include="..\..\..\external\corefx\src\Common\src\CoreLib\System\Reflection\TypeAttributes.cs" />
+    <Compile Include="..\..\..\external\corefx\src\Common\src\CoreLib\System\Reflection\TypeDelegator.cs" />
     <Compile Include="..\..\..\external\corefx\src\Common\src\CoreLib\System\Reflection\TypeFilter.cs" />
     <Compile Include="..\..\..\external\corefx\src\Common\src\CoreLib\System\Reflection\TypeInfo.cs" />
     <Compile Include="..\..\..\external\corefx\src\Common\src\CoreLib\System\ResolveEventArgs.cs" />
@@ -854,6 +860,7 @@
     <Compile Include="..\..\..\external\corert\src\System.Private.CoreLib\shared\System\OutOfMemoryException.cs" />
     <Compile Include="..\..\..\external\corert\src\System.Private.CoreLib\shared\System\Runtime\CompilerServices\TaskAwaiter.cs" />
     <Compile Include="..\..\..\external\corert\src\System.Private.CoreLib\shared\System\Runtime\ConstrainedExecution\CriticalFinalizerObject.cs" />
+    <Compile Include="..\..\..\external\corert\src\System.Private.CoreLib\shared\System\Runtime\InteropServices\SafeBuffer.cs" />
     <Compile Include="..\..\..\external\corert\src\System.Private.CoreLib\shared\System\Threading\ManualResetEventSlim.cs" />
     <Compile Include="..\..\..\external\corert\src\System.Private.CoreLib\shared\System\Threading\NativeOverlapped.cs" />
     <Compile Include="..\..\..\external\corert\src\System.Private.CoreLib\shared\System\Threading\SpinWait.cs" />
@@ -866,6 +873,7 @@
     <Compile Include="..\..\..\external\corert\src\System.Private.CoreLib\src\System\ByReference.cs" />
     <Compile Include="..\..\..\external\corert\src\System.Private.CoreLib\src\System\Collections\Generic\ArraySortHelper.CoreRT.cs" />
     <Compile Include="..\..\..\external\corert\src\System.Private.CoreLib\src\System\Globalization\GlobalizationMode.cs" />
+    <Compile Include="..\..\..\external\corert\src\System.Private.CoreLib\src\System\IO\FileLoadException.CoreRT.cs" />
     <Compile Include="..\..\..\external\corert\src\System.Private.CoreLib\src\System\MissingMemberException.CoreRT.cs" />
     <Compile Include="..\..\..\external\corert\src\System.Private.CoreLib\src\System\Number.CoreRT.cs" />
     <Compile Include="..\..\..\external\corert\src\System.Private.CoreLib\src\System\Reflection\CustomAttributeNamedArgument.cs" />
@@ -1001,11 +1009,8 @@
     <Compile Include="..\referencesource\mscorlib\system\io\bufferedstream.cs" />
     <Compile Include="..\referencesource\mscorlib\system\io\directory.cs" />
     <Compile Include="..\referencesource\mscorlib\system\io\fileinfo.cs" />
-    <Compile Include="..\referencesource\mscorlib\system\io\fileloadexception.cs" />
     <Compile Include="..\referencesource\mscorlib\system\io\filesystemenumerable.cs" />
     <Compile Include="..\referencesource\mscorlib\system\io\filesysteminfo.cs" />
-    <Compile Include="..\referencesource\mscorlib\system\io\ioexception.cs" />
-    <Compile Include="..\referencesource\mscorlib\system\io\pinnedbuffermemorystream.cs" />
     <Compile Include="..\referencesource\mscorlib\system\io\stream.cs" />
     <Compile Include="..\referencesource\mscorlib\system\io\streamreader.cs" />
     <Compile Include="..\referencesource\mscorlib\system\io\streamwriter.cs" />
@@ -1013,8 +1018,6 @@
     <Compile Include="..\referencesource\mscorlib\system\io\stringwriter.cs" />
     <Compile Include="..\referencesource\mscorlib\system\io\textreader.cs" />
     <Compile Include="..\referencesource\mscorlib\system\io\textwriter.cs" />
-    <Compile Include="..\referencesource\mscorlib\system\io\unmanagedmemoryaccessor.cs" />
-    <Compile Include="..\referencesource\mscorlib\system\io\unmanagedmemorystream.cs" />
     <Compile Include="..\referencesource\mscorlib\system\iserviceobjectprovider.cs" />
     <Compile Include="..\referencesource\mscorlib\system\random.cs" />
     <Compile Include="..\referencesource\mscorlib\system\reflection\CustomAttributeExtensions.cs" />
@@ -1024,7 +1027,6 @@
     <Compile Include="..\referencesource\mscorlib\system\reflection\memberinfoserializationholder.cs" />
     <Compile Include="..\referencesource\mscorlib\system\reflection\methodbase.cs" />
     <Compile Include="..\referencesource\mscorlib\system\reflection\methodinfo.cs" />
-    <Compile Include="..\referencesource\mscorlib\system\reflection\typedelegator.cs" />
     <Compile Include="..\referencesource\mscorlib\system\resid.cs" />
     <Compile Include="..\referencesource\mscorlib\system\resources\__fastresourcecomparer.cs" />
     <Compile Include="..\referencesource\mscorlib\system\resources\__hresults.cs" />
@@ -1469,7 +1471,6 @@
     <Compile Include="System.Runtime.InteropServices\RegistrationServices.cs" />
     <Compile Include="System.Runtime.InteropServices\STATSTG.cs" />
     <Compile Include="System.Runtime.InteropServices\SYSKIND.cs" />
-    <Compile Include="System.Runtime.InteropServices\SafeBuffer.cs" />
     <Compile Include="System.Runtime.InteropServices\SafeHandle.cs" />
     <Compile Include="System.Runtime.InteropServices\TYPELIBATTR.cs" />
     <Compile Include="System.Runtime.InteropServices\TypeLibConverter.cs" />
@@ -2041,6 +2042,8 @@
         <Compile Include="Microsoft.Win32\UnixRegistryApi.cs" />
         <Compile Include="Microsoft.Win32\Win32RegistryApi.cs" />
         <Compile Include="Microsoft.Win32\Win32ResultCode.cs" />
+        <Compile Include="Mono\MonoNativePlatform.cs" />
+        <Compile Include="Mono\MonoNativePlatformType.cs" />
         <Compile Include="System.Security.AccessControl\RegistryAccessRule.cs" />
         <Compile Include="System.Security.AccessControl\RegistryAuditRule.cs" />
         <Compile Include="System.Security.AccessControl\RegistrySecurity.cs" />
@@ -2315,6 +2318,8 @@
             <Compile Include="Microsoft.Win32\UnixRegistryApi.cs" />
             <Compile Include="Microsoft.Win32\Win32RegistryApi.cs" />
             <Compile Include="Microsoft.Win32\Win32ResultCode.cs" />
+            <Compile Include="Mono\MonoNativePlatform.cs" />
+            <Compile Include="Mono\MonoNativePlatformType.cs" />
             <Compile Include="System.Security.AccessControl\RegistryAccessRule.cs" />
             <Compile Include="System.Security.AccessControl\RegistryAuditRule.cs" />
             <Compile Include="System.Security.AccessControl\RegistrySecurity.cs" />
@@ -2351,6 +2356,8 @@
             <Compile Include="Microsoft.Win32\UnixRegistryApi.cs" />
             <Compile Include="Microsoft.Win32\Win32RegistryApi.cs" />
             <Compile Include="Microsoft.Win32\Win32ResultCode.cs" />
+            <Compile Include="Mono\MonoNativePlatform.cs" />
+            <Compile Include="Mono\MonoNativePlatformType.cs" />
             <Compile Include="System.Security.AccessControl\RegistryAccessRule.cs" />
             <Compile Include="System.Security.AccessControl\RegistryAuditRule.cs" />
             <Compile Include="System.Security.AccessControl\RegistrySecurity.cs" />
@@ -2387,6 +2394,8 @@
             <Compile Include="Microsoft.Win32\UnixRegistryApi.cs" />
             <Compile Include="Microsoft.Win32\Win32RegistryApi.cs" />
             <Compile Include="Microsoft.Win32\Win32ResultCode.cs" />
+            <Compile Include="Mono\MonoNativePlatform.cs" />
+            <Compile Include="Mono\MonoNativePlatformType.cs" />
             <Compile Include="System.Security.AccessControl\RegistryAccessRule.cs" />
             <Compile Include="System.Security.AccessControl\RegistryAuditRule.cs" />
             <Compile Include="System.Security.AccessControl\RegistrySecurity.cs" />
@@ -2420,6 +2429,8 @@
         <Compile Include="Microsoft.Win32\UnixRegistryApi.cs" />
         <Compile Include="Microsoft.Win32\Win32RegistryApi.cs" />
         <Compile Include="Microsoft.Win32\Win32ResultCode.cs" />
+        <Compile Include="Mono\MonoNativePlatform.cs" />
+        <Compile Include="Mono\MonoNativePlatformType.cs" />
         <Compile Include="System.Security.AccessControl\RegistryAccessRule.cs" />
         <Compile Include="System.Security.AccessControl\RegistryAuditRule.cs" />
         <Compile Include="System.Security.AccessControl\RegistrySecurity.cs" />
@@ -2452,6 +2463,8 @@
         <Compile Include="Microsoft.Win32\UnixRegistryApi.cs" />
         <Compile Include="Microsoft.Win32\Win32RegistryApi.cs" />
         <Compile Include="Microsoft.Win32\Win32ResultCode.cs" />
+        <Compile Include="Mono\MonoNativePlatform.cs" />
+        <Compile Include="Mono\MonoNativePlatformType.cs" />
         <Compile Include="System.Security.AccessControl\RegistryAccessRule.cs" />
         <Compile Include="System.Security.AccessControl\RegistryAuditRule.cs" />
         <Compile Include="System.Security.AccessControl\RegistrySecurity.cs" />
@@ -2484,6 +2497,8 @@
         <Compile Include="Microsoft.Win32\UnixRegistryApi.cs" />
         <Compile Include="Microsoft.Win32\Win32RegistryApi.cs" />
         <Compile Include="Microsoft.Win32\Win32ResultCode.cs" />
+        <Compile Include="Mono\MonoNativePlatform.cs" />
+        <Compile Include="Mono\MonoNativePlatformType.cs" />
         <Compile Include="System.Security.AccessControl\RegistryAccessRule.cs" />
         <Compile Include="System.Security.AccessControl\RegistryAuditRule.cs" />
         <Compile Include="System.Security.AccessControl\RegistrySecurity.cs" />

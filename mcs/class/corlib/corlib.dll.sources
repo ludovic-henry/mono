@@ -376,7 +376,7 @@ System.Runtime.InteropServices/RegistrationClassContext.cs
 ../../../external/corefx/src/System.Runtime.InteropServices/src/System/Runtime/InteropServices/RegistrationConnectionType.cs
 System.Runtime.InteropServices/STATSTG.cs
 System.Runtime.InteropServices/RegistrationServices.cs
-System.Runtime.InteropServices/SafeBuffer.cs
+../../../external/corert/src/System.Private.CoreLib/shared/System/Runtime/InteropServices/SafeBuffer.cs
 System.Runtime.InteropServices/SafeHandle.cs
 System.Runtime.InteropServices/SYSKIND.cs
 System.Runtime.InteropServices/TYPELIBATTR.cs
@@ -1117,15 +1117,16 @@ ReferenceSources/AppContextDefaultValues.cs
 ../../../external/corefx/src/Common/src/CoreLib/System/IO/DirectoryNotFoundException.cs
 ../../../external/corefx/src/System.IO.FileSystem.DriveInfo/src/System/IO/DriveNotFoundException.cs
 ../../../external/corefx/src/Common/src/CoreLib/System/IO/EndOfStreamException.cs
-../referencesource/mscorlib/system/io/ioexception.cs
+../../../external/corefx/src/Common/src/CoreLib/System/IO/IOException.cs
 ../referencesource/mscorlib/system/io/fileinfo.cs
-../referencesource/mscorlib/system/io/fileloadexception.cs
+../../../external/corefx/src/Common/src/CoreLib/System/IO/FileLoadException.cs
+../../../external/corert/src/System.Private.CoreLib/src/System/IO/FileLoadException.CoreRT.cs
 ../../../external/corefx/src/Common/src/CoreLib/System/IO/FileNotFoundException.cs
 ../referencesource/mscorlib/system/io/filesysteminfo.cs
 ../referencesource/mscorlib/system/io/filesystemenumerable.cs
 ../../../external/corefx/src/Common/src/CoreLib/System/IO/MemoryStream.cs
 ../../../external/corefx/src/Common/src/CoreLib/System/IO/PathTooLongException.cs
-../referencesource/mscorlib/system/io/pinnedbuffermemorystream.cs
+../../../external/corefx/src/Common/src/CoreLib/System/IO/PinnedBufferMemoryStream.cs
 ../referencesource/mscorlib/system/io/stream.cs
 ../referencesource/mscorlib/system/io/streamreader.cs
 ../referencesource/mscorlib/system/io/streamwriter.cs
@@ -1133,8 +1134,8 @@ ReferenceSources/AppContextDefaultValues.cs
 ../referencesource/mscorlib/system/io/stringwriter.cs
 ../referencesource/mscorlib/system/io/textreader.cs
 ../referencesource/mscorlib/system/io/textwriter.cs
-../referencesource/mscorlib/system/io/unmanagedmemoryaccessor.cs
-../referencesource/mscorlib/system/io/unmanagedmemorystream.cs
+../../../external/corefx/src/Common/src/CoreLib/System/IO/UnmanagedMemoryStream.cs
+../../../external/corefx/src/Common/src/CoreLib/System/IO/UnmanagedMemoryAccessor.cs
 ../../../external/corefx/src/Common/src/CoreLib/System/IO/UnmanagedMemoryStreamWrapper.cs
 
 ../../../external/corefx/src/Common/src/CoreLib/System/Reflection/AmbiguousMatchException.cs
@@ -1202,6 +1203,7 @@ ReferenceSources/AppContextDefaultValues.cs
 ../../../external/corefx/src/Common/src/CoreLib/System/Reflection/TargetParameterCountException.cs
 ../../../external/corefx/src/Common/src/CoreLib/System/Reflection/TypeAttributes.cs
 ../../../external/corefx/src/Common/src/CoreLib/System/Reflection/TypeFilter.cs
+../../../external/corefx/src/Common/src/CoreLib/System/Reflection/TypeDelegator.cs
 ../../../external/corefx/src/Common/src/CoreLib/System/Reflection/TypeInfo.cs
 
 ../../../external/corefx/src/System.Reflection.TypeExtensions/src/System/Reflection/TypeExtensions.cs
@@ -1212,7 +1214,6 @@ ReferenceSources/AppContextDefaultValues.cs
 ../referencesource/mscorlib/system/reflection/memberinfoserializationholder.cs
 ../referencesource/mscorlib/system/reflection/methodbase.cs
 ../referencesource/mscorlib/system/reflection/methodinfo.cs
-../referencesource/mscorlib/system/reflection/typedelegator.cs
 
 ../referencesource/mscorlib/system/reflection/emit/methodbuilder.cs
 ../referencesource/mscorlib/system/reflection/emit/symboltype.cs
